@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
+import { getCachedSermons, findSermonBySlug } from "@/lib/site/get-site-sermons";
+
+export const revalidate = 300;
 
 export default async function SermonDetailPage({
   params,
@@ -11,9 +13,8 @@ export default async function SermonDetailPage({
   const data = await getPublishedSiteBySlug(siteSlug);
   if (!data || !data.site.features.sermons) notFound();
 
-  const sermon = await prisma.sermon.findUnique({
-    where: { siteId_slug: { siteId: data.site.site.id, slug } },
-  });
+  const allSermons = await getCachedSermons(data.site.site.id, siteSlug);
+  const sermon = findSermonBySlug(allSermons, slug);
   if (!sermon) notFound();
 
   return (
@@ -26,7 +27,7 @@ export default async function SermonDetailPage({
       <h1 className="mt-2 text-3xl font-bold text-site-foreground">{sermon.title}</h1>
       <p className="mt-2 text-sm text-site-muted">
         {sermon.speaker ?? "Guest Speaker"} &middot;{" "}
-        {sermon.date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+        {new Date(sermon.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
       </p>
 
       {sermon.videoUrl && (

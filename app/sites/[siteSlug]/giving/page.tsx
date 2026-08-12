@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { GivingCentered } from "@/components/website/sections/giving";
 
+export const revalidate = 300;
+
 export default async function GivingPage({
   params,
 }: {

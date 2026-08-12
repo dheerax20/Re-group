@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { invalidateSiteCache } from "@/lib/cache/redis";
 import { toDatabaseError } from "@/lib/db/errors";
 import { slugify } from "@/lib/validation/slug";
 import { generateNavigation } from "@/lib/site/navigation";
@@ -48,8 +49,13 @@ async function revalidateSite(siteId: string) {
   const site = await prisma.site.findUnique({ where: { id: siteId }, select: { slug: true } });
   if (site?.slug) {
     revalidatePath(`/sites/${site.slug}`);
+    revalidatePath(`/sites/${site.slug}/about`);
+    revalidatePath(`/sites/${site.slug}/contact`);
+    revalidatePath(`/sites/${site.slug}/giving`);
+    revalidatePath(`/sites/${site.slug}/ministries`);
     revalidatePath(`/sites/${site.slug}/events`);
     revalidatePath(`/sites/${site.slug}/sermons`);
+    await invalidateSiteCache(site.slug);
   }
   revalidatePath(`/builder/${siteId}`);
   revalidatePath(`/builder/${siteId}/events`);

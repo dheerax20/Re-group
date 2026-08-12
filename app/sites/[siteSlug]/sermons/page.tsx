@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
+import { getCachedSermons, filterSermons } from "@/lib/site/get-site-sermons";
 import { Input } from "@/components/ui/input";
 
 export default async function SermonsPage({
@@ -19,21 +19,8 @@ export default async function SermonsPage({
 
   const { site } = data;
 
-  const sermons = await prisma.sermon.findMany({
-    where: {
-      siteId: site.site.id,
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { speaker: { contains: q, mode: "insensitive" } },
-              { series: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { date: "desc" },
-  });
+  const allSermons = await getCachedSermons(site.site.id, siteSlug);
+  const sermons = filterSermons(allSermons, q);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
@@ -63,7 +50,7 @@ export default async function SermonsPage({
               </Link>
               <p className="mt-1 text-sm text-site-muted">
                 {sermon.speaker ?? "Guest Speaker"} &middot;{" "}
-                {sermon.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                {new Date(sermon.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 {sermon.series ? ` · ${sermon.series}` : ""}
               </p>
             </li>

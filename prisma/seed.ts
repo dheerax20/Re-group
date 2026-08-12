@@ -78,8 +78,8 @@ async function seedDemoChurch() {
       primaryFont: "dm-sans",
       secondaryFont: "playfair-display",
     },
-    logo: { url: "/uploads/seed/grace-logo.svg", alt: churchName },
-    favicon: { url: "/uploads/seed/grace-favicon.svg" },
+    logo: { url: "/seed/grace-logo.svg", alt: churchName },
+    favicon: { url: "/seed/grace-favicon.svg" },
     tagline: "A place to belong",
   };
 

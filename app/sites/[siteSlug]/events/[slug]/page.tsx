@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
+import { getCachedEvents, findEventBySlug } from "@/lib/site/get-site-events";
 import { buttonVariants } from "@/components/ui/button";
+
+export const revalidate = 300;
 
 export default async function EventDetailPage({
   params,
@@ -13,15 +15,14 @@ export default async function EventDetailPage({
   const data = await getPublishedSiteBySlug(siteSlug);
   if (!data || !data.site.features.events) notFound();
 
-  const event = await prisma.event.findUnique({
-    where: { siteId_slug: { siteId: data.site.site.id, slug } },
-  });
+  const allEvents = await getCachedEvents(data.site.site.id, siteSlug);
+  const event = findEventBySlug(allEvents, slug);
   if (!event) notFound();
 
   return (
     <article className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
       <p className="text-sm font-semibold uppercase tracking-wide text-site-accent">
-        {event.startAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+        {new Date(event.startAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
       </p>
       <h1 className="mt-2 text-3xl font-bold text-site-foreground">{event.title}</h1>
       {event.location && <p className="mt-2 text-site-muted">{event.location}</p>}

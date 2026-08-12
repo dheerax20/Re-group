@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
+import { getCachedEvents } from "@/lib/site/get-site-events";
 
 export default async function EventsPage({
   params,
@@ -12,10 +12,7 @@ export default async function EventsPage({
   const data = await getPublishedSiteBySlug(siteSlug);
   if (!data || !data.site.features.events) notFound();
 
-  const events = await prisma.event.findMany({
-    where: { siteId: data.site.site.id },
-    orderBy: { startAt: "asc" },
-  });
+  const events = await getCachedEvents(data.site.site.id, siteSlug);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
@@ -30,7 +27,7 @@ export default async function EventsPage({
                 <h2 className="text-lg font-semibold">{event.title}</h2>
               </Link>
               <p className="mt-1 text-sm text-site-muted">
-                {event.startAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                {new Date(event.startAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 {event.location ? ` · ${event.location}` : ""}
               </p>
             </li>

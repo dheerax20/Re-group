@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { ContactStandard } from "@/components/website/sections/contact";
 
+export const revalidate = 300;
+
 export default async function ContactPage({
   params,
 }: {

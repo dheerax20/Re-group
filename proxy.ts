@@ -18,7 +18,6 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/sites") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/uploads") ||
     pathname === "/favicon.ico"
   ) {
     return NextResponse.next();

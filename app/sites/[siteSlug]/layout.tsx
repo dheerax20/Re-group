@@ -4,6 +4,8 @@ import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { resolveSectionComponent } from "@/components/website/renderer/section-registry";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 
+export const revalidate = 300;
+
 export async function generateMetadata({
   params,
 }: {

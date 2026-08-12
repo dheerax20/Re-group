@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { WebsiteRenderer } from "@/components/website/renderer/website-renderer";
 
+export const revalidate = 300;
+
 export default async function SiteHomePage({
   params,
 }: {

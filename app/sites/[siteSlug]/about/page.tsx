@@ -4,6 +4,8 @@ import { resolveSectionComponent } from "@/components/website/renderer/section-r
 import { AboutImageRight } from "@/components/website/sections/about";
 import { MinistryGrid } from "@/components/website/sections/ministries";
 
+export const revalidate = 300;
+
 export default async function AboutPage({
   params,
 }: {

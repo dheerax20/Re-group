@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, withDbRetry } from "@/lib/db";
+import { invalidateSiteCache } from "@/lib/cache/redis";
 import { churchInfoSchema } from "@/lib/validation/church";
 import { brandConfigSchema, defaultBrandConfig } from "@/lib/validation/brand";
 import { socialLinksSchema, toSocialLinkRecords } from "@/lib/validation/social";
@@ -20,6 +21,21 @@ import { toDatabaseError, isDatabaseUnavailableError } from "@/lib/db/errors";
 import type { Prisma } from "@prisma/client";
 
 const siteGenerator = new DeterministicSiteGenerator();
+
+const PUBLIC_SUB_PATHS = ["", "/about", "/contact", "/giving", "/ministries", "/sermons", "/events"];
+
+/** Revalidates every public sub-page + the Redis data cache for a site.
+ * Resolves the slug from `siteId` if not already known by the caller. */
+async function invalidate(siteId: string, slug?: string) {
+  const resolvedSlug =
+    slug ?? (await prisma.site.findUnique({ where: { id: siteId }, select: { slug: true } }))?.slug;
+  if (!resolvedSlug) return;
+
+  for (const path of PUBLIC_SUB_PATHS) {
+    revalidatePath(`/sites/${resolvedSlug}${path}`);
+  }
+  await invalidateSiteCache(resolvedSlug);
+}
 
 /** Prisma's Json columns want InputJsonValue; our domain types are plain
  * serializable objects/arrays, so this cast is safe at every call site. */
@@ -97,6 +113,7 @@ export async function updateChurchInfo(siteId: string, input: unknown) {
       tagline: data.tagline || null,
     },
   });
+  await invalidate(siteId);
   return { success: true };
 }
 
@@ -111,6 +128,7 @@ export async function updateSocialLinks(siteId: string, input: unknown) {
     ),
   ]);
 
+  await invalidate(siteId);
   return { success: true };
 }
 
@@ -120,6 +138,7 @@ export async function updateBrand(siteId: string, input: unknown) {
     where: { id: siteId },
     data: { brandConfig: toJson(data) },
   });
+  await invalidate(siteId);
   return { success: true };
 }
 
@@ -148,6 +167,7 @@ export async function updateFeatures(siteId: string, input: unknown) {
       navigationConfig: toJson(generateNavigation(data)),
     },
   });
+  await invalidate(siteId);
   return { success: true };
 }
 
@@ -192,6 +212,7 @@ export async function selectTemplate(siteId: string, templateId: string) {
     },
   });
 
+  await invalidate(siteId);
   return { success: true };
 }
 
@@ -201,6 +222,7 @@ export async function updateSections(siteId: string, input: unknown) {
     where: { id: siteId },
     data: { sectionConfig: toJson(data) },
   });
+  await invalidate(siteId);
   return { success: true };
 }
 
@@ -245,7 +267,7 @@ export async function publishSite(siteId: string, slug: string) {
     data: { status: "PUBLISHED", publishedAt: new Date() },
   });
 
-  revalidatePath(`/sites/${parsedSlug}`);
+  await invalidate(siteId, parsedSlug);
 
   return { success: true, slug: parsedSlug };
 }
@@ -255,6 +277,6 @@ export async function unpublishSite(siteId: string) {
     where: { id: siteId },
     data: { status: "DRAFT" },
   });
-  revalidatePath(`/sites/${site.slug}`);
+  await invalidate(siteId, site.slug);
   return { success: true };
 }
