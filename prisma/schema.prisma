@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SiteStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum MediaType {
+  LOGO
+  FAVICON
+  IMAGE
+  VIDEO
+  OTHER
+}
+
+model Site {
+  id               String @id @default(cuid())
+  name             String
+  slug             String @unique
+  denomination     String?
+  congregationSize Int?
+
+  primaryContactName  String?
+  primaryContactEmail String?
+  primaryContactPhone String?
+
+  tagline String?
+
+  status SiteStatus @default(DRAFT)
+
+  brandConfig      Json
+  featureConfig    Json
+  navigationConfig Json
+  sectionConfig    Json
+  seoConfig        Json
+
+  templateId      String
+  templateVersion Int    @default(1)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  socialLinks SocialLink[]
+  media       Media[]
+  sermons     Sermon[]
+  events      Event[]
+
+  @@index([status])
+}
+
+model SocialLink {
+  id        String   @id @default(cuid())
+  siteId    String
+  platform  String
+  url       String
+  createdAt DateTime @default(now())
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+}
+
+model Media {
+  id        String    @id @default(cuid())
+  siteId    String
+  type      MediaType
+  url       String
+  altText   String?
+  filename  String?
+  createdAt DateTime  @default(now())
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+}
+
+model Sermon {
+  id           String   @id @default(cuid())
+  siteId       String
+  title        String
+  slug         String
+  description  String?
+  speaker      String?
+  series       String?
+  date         DateTime
+  videoUrl     String?
+  audioUrl     String?
+  thumbnailUrl String?
+  transcript   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+  @@index([siteId, date])
+}
+
+model Event {
+  id              String    @id @default(cuid())
+  siteId          String
+  title           String
+  slug            String
+  description     String?
+  startAt         DateTime
+  endAt           DateTime?
+  location        String?
+  imageUrl        String?
+  registrationUrl String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+  @@index([siteId, startAt])
+}
+
+model Template {
+  id          String   @id
+  name        String
+  description String?
+  category    String?
+  version     Int      @default(1)
+  metadata    Json
+  createdAt   DateTime @default(now())
+}
