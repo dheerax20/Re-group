@@ -22,9 +22,9 @@ enum MediaType {
 }
 
 model Site {
-  id               String @id @default(cuid())
+  id               String  @id @default(cuid())
   name             String
-  slug             String @unique
+  slug             String  @unique
   denomination     String?
   congregationSize Int?
 
@@ -133,4 +133,166 @@ model Template {
   version     Int      @default(1)
   metadata    Json
   createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// TEMPORARY USER MODULE
+// Delete this entire block when the real auth/users module lands.
+// Nothing in the billing module reads these tables directly —
+// it only depends on a `userId: String`. See lib/auth-temp/README.md.
+// ============================================================
+
+model TempUser {
+  id    String  @id @default(cuid())
+  email String  @unique
+  name  String?
+
+  onboardingCompletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions        TempSession[]
+  billingCustomer BillingCustomer?
+  entitlements    Entitlement[]
+
+  @@map("tmp_users")
+}
+
+model TempSession {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user TempUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("tmp_sessions")
+}
+
+// ============================================================
+// BILLING MODULE — permanent
+// ============================================================
+
+model BillingCustomer {
+  id               String @id @default(cuid())
+  userId           String @unique
+  stripeCustomerId String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          TempUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+
+  @@map("billing_customers")
+}
+
+enum SubscriptionStatus {
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+}
+
+model Subscription {
+  id                   String @id @default(cuid())
+  billingCustomerId    String
+  stripeSubscriptionId String @unique
+
+  status            SubscriptionStatus
+  cancelAtPeriodEnd Boolean            @default(false)
+
+  // NOTE: Stripe has no subscription-level period since Basil.
+  // These are DERIVED from the base plan item and stored for convenient
+  // querying only. items[].currentPeriodEnd is the authoritative value.
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  // Watermark of the newest Stripe EVENT applied, from the event's `created`
+  // timestamp — i.e. Stripe's clock. Only webhook-driven syncs advance it.
+  lastEventAt DateTime?
+
+  // When the state currently stored here was read from Stripe — i.e. the LOCAL
+  // clock. Reconcile syncs have no event timestamp, so they compare against
+  // this instead. Keeping the two watermarks separate means each comparison is
+  // same-clock; mixing them left a residual race and made clock skew matter.
+  stateReadAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  billingCustomer BillingCustomer    @relation(fields: [billingCustomerId], references: [id], onDelete: Cascade)
+  items           SubscriptionItem[]
+
+  @@index([billingCustomerId])
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id                       String @id @default(cuid())
+  subscriptionId           String
+  stripeSubscriptionItemId String @unique
+  stripePriceId            String
+  // The Stripe lookup_key AS OF THE LAST SYNC. Informational only — a
+  // lookup key is mutable (transfer_lookup_key moves it to a new price),
+  // so it must never be used to decide what a subscription grants.
+  lookupKey                String
+  // Stable plan identity: "base" | an AddonKey. Resolved from immutable
+  // price metadata written at catalog bootstrap. THIS is what feature
+  // gating and add-on matching read.
+  planKey                  String?
+  quantity                 Int    @default(1)
+
+  // Authoritative billing period — lives on the ITEM in Stripe, not the sub.
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@map("subscription_items")
+}
+
+// Denormalized read model. This is what the app gates features on —
+// never query Stripe or Subscription/SubscriptionItem from UI code.
+// @@unique([userId, featureKey]) requires every product to grant a
+// DISTINCT feature key, or the second upsert collides.
+model Entitlement {
+  id         String    @id @default(cuid())
+  userId     String
+  featureKey String
+  source     String // "base" | "addon_analytics" | "addon_support"
+  grantedAt  DateTime  @default(now())
+  expiresAt  DateTime?
+
+  user TempUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, featureKey])
+  @@index([userId])
+  @@map("entitlements")
+}
+
+// Webhook idempotency. Stripe retries; handlers must be safe to re-run.
+model ProcessedStripeEvent {
+  id          String   @id // the Stripe event id, evt_...
+  type        String
+  // When the row was INSERTed, i.e. when a handler claimed the event.
+  processedAt DateTime @default(now())
+  // Set only once the handler has finished successfully. A row with a null
+  // completedAt is a claim whose handler never reported back — a crash
+  // between claim and completion. Such claims are reprocessable so the
+  // event is not silently lost.
+  completedAt DateTime?
+
+  @@index([processedAt])
+  @@map("processed_stripe_events")
 }
