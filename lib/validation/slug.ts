@@ -10,6 +10,12 @@ export const reservedSlugs = new Set([
   "login",
   "settings",
   "sites",
+  // Billing + Auth0 routes. A church claiming one of these slugs would
+  // shadow the route on its own subdomain.
+  "auth",
+  "post-auth",
+  "upgrade",
+  "welcome",
 ]);
 
 export const slugSchema = z

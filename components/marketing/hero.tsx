@@ -16,9 +16,9 @@ export function MarketingNav() {
           <a href="#builder" className="transition-colors hover:text-foreground">
             Builder
           </a>
-          <a href="#platform" className="transition-colors hover:text-foreground">
-            Platform
-          </a>
+          <Link href="/upgrade" className="transition-colors hover:text-foreground">
+            Upgrade
+          </Link>
           <Link href="/login" className="transition-colors hover:text-foreground">
             Sign in
           </Link>

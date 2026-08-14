@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSite } from "@/lib/site/actions";
-import { requireSession } from "@/lib/auth/session";
+import { syncCurrentUser } from "@/lib/auth/session";
+import { requireActivePlan } from "@/lib/billing/guard";
 import { BuilderSidebar } from "@/components/builder/builder-sidebar";
 import {
   SidebarInset,
@@ -16,7 +17,10 @@ export default async function BuilderLayout({
   children: React.ReactNode;
   params: Promise<{ siteId: string }>;
 }) {
-  await requireSession();
+  // Also in `(platform)`, so the `(paid)` group does not cover it.
+  const user = await syncCurrentUser();
+  await requireActivePlan(user.id);
+
   const { siteId } = await params;
   const site = await getSite(siteId);
   if (!site) notFound();

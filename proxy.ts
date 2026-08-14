@@ -41,8 +41,20 @@ function copyCookies(from: NextResponse, to: NextResponse) {
  * Always start from auth0.middleware() so /auth/* and session cookies stay intact.
  */
 export async function proxy(request: NextRequest) {
-  const authResponse = await auth0.middleware(request);
   const { pathname } = request.nextUrl;
+
+  /**
+   * The Stripe webhook is unauthenticated by design — it is verified by
+   * signature over the RAW request body, has no session to refresh, and no
+   * cookies to set. Returning before auth0.middleware() keeps anything
+   * session-related well away from a route where the body must arrive
+   * byte-for-byte intact.
+   */
+  if (pathname === "/api/stripe/webhook") {
+    return NextResponse.next();
+  }
+
+  const authResponse = await auth0.middleware(request);
 
   if (pathname.startsWith("/auth")) {
     return authResponse;

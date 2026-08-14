@@ -1,12 +1,16 @@
 import { StepProgress } from "@/components/onboarding/step-progress";
-import { requireSession } from "@/lib/auth/session";
+import { syncCurrentUser } from "@/lib/auth/session";
+import { requireActivePlan } from "@/lib/billing/guard";
 
 export default async function WizardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireSession();
+  // The wizard lives in `(platform)`, outside the `(paid)` group, so it needs
+  // its own paywall — deep-linking a step must not skip the gate.
+  const user = await syncCurrentUser();
+  await requireActivePlan(user.id);
   return (
     <div className="min-h-screen bg-background regroup-noise">
       <StepProgress />

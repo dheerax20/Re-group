@@ -12,7 +12,10 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "stripe:bootstrap": "tsx scripts/bootstrap-stripe-catalog.ts",
+    "billing:backfill": "tsx scripts/backfill-plan-keys.ts",
+    "billing:prune": "tsx scripts/prune-stripe-events.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -48,6 +51,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.85.0",
+    "stripe": "^22.5.0",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

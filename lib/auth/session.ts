@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth0 } from "@/lib/auth0";
 import { prisma } from "@/lib/db";
@@ -19,8 +20,10 @@ export async function requireSession() {
   return session;
 }
 
-export async function syncCurrentUser(): Promise<AppUser> {
-  const session = await requireSession();
+type Auth0Session = NonNullable<Awaited<ReturnType<typeof auth0.getSession>>>;
+
+/** Mirrors the Auth0 profile into our own users table. */
+async function upsertFromSession(session: Auth0Session): Promise<AppUser> {
   const auth0Id = session.user.sub;
   const picture =
     typeof session.user.picture === "string" ? session.user.picture : null;
@@ -43,6 +46,34 @@ export async function syncCurrentUser(): Promise<AppUser> {
     },
   });
 
+  return user;
+}
+
+/**
+ * The current user, or null. Use this in Route Handlers: `syncCurrentUser()`
+ * redirects when there is no session, and a redirect is useless to `fetch()` —
+ * an API caller needs a 401 it can act on.
+ *
+ * `cache()` deduplicates it for the lifetime of one request. A gated page
+ * renders through `(app)/layout.tsx` and `(paid)/layout.tsx` and usually calls
+ * again in the page body; without this that is three identical upserts per
+ * navigation. Note this only works because the function takes no arguments —
+ * `cache()` keys on argument identity, and `getSession()` hands back a fresh
+ * object every call, so wrapping the upsert itself would never hit.
+ */
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<
+  AppUser | null
+> {
+  const session = await auth0.getSession();
+  if (!session) return null;
+  return upsertFromSession(session);
+});
+
+/** The current user, or a redirect to login. For Server Components. */
+export async function syncCurrentUser(): Promise<AppUser> {
+  // Routes through getCurrentUser() so both share the per-request cache.
+  const user = await getCurrentUser();
+  if (!user) redirect("/auth/login?returnTo=/post-auth");
   return user;
 }
 

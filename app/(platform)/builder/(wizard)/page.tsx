@@ -3,6 +3,7 @@ import { createDraftSite } from "@/lib/site/actions";
 import { wizardHref } from "@/lib/onboarding/steps";
 import { OnboardingWelcome } from "@/components/onboarding/onboarding-welcome";
 import { syncCurrentUser } from "@/lib/auth/session";
+import { requireActivePlan } from "@/lib/billing/guard";
 
 async function startBuilder() {
   "use server";
@@ -16,6 +17,7 @@ async function startBuilder() {
 
 export default async function BuilderWizardStartPage() {
   const user = await syncCurrentUser();
+  await requireActivePlan(user.id);
   if (user.site) {
     redirect(`/dashboard?siteId=${user.site.id}`);
   }
