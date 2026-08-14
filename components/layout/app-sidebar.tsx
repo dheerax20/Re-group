@@ -8,6 +8,7 @@ import {
   Mic2,
   Video,
   PanelsTopLeft,
+  CreditCard,
   ChevronsLeft,
   ChevronsRight,
   LogOut,
@@ -189,6 +190,24 @@ export function AppSidebar({
               <Link href={websiteHref}>
                 <PanelsTopLeft className="size-4! opacity-80" />
                 <span>Website</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          {/*
+            Deliberately not in the `nav` array above: every href there is run
+            through withSite(), which appends ?siteId=. Billing is account-level,
+            not site-level, so that parameter would be meaningless on it.
+          */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip="Billing"
+              className={navButtonClass(pathname.startsWith("/settings/billing"))}
+            >
+              <Link href="/settings/billing">
+                <CreditCard className="size-4! opacity-80" />
+                <span>Billing</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth-temp";
+import { syncCurrentUser } from "@/lib/auth/session";
 import { hasBasePlan, listEntitlements } from "@/lib/billing/entitlements";
 import { Button } from "@/components/ui/button";
 import { completeOnboarding } from "./actions";
@@ -15,7 +15,7 @@ export default async function OnboardingPage({
 }: {
   searchParams: Promise<{ session_id?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await syncCurrentUser();
   const { session_id: sessionId } = await searchParams;
 
   // Entitlements come from the database, never from session_id — that is a

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-temp";
+import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/billing/stripe";
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { requireUser } from "@/lib/auth-temp";
+import { syncCurrentUser } from "@/lib/auth/session";
 import { getCatalog, toDisplayPrice } from "@/lib/billing/catalog";
 import {
   activeAddonKeys,
@@ -26,7 +26,7 @@ const STATUS_COPY: Record<string, { label: string; tone: string }> = {
 };
 
 export default async function BillingSettingsPage() {
-  const user = await requireUser();
+  const user = await syncCurrentUser();
 
   const subscription = await getActiveSubscription(user.id);
   if (!subscription) redirect("/upgrade");

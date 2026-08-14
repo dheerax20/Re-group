@@ -38,7 +38,7 @@ export async function listEntitlements(userId: string): Promise<Entitlement[]> {
   );
 }
 
-/** True once the base plan has been paid for. The gate for `/onboarding`. */
+/** True once the base plan has been paid for. The gate for the whole app. */
 export function hasBasePlan(userId: string): Promise<boolean> {
   return hasFeature(userId, BASE.featureKey);
 }

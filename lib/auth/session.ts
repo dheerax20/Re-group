@@ -19,8 +19,10 @@ export async function requireSession() {
   return session;
 }
 
-export async function syncCurrentUser(): Promise<AppUser> {
-  const session = await requireSession();
+type Auth0Session = NonNullable<Awaited<ReturnType<typeof auth0.getSession>>>;
+
+/** Mirrors the Auth0 profile into our own users table. */
+async function upsertFromSession(session: Auth0Session): Promise<AppUser> {
   const auth0Id = session.user.sub;
   const picture =
     typeof session.user.picture === "string" ? session.user.picture : null;
@@ -44,6 +46,22 @@ export async function syncCurrentUser(): Promise<AppUser> {
   });
 
   return user;
+}
+
+/**
+ * The current user, or null. Use this in Route Handlers: `syncCurrentUser()`
+ * redirects when there is no session, and a redirect is useless to `fetch()` —
+ * an API caller needs a 401 it can act on.
+ */
+export async function getCurrentUser(): Promise<AppUser | null> {
+  const session = await auth0.getSession();
+  if (!session) return null;
+  return upsertFromSession(session);
+}
+
+/** The current user, or a redirect to login. For Server Components. */
+export async function syncCurrentUser(): Promise<AppUser> {
+  return upsertFromSession(await requireSession());
 }
 
 export async function requireOwnedSite(siteId: string) {

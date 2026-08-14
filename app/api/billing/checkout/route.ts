@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getCurrentUser } from "@/lib/auth-temp";
+import { getCurrentUser } from "@/lib/auth/session";
 import { getOrCreateBillingCustomer } from "@/lib/billing/customer";
 import { getPriceIdByLookupKey } from "@/lib/billing/catalog";
 import { getActiveSubscription } from "@/lib/billing/entitlements";
@@ -14,7 +14,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  // Not requireUser(): a redirect is useless to fetch(), so answer with 401.
+  // Not syncCurrentUser(): a redirect is useless to fetch(), so answer 401.
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       // How the webhook maps a subscription back to a user without depending
       // on any session state.
       subscription_data: { metadata: { userId: user.id } },
-      success_url: `${appUrl}/onboarding?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/upgrade?canceled=1`,
       allow_promotion_codes: true,
       // NOTE: Stripe Tax is intentionally not enabled. Turning it on means

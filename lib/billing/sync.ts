@@ -172,7 +172,7 @@ export type SyncOptions = {
   /**
    * The Stripe event's `created` time, for webhook-driven syncs.
    *
-   * Omit it for reconciliation syncs (the /onboarding fallback). Omitting has
+   * Omit it for reconciliation syncs (the /welcome fallback). Omitting has
    * two deliberate consequences: staleness is judged against when we READ from
    * Stripe rather than a fabricated timestamp, and `lastEventAt` is left
    * untouched so a wall-clock value can never cause genuine later webhooks to

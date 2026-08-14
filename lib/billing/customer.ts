@@ -13,7 +13,9 @@ import { getStripe } from "./stripe";
  */
 export async function getOrCreateBillingCustomer(user: {
   id: string;
-  email: string;
+  // Auth0 does not guarantee an email claim (a phone-only or social connection
+  // may omit it), so this must tolerate null rather than assume one.
+  email: string | null;
   name: string | null;
 }): Promise<BillingCustomer> {
   const existing = await prisma.billingCustomer.findUnique({
@@ -22,7 +24,7 @@ export async function getOrCreateBillingCustomer(user: {
   if (existing) return existing;
 
   const customer = await getStripe().customers.create({
-    email: user.email,
+    email: user.email ?? undefined,
     name: user.name ?? undefined,
     // Lets a Stripe-side operator trace a customer back to a user, and
     // survives the temp-auth module being replaced.

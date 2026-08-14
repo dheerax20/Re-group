@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth-temp";
+import { syncCurrentUser } from "@/lib/auth/session";
 import { getCatalog, toDisplayPrice } from "@/lib/billing/catalog";
 import { getActiveSubscription } from "@/lib/billing/entitlements";
 import { ADDONS, ADDON_KEYS, BASE } from "@/lib/billing/plan";
@@ -15,7 +15,7 @@ export default async function UpgradePage({
 }: {
   searchParams: Promise<{ canceled?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await syncCurrentUser();
 
   // One subscription per user. Sending someone with an active subscription
   // through Checkout again would create a second one — a support nightmare.
@@ -65,9 +65,11 @@ export default async function UpgradePage({
 
         <UpgradeForm base={base} addons={addons} />
 
-        <p className="mt-6 text-center text-xs text-muted">
-          Signed in as {user.email}
-        </p>
+        {user.email ? (
+          <p className="mt-6 text-center text-xs text-muted">
+            Signed in as {user.email}
+          </p>
+        ) : null}
       </div>
     </main>
   );

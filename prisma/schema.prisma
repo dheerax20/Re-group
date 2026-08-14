@@ -27,9 +27,17 @@ model User {
   email     String?
   name      String?
   picture   String?
+
+  // Set once the user has paid and dismissed /welcome. Distinct from
+  // `site` — a user can have a plan before a site exists.
+  onboardingCompletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  site      Site?
+
+  site            Site?
+  billingCustomer BillingCustomer?
+  entitlements    Entitlement[]
 }
 
 model Site {
@@ -151,43 +159,10 @@ model Template {
 }
 
 // ============================================================
-// TEMPORARY USER MODULE
-// Delete this entire block when the real auth/users module lands.
-// Nothing in the billing module reads these tables directly —
-// it only depends on a `userId: String`. See lib/auth-temp/README.md.
-// ============================================================
-
-model TempUser {
-  id    String  @id @default(cuid())
-  email String  @unique
-  name  String?
-
-  onboardingCompletedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  sessions        TempSession[]
-  billingCustomer BillingCustomer?
-  entitlements    Entitlement[]
-
-  @@map("tmp_users")
-}
-
-model TempSession {
-  id        String   @id @default(cuid())
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  user TempUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("tmp_sessions")
-}
-
-// ============================================================
-// BILLING MODULE — permanent
+// BILLING MODULE
+// Nothing here reads the user model directly — it only depends on a
+// `userId: String`, which is why swapping the temp auth shim for Auth0
+// touched only the two `user` relations below.
 // ============================================================
 
 model BillingCustomer {
@@ -198,7 +173,7 @@ model BillingCustomer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user          TempUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   subscriptions Subscription[]
 
   @@map("billing_customers")
@@ -285,11 +260,11 @@ model Entitlement {
   id         String    @id @default(cuid())
   userId     String
   featureKey String
-  source     String // "base" | "addon_analytics" | "addon_support"
+  source     String // "base" | "addon_website" | "addon_automations"
   grantedAt  DateTime  @default(now())
   expiresAt  DateTime?
 
-  user TempUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, featureKey])
   @@index([userId])

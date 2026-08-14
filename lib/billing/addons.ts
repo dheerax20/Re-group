@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { getCurrentUser } from "@/lib/auth-temp";
+import { getCurrentUser } from "@/lib/auth/session";
 import { getPriceIdByLookupKey } from "./catalog";
 import {
   getActiveSubscription,

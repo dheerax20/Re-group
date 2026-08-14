@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/auth-temp";
+import { getCurrentUser } from "@/lib/auth/session";
 import { hasBasePlan, listEntitlements } from "@/lib/billing/entitlements";
 import { getStripe } from "@/lib/billing/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/billing/sync";
@@ -7,7 +7,7 @@ import { syncSubscriptionFromStripe } from "@/lib/billing/sync";
 export const runtime = "nodejs";
 
 /**
- * Lightweight poll target for `/onboarding`.
+ * Lightweight poll target for `/welcome`.
  *
  * Since Basil, Checkout postpones subscription creation until after payment
  * completes, so the success redirect routinely arrives before the webhook.
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
         const entitlements = await listEntitlements(user.id);
         return NextResponse.json({
-          // Must agree with the gate /onboarding actually uses, or the client
+          // Must agree with the gate /welcome actually uses, or the client
           // stops polling while the server keeps rendering the waiting state.
           ready: await hasBasePlan(user.id),
           entitlements: entitlements.map((e) => e.featureKey),
