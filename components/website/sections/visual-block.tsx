@@ -6,7 +6,7 @@ export function VisualBlock({
   className,
   label,
 }: {
-  variant?: "sanctuary" | "community" | "worship" | "nature" | "editorial" | "minimal";
+  variant?: "sanctuary" | "community" | "worship" | "nature" | "editorial" | "minimal" | "cinematic";
   className?: string;
   label?: string;
 }) {
@@ -21,8 +21,8 @@ export function VisualBlock({
       "linear-gradient(180deg, color-mix(in oklab, var(--color-secondary) 40%, white), var(--color-primary))",
     editorial:
       "linear-gradient(120deg, color-mix(in oklab, var(--color-foreground) 88%, var(--color-primary)), var(--color-primary))",
-    minimal:
-      "linear-gradient(180deg, color-mix(in oklab, var(--color-primary) 12%, white), color-mix(in oklab, var(--color-primary) 28%, white))",
+    cinematic:
+      "radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--color-accent) 38%, transparent), transparent 42%), radial-gradient(ellipse at 80% 80%, color-mix(in oklab, var(--color-secondary) 28%, transparent), transparent 40%), linear-gradient(165deg, var(--color-primary), color-mix(in oklab, var(--color-primary) 70%, black))",
   };
 
   return (

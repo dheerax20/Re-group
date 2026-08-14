@@ -11,6 +11,7 @@ import {
   SiteConfig,
   YoutubeConfig,
 } from "./types";
+import { parseChurchStory } from "./story";
 
 type SiteWithRelations = Site & { socialLinks?: SocialLink[] };
 
@@ -74,5 +75,6 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
     podcast,
     giving,
     contact,
+    story: parseChurchStory(site.storyConfig),
   };
 }

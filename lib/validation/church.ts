@@ -19,6 +19,12 @@ export const churchInfoSchema = z.object({
     .or(z.literal("")),
   primaryContactPhone: z.string().max(30).optional().or(z.literal("")),
   tagline: z.string().max(160).optional().or(z.literal("")),
+  city: z.string().max(80).optional().or(z.literal("")),
+  worshipStyle: z.string().max(80).optional().or(z.literal("")),
+  serviceTimes: z.string().max(160).optional().or(z.literal("")),
+  pastorName: z.string().max(120).optional().or(z.literal("")),
+  mission: z.string().max(400).optional().or(z.literal("")),
+  values: z.string().max(240).optional().or(z.literal("")),
 });
 
 export type ChurchInfoInput = z.infer<typeof churchInfoSchema>;

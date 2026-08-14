@@ -19,6 +19,13 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: r2RemotePattern(),
   },
+  async redirects() {
+    return [
+      { source: "/dashboard/events", destination: "/events", permanent: false },
+      { source: "/dashboard/sermons", destination: "/sermons", permanent: false },
+      { source: "/dashboard/youtube", destination: "/youtube", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

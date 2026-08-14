@@ -14,14 +14,14 @@ export function FieldGroup({
   return (
     <section
       className={cn(
-        "space-y-4 rounded-xl border border-border bg-background/60 p-5",
+        "space-y-4 rounded-xl border border-border bg-surface-muted/50 p-5",
         className
       )}
     >
       {title || description ? (
         <div className="space-y-1">
           {title ? (
-            <h3 className="text-sm font-medium tracking-tight text-foreground">{title}</h3>
+            <h3 className="font-serif text-base font-medium tracking-tight text-foreground">{title}</h3>
           ) : null}
           {description ? <p className="text-sm text-muted">{description}</p> : null}
         </div>

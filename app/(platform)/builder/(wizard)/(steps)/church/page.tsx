@@ -19,7 +19,7 @@ export default async function ChurchInfoPage({
     <div>
       <WizardStepHeader
         title="Tell us about your church"
-        description="This information appears throughout your site and helps us recommend the right design."
+        description="This information appears throughout your site and gives AI the details it needs to write real copy."
       />
       <ChurchForm siteId={siteId} defaultValues={site} nextHref={wizardHref("social", siteId)} />
     </div>

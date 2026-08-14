@@ -10,6 +10,8 @@ import {
   PanelsTopLeft,
   ChevronsLeft,
   ChevronsRight,
+  LogOut,
+  UserRound,
 } from "lucide-react";
 import {
   Sidebar,
@@ -47,21 +49,29 @@ function navButtonClass(active: boolean) {
 export function AppSidebar({
   siteId,
   siteName,
+  userEmail,
+  userName,
+  userPicture,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   siteId?: string | null;
   siteName?: string | null;
+  userEmail?: string | null;
+  userName?: string | null;
+  userPicture?: string | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
 
-  const activeSiteId = siteId ?? searchParams.get("siteId");
+  const activeSiteId = searchParams.get("siteId") ?? siteId;
   const withSite = (href: string) =>
     activeSiteId ? `${href}?siteId=${activeSiteId}` : href;
 
-  const websiteHref = activeSiteId ? `/builder/${activeSiteId}` : "/builder";
+  const websiteHref = activeSiteId
+    ? `/dashboard/builder?siteId=${activeSiteId}`
+    : "/dashboard/builder";
   const churchInitial = (siteName?.trim()?.[0] ?? "C").toUpperCase();
 
   return (
@@ -174,7 +184,7 @@ export function AppSidebar({
             <SidebarMenuButton
               asChild
               tooltip="Website"
-              className={navButtonClass(pathname.startsWith("/builder"))}
+              className={navButtonClass(pathname.startsWith("/dashboard/builder") || pathname.startsWith("/builder/"))}
             >
               <Link href={websiteHref}>
                 <PanelsTopLeft className="size-4! opacity-80" />
@@ -183,6 +193,50 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        <div
+          className={cn(
+            "rounded-xl border border-sidebar-border/80 bg-white/70 p-2",
+            collapsed && "border-0 bg-transparent p-0"
+          )}
+        >
+          <Link
+            href="/dashboard/profile"
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-sidebar-accent",
+              collapsed && "justify-center px-0",
+              pathname.startsWith("/dashboard/profile") && "bg-brand-soft"
+            )}
+          >
+            {userPicture ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={userPicture} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand">
+                {(userName?.trim()?.[0] ?? userEmail?.trim()?.[0] ?? "U").toUpperCase()}
+              </span>
+            )}
+            <span className={cn("min-w-0 flex-1", collapsed && "hidden")}>
+              <span className="block truncate text-[13px] font-medium leading-tight">
+                {userName ?? "Account"}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                {userEmail ?? "Profile"}
+              </span>
+            </span>
+            <UserRound className={cn("size-3.5 text-muted-foreground", collapsed && "hidden")} />
+          </Link>
+          <a
+            href="/auth/logout"
+            className={cn(
+              "mt-1 flex h-9 items-center gap-2 rounded-lg px-2 text-[13px] font-medium text-red-700 hover:bg-red-50",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <LogOut className="size-4" />
+            <span className={cn(collapsed && "hidden")}>Log out</span>
+          </a>
+        </div>
 
         {collapsed ? (
           <button

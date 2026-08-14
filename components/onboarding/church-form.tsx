@@ -48,6 +48,12 @@ export function ChurchForm({
       primaryContactEmail: defaultValues.contact?.email ?? "",
       primaryContactPhone: defaultValues.contact?.phone ?? "",
       tagline: defaultValues.brand.tagline ?? "",
+      city: defaultValues.story?.city ?? "",
+      worshipStyle: defaultValues.story?.worshipStyle ?? "",
+      serviceTimes: defaultValues.story?.serviceTimes ?? "",
+      pastorName: defaultValues.story?.pastorName ?? "",
+      mission: defaultValues.story?.mission ?? "",
+      values: defaultValues.story?.values ?? "",
     },
   });
 
@@ -111,6 +117,45 @@ export function ChurchForm({
           <Label htmlFor="tagline">Tagline</Label>
           <Input id="tagline" {...register("tagline")} placeholder="A place to belong" />
           <FieldHint>Short line for hero and template matching.</FieldHint>
+        </Field>
+      </FieldGroup>
+
+      <FieldGroup
+        title="How you gather"
+        description="More detail lets AI write specific copy instead of generic church language."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field>
+            <Label htmlFor="city">City</Label>
+            <Input id="city" {...register("city")} placeholder="Austin" />
+          </Field>
+          <Field>
+            <Label htmlFor="worshipStyle">Worship style</Label>
+            <Input id="worshipStyle" {...register("worshipStyle")} placeholder="Contemporary" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field>
+            <Label htmlFor="serviceTimes">Service times</Label>
+            <Input id="serviceTimes" {...register("serviceTimes")} placeholder="Sundays 9am & 11am" />
+          </Field>
+          <Field>
+            <Label htmlFor="pastorName">Lead pastor</Label>
+            <Input id="pastorName" {...register("pastorName")} placeholder="Pastor Jordan Lee" />
+          </Field>
+        </div>
+        <Field>
+          <Label htmlFor="mission">Mission</Label>
+          <Input
+            id="mission"
+            {...register("mission")}
+            placeholder="Helping people know God and find family"
+          />
+        </Field>
+        <Field>
+          <Label htmlFor="values">Values</Label>
+          <Input id="values" {...register("values")} placeholder="Faith, hospitality, justice" />
+          <FieldHint>Comma-separated — used for ministry cards and tone.</FieldHint>
         </Field>
       </FieldGroup>
 

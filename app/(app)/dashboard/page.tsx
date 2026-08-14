@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { resolveActiveSite, getSite } from "@/lib/site/actions";
 import { getSiteContent } from "@/lib/site/get-site-content";
 import { PageHeader } from "@/components/layout/page-header";
@@ -14,21 +15,7 @@ export default async function DashboardPage({
   const active = await resolveActiveSite(preferred ?? null);
 
   if (!active) {
-    return (
-      <div>
-        <PageHeader
-          title="Welcome to Regroup"
-          description="Build your church website, then manage events, sermons, and YouTube from one place."
-          actions={
-            <Link href="/builder">
-              <Button className="bg-brand text-brand-foreground hover:bg-brand/90">
-                Create website
-              </Button>
-            </Link>
-          }
-        />
-      </div>
-    );
+    redirect("/builder");
   }
 
   const [site, content] = await Promise.all([
@@ -67,7 +54,7 @@ export default async function DashboardPage({
         title={active.name}
         description="Manage content that appears on your church website."
         actions={
-          <Link href={`/builder/${active.id}`}>
+          <Link href={`/dashboard/builder?siteId=${active.id}`}>
             <Button className="bg-brand text-brand-foreground hover:bg-brand/90">
               <PanelsTopLeft className="mr-2 h-4 w-4" />
               Website

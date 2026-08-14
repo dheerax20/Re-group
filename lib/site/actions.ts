@@ -16,6 +16,8 @@ import { DeterministicSiteGenerator } from "@/lib/ai/deterministic-site-generato
 import { getTemplateRecommendationEngine } from "@/lib/ai";
 import { validateSiteForPublish } from "@/lib/site/publish-validation";
 import { toSiteConfig } from "@/lib/site/to-site-config";
+import { parseChurchStory } from "@/lib/site/story";
+import { requireOwnedSite, syncCurrentUser } from "@/lib/auth/session";
 import { z } from "zod";
 import { toDatabaseError, isDatabaseUnavailableError } from "@/lib/db/errors";
 import type { Prisma } from "@prisma/client";
@@ -45,8 +47,14 @@ function toJson(value: unknown): Prisma.InputJsonValue {
 
 export async function createDraftSite() {
   try {
+    const user = await syncCurrentUser();
+    if (user.site) {
+      return { siteId: user.site.id, existing: true as const };
+    }
+
     const site = await prisma.site.create({
       data: {
+        userId: user.id,
         name: "Untitled Church",
         slug: `untitled-${Math.random().toString(36).slice(2, 8)}`,
         brandConfig: toJson(defaultBrandConfig),
@@ -54,17 +62,19 @@ export async function createDraftSite() {
         navigationConfig: toJson([]),
         sectionConfig: toJson([]),
         seoConfig: toJson({ title: "", description: "" }),
+        storyConfig: toJson({}),
         templateId: "modern-church",
         templateVersion: 1,
       },
     });
-    return { siteId: site.id };
+    return { siteId: site.id, existing: false as const };
   } catch (error) {
     toDatabaseError(error);
   }
 }
 
 export async function getSite(siteId: string) {
+  await requireOwnedSite(siteId);
   const site = await prisma.site.findUnique({
     where: { id: siteId },
     include: { socialLinks: true },
@@ -73,22 +83,12 @@ export async function getSite(siteId: string) {
   return toSiteConfig(site);
 }
 
-/** Prefer an explicit siteId, otherwise the most recently updated site. */
-export async function resolveActiveSite(preferredSiteId?: string | null) {
+/** The signed-in user's site only — one website per Auth0 account. */
+export async function resolveActiveSite(_preferredSiteId?: string | null) {
   try {
     return await withDbRetry(async () => {
-      if (preferredSiteId) {
-        const preferred = await prisma.site.findUnique({
-          where: { id: preferredSiteId },
-          select: { id: true, name: true, slug: true, status: true },
-        });
-        if (preferred) return preferred;
-      }
-
-      return prisma.site.findFirst({
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, name: true, slug: true, status: true },
-      });
+      const user = await syncCurrentUser();
+      return user.site;
     });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
@@ -100,6 +100,7 @@ export async function resolveActiveSite(preferredSiteId?: string | null) {
 }
 
 export async function updateChurchInfo(siteId: string, input: unknown) {
+  await requireOwnedSite(siteId);
   const data = churchInfoSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -111,6 +112,14 @@ export async function updateChurchInfo(siteId: string, input: unknown) {
       primaryContactEmail: data.primaryContactEmail || null,
       primaryContactPhone: data.primaryContactPhone || null,
       tagline: data.tagline || null,
+      storyConfig: toJson({
+        city: data.city || "",
+        worshipStyle: data.worshipStyle || "",
+        serviceTimes: data.serviceTimes || "",
+        pastorName: data.pastorName || "",
+        mission: data.mission || "",
+        values: data.values || "",
+      }),
     },
   });
   await invalidate(siteId);
@@ -118,6 +127,7 @@ export async function updateChurchInfo(siteId: string, input: unknown) {
 }
 
 export async function updateSocialLinks(siteId: string, input: unknown) {
+  await requireOwnedSite(siteId);
   const data = socialLinksSchema.parse(input);
   const records = toSocialLinkRecords(data);
 
@@ -133,6 +143,7 @@ export async function updateSocialLinks(siteId: string, input: unknown) {
 }
 
 export async function updateBrand(siteId: string, input: unknown) {
+  await requireOwnedSite(siteId);
   const data = brandConfigSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -154,6 +165,7 @@ const featureConfigSchema = z.object({
 });
 
 export async function updateFeatures(siteId: string, input: unknown) {
+  await requireOwnedSite(siteId);
   const data = featureConfigSchema.parse(input) as FeatureConfig;
   const errors = validateFeatureDependencies(data);
   if (errors.length > 0) {
@@ -172,6 +184,7 @@ export async function updateFeatures(siteId: string, input: unknown) {
 }
 
 export async function getTemplateRecommendations(siteId: string) {
+  await requireOwnedSite(siteId);
   const site = await prisma.site.findUnique({ where: { id: siteId } });
   if (!site) throw new Error("Site not found");
 
@@ -182,10 +195,12 @@ export async function getTemplateRecommendations(siteId: string) {
     congregationSize: site.congregationSize ?? undefined,
     brand: site.brandConfig as never,
     features: site.featureConfig as never,
+    story: parseChurchStory(site.storyConfig),
   });
 }
 
 export async function selectTemplate(siteId: string, templateId: string) {
+  await requireOwnedSite(siteId);
   const template = getTemplate(templateId);
   if (!template) throw new Error("Unknown template");
 
@@ -196,10 +211,17 @@ export async function selectTemplate(siteId: string, templateId: string) {
     churchName: site.name,
     tagline: site.tagline ?? undefined,
     denomination: site.denomination ?? undefined,
+    congregationSize: site.congregationSize ?? undefined,
     brand: site.brandConfig as never,
     features: site.featureConfig as never,
     templateId: template.id,
+    story: parseChurchStory(site.storyConfig),
   });
+
+  const currentBrand = site.brandConfig as typeof defaultBrandConfig;
+  const preset = template.brandPreset;
+  const applyPreset =
+    Boolean(preset) && currentBrand?.colors?.primary === defaultBrandConfig.colors.primary;
 
   await prisma.site.update({
     where: { id: siteId },
@@ -209,6 +231,15 @@ export async function selectTemplate(siteId: string, templateId: string) {
       sectionConfig: toJson(generated.sections),
       navigationConfig: toJson(generated.navigation),
       seoConfig: toJson(generated.seo),
+      ...(applyPreset && preset
+        ? {
+            brandConfig: toJson({
+              ...currentBrand,
+              colors: preset.colors,
+              typography: preset.typography,
+            }),
+          }
+        : {}),
     },
   });
 
@@ -217,6 +248,7 @@ export async function selectTemplate(siteId: string, templateId: string) {
 }
 
 export async function updateSections(siteId: string, input: unknown) {
+  await requireOwnedSite(siteId);
   const data = sectionConfigSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -243,6 +275,7 @@ export async function suggestSlug(name: string) {
 }
 
 export async function publishSite(siteId: string, slug: string) {
+  await requireOwnedSite(siteId);
   const parsedSlug = slugSchema.parse(slug);
 
   await prisma.site.update({
@@ -273,6 +306,7 @@ export async function publishSite(siteId: string, slug: string) {
 }
 
 export async function unpublishSite(siteId: string) {
+  await requireOwnedSite(siteId);
   const site = await prisma.site.update({
     where: { id: siteId },
     data: { status: "DRAFT" },

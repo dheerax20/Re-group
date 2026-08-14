@@ -7,6 +7,11 @@ import {
   contemporaryBoldTemplate,
   sacredClassicTemplate,
 } from "./extra-church";
+import {
+  emberSanctuaryTemplate,
+  riverGatheringTemplate,
+  nightCathedralTemplate,
+} from "./cinematic-church";
 
 export const templateRegistry: Record<string, TemplateDefinition> = {
   [modernChurchTemplate.id]: modernChurchTemplate,
@@ -15,6 +20,9 @@ export const templateRegistry: Record<string, TemplateDefinition> = {
   [communityWarmTemplate.id]: communityWarmTemplate,
   [contemporaryBoldTemplate.id]: contemporaryBoldTemplate,
   [sacredClassicTemplate.id]: sacredClassicTemplate,
+  [emberSanctuaryTemplate.id]: emberSanctuaryTemplate,
+  [riverGatheringTemplate.id]: riverGatheringTemplate,
+  [nightCathedralTemplate.id]: nightCathedralTemplate,
 };
 
 export const allTemplates = Object.values(templateRegistry);

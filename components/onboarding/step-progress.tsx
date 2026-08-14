@@ -46,7 +46,7 @@ export function StepProgress() {
                 className={cn(
                   "whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium",
                   i === step
-                    ? "bg-foreground text-background"
+                    ? "bg-brand text-brand-foreground"
                     : i < step
                       ? "text-foreground"
                       : "text-muted"

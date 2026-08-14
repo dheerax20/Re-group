@@ -106,6 +106,14 @@ async function seedDemoChurch() {
         description:
           "Join Grace Community Church for worship, sermons, events, and community.",
       } as Prisma.InputJsonValue,
+      storyConfig: {
+        city: "Austin",
+        worshipStyle: "Contemporary",
+        serviceTimes: "Sundays 9am & 11am",
+        pastorName: "Pastor John Miller",
+        mission: "Helping people know God, find family, and live with purpose.",
+        values: "Faith, hospitality, justice",
+      } as Prisma.InputJsonValue,
       templateId: template.id,
       templateVersion: template.version,
     },
@@ -218,7 +226,6 @@ async function seedDemoChurch() {
 
 async function main() {
   await seedTemplates();
-  await seedDemoChurch();
 }
 
 main()

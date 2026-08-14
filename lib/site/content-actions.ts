@@ -3,12 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { invalidateSiteCache } from "@/lib/cache/redis";
+import { requireOwnedSite } from "@/lib/auth/session";
 import { toDatabaseError } from "@/lib/db/errors";
 import { slugify } from "@/lib/validation/slug";
 import { generateNavigation } from "@/lib/site/navigation";
-import type { FeatureConfig } from "@/lib/features/types";
+import { defaultFeatures, type FeatureConfig } from "@/lib/features/types";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+function mergeFeatures(stored: unknown, patch: Partial<FeatureConfig>): FeatureConfig {
+  return {
+    ...defaultFeatures,
+    ...((stored as FeatureConfig | null) ?? {}),
+    ...patch,
+  };
+}
 
 function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
@@ -71,15 +82,13 @@ async function revalidateSite(siteId: string) {
 async function enableFeatureOnSite(
   siteId: string,
   feature: "events" | "sermons" | "youtube",
-  sectionSeed?: { variant: string; config?: Record<string, unknown> }
+  sectionSeed?: { variant: string; config?: Record<string, unknown> },
+  db: DbClient = prisma
 ) {
-  const site = await prisma.site.findUnique({ where: { id: siteId } });
+  const site = await db.site.findUnique({ where: { id: siteId } });
   if (!site) return;
 
-  const features = {
-    ...((site.featureConfig as unknown as FeatureConfig) ?? {}),
-    [feature]: true,
-  } as FeatureConfig;
+  const features = mergeFeatures(site.featureConfig, { [feature]: true });
 
   const sections = Array.isArray(site.sectionConfig)
     ? (site.sectionConfig as Array<Record<string, unknown>>)
@@ -110,7 +119,7 @@ async function enableFeatureOnSite(
     });
   }
 
-  await prisma.site.update({
+  await db.site.update({
     where: { id: siteId },
     data: {
       featureConfig: toJson(features),
@@ -122,6 +131,7 @@ async function enableFeatureOnSite(
 
 export async function listEvents(siteId: string) {
   try {
+    await requireOwnedSite(siteId);
     return await prisma.event.findMany({
       where: { siteId },
       orderBy: { startAt: "asc" },
@@ -133,6 +143,7 @@ export async function listEvents(siteId: string) {
 
 export async function createEvent(siteId: string, input: unknown) {
   try {
+    await requireOwnedSite(siteId);
     const data = eventSchema.parse(input);
     const existing = await prisma.event.findMany({
       where: { siteId },
@@ -140,20 +151,23 @@ export async function createEvent(siteId: string, input: unknown) {
     });
     const slug = uniqueSlug(data.title, existing.map((e) => e.slug));
 
-    const event = await prisma.event.create({
-      data: {
-        siteId,
-        title: data.title,
-        slug,
-        description: data.description || null,
-        startAt: new Date(data.startAt),
-        endAt: data.endAt ? new Date(data.endAt) : null,
-        location: data.location || null,
-        registrationUrl: data.registrationUrl || null,
-      },
+    const event = await prisma.$transaction(async (tx) => {
+      const created = await tx.event.create({
+        data: {
+          siteId,
+          title: data.title,
+          slug,
+          description: data.description || null,
+          startAt: new Date(data.startAt),
+          endAt: data.endAt ? new Date(data.endAt) : null,
+          location: data.location || null,
+          registrationUrl: data.registrationUrl || null,
+        },
+      });
+      await enableFeatureOnSite(siteId, "events", { variant: "grid" }, tx);
+      return created;
     });
 
-    await enableFeatureOnSite(siteId, "events", { variant: "grid" });
     await revalidateSite(siteId);
     return { success: true as const, event };
   } catch (error) {
@@ -163,6 +177,7 @@ export async function createEvent(siteId: string, input: unknown) {
 
 export async function deleteEvent(siteId: string, eventId: string) {
   try {
+    await requireOwnedSite(siteId);
     await prisma.event.deleteMany({ where: { id: eventId, siteId } });
     await revalidateSite(siteId);
     return { success: true as const };
@@ -173,6 +188,7 @@ export async function deleteEvent(siteId: string, eventId: string) {
 
 export async function listSermons(siteId: string) {
   try {
+    await requireOwnedSite(siteId);
     return await prisma.sermon.findMany({
       where: { siteId },
       orderBy: { date: "desc" },
@@ -184,6 +200,7 @@ export async function listSermons(siteId: string) {
 
 export async function createSermon(siteId: string, input: unknown) {
   try {
+    await requireOwnedSite(siteId);
     const data = sermonSchema.parse(input);
     const existing = await prisma.sermon.findMany({
       where: { siteId },
@@ -191,21 +208,24 @@ export async function createSermon(siteId: string, input: unknown) {
     });
     const slug = uniqueSlug(data.title, existing.map((s) => s.slug));
 
-    const sermon = await prisma.sermon.create({
-      data: {
-        siteId,
-        title: data.title,
-        slug,
-        description: data.description || null,
-        speaker: data.speaker || null,
-        series: data.series || null,
-        date: new Date(data.date),
-        videoUrl: data.videoUrl || null,
-        audioUrl: data.audioUrl || null,
-      },
+    const sermon = await prisma.$transaction(async (tx) => {
+      const created = await tx.sermon.create({
+        data: {
+          siteId,
+          title: data.title,
+          slug,
+          description: data.description || null,
+          speaker: data.speaker || null,
+          series: data.series || null,
+          date: new Date(data.date),
+          videoUrl: data.videoUrl || null,
+          audioUrl: data.audioUrl || null,
+        },
+      });
+      await enableFeatureOnSite(siteId, "sermons", { variant: "cards" }, tx);
+      return created;
     });
 
-    await enableFeatureOnSite(siteId, "sermons", { variant: "cards" });
     await revalidateSite(siteId);
     return { success: true as const, sermon };
   } catch (error) {
@@ -215,6 +235,7 @@ export async function createSermon(siteId: string, input: unknown) {
 
 export async function deleteSermon(siteId: string, sermonId: string) {
   try {
+    await requireOwnedSite(siteId);
     await prisma.sermon.deleteMany({ where: { id: sermonId, siteId } });
     await revalidateSite(siteId);
     return { success: true as const };
@@ -225,6 +246,7 @@ export async function deleteSermon(siteId: string, sermonId: string) {
 
 export async function updateYoutubeChannel(siteId: string, input: unknown) {
   try {
+    await requireOwnedSite(siteId);
     const data = youtubeSchema.parse(input);
     const site = await prisma.site.findUnique({ where: { id: siteId } });
     if (!site) throw new Error("Site not found");
@@ -235,10 +257,7 @@ export async function updateYoutubeChannel(siteId: string, input: unknown) {
         config: { channelUrl: data.channelUrl },
       });
     } else {
-      const features = {
-        ...((site.featureConfig as unknown as FeatureConfig) ?? {}),
-        youtube: false,
-      } as FeatureConfig;
+      const features = mergeFeatures(site.featureConfig, { youtube: false });
       const sections = Array.isArray(site.sectionConfig)
         ? (site.sectionConfig as Array<Record<string, unknown>>)
         : [];

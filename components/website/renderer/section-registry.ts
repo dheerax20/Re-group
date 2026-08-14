@@ -1,7 +1,7 @@
 import { ComponentType } from "react";
 import { SectionProps, SectionType } from "@/lib/site/types";
 import { NavbarTransparent, NavbarSolid, NavbarMinimal } from "@/components/website/sections/navbar";
-import { HeroSplit, HeroCentered, HeroFullscreen } from "@/components/website/sections/hero";
+import { HeroSplit, HeroCentered, HeroFullscreen, HeroCinematic } from "@/components/website/sections/hero";
 import { WelcomeCentered, WelcomeSplit } from "@/components/website/sections/welcome";
 import { SermonCards, SermonFeatured, SermonList } from "@/components/website/sections/sermons";
 import { EventGrid, EventList, EventCalendar } from "@/components/website/sections/events";
@@ -33,6 +33,7 @@ export const sectionRegistry: Record<
     split: HeroSplit,
     centered: HeroCentered,
     fullscreen: HeroFullscreen,
+    cinematic: HeroCinematic,
   },
   welcome: {
     centered: WelcomeCentered,
@@ -74,6 +75,10 @@ export const sectionRegistry: Record<
     standard: FooterStandard,
   },
 };
+
+export function variantsFor(type: SectionType): string[] {
+  return Object.keys(sectionRegistry[type] ?? {});
+}
 
 export function resolveSectionComponent(
   type: string,

@@ -46,9 +46,13 @@ export class RuleBasedRecommendationEngine implements TemplateRecommendationEngi
         score += 15;
         reasons.push("Classic style suits a traditional denomination");
       }
-      if (!isTraditional && (template.metadata.style === "modern" || template.metadata.style === "contemporary" || template.metadata.style === "community")) {
+      if (!isTraditional && (template.metadata.style === "modern" || template.metadata.style === "contemporary" || template.metadata.style === "community" || template.metadata.style === "cinematic" || template.metadata.style === "luminous")) {
         score += 10;
         reasons.push("Contemporary style matches your church profile");
+      }
+      if (template.metadata.style === "cinematic") {
+        score += 6;
+        reasons.push("Cinematic visual system feels like a designed brand site");
       }
 
       if (input.features.sermons && template.sections.some((s) => s.type === "sermons")) {
@@ -81,6 +85,6 @@ export class RuleBasedRecommendationEngine implements TemplateRecommendationEngi
       };
     });
 
-    return scored.sort((a, b) => b.score - a.score).slice(0, 3);
+    return scored.sort((a, b) => b.score - a.score).slice(0, 4);
   }
 }

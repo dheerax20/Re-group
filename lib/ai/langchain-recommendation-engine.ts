@@ -19,7 +19,7 @@ const recommendationSchema = z.object({
       })
     )
     .min(1)
-    .max(2),
+    .max(4),
 });
 
 /**
@@ -47,7 +47,7 @@ export class AIRecommendationEngine implements TemplateRecommendationEngine {
       [
         "system",
         "You are a design recommendation engine for a church website builder. " +
-          "You choose 1-2 templates from a fixed catalog that best fit a church's " +
+          "You choose 1-4 templates from a fixed catalog that best fit a church's " +
           "profile, and explain each pick with short, concrete reasons a church " +
           "admin would understand. You must only choose templateId values from " +
           "the provided catalog — never invent one.",
@@ -55,7 +55,7 @@ export class AIRecommendationEngine implements TemplateRecommendationEngine {
       [
         "human",
         "Church profile:\n{profile}\n\nAvailable templates (id, style, suitable-for tags):\n{catalog}\n\n" +
-          "Return 1-2 recommendations ranked best first.",
+          "Return 1-4 recommendations ranked best first.",
       ],
     ]);
 
@@ -91,6 +91,6 @@ export class AIRecommendationEngine implements TemplateRecommendationEngine {
 
     return result.recommendations
       .filter((r) => validIds.has(r.templateId))
-      .slice(0, 2);
+      .slice(0, 4);
   }
 }

@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { TemplatePreviewFrame } from "@/components/onboarding/template-preview-frame";
 import { PublishBar } from "@/components/builder/publish-bar";
 import { builderHref } from "@/lib/builder/nav";
-import { Calendar, Mic2, Video, LayoutDashboard } from "lucide-react";
+import { Calendar, Mic2, Video, LayoutDashboard, PanelsTopLeft } from "lucide-react";
 
 const contentLinks = [
   {
@@ -55,13 +55,22 @@ export default async function BuilderOverviewPage({
             Manage events, sermons, and YouTube — content syncs to your public site.
           </p>
         </div>
-        <Link
-          href={`/dashboard?siteId=${siteId}`}
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-background"
-        >
-          <LayoutDashboard className="h-4 w-4" />
-          Dashboard
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/dashboard/builder?siteId=${siteId}`}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-background"
+          >
+            <PanelsTopLeft className="h-4 w-4" />
+            Open editor
+          </Link>
+          <Link
+            href={`/dashboard?siteId=${siteId}`}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-background"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6">

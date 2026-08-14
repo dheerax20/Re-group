@@ -47,7 +47,7 @@ export function MarketingSections() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
             Website Builder
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             Your church website, without the complexity.
           </h2>
           <p className="mt-4 text-muted">
@@ -78,7 +78,7 @@ export function MarketingSections() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
               Events
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+            <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight">
               Keep your calendar clear and welcoming.
             </h2>
             <p className="mt-4 text-muted">
@@ -129,7 +129,7 @@ export function MarketingSections() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
               Members
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+            <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight">
               Know your people at a glance.
             </h2>
             <p className="mt-4 text-muted">
@@ -150,7 +150,7 @@ export function MarketingSections() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
               Courses
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+            <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight">
               Disciple with clarity.
             </h2>
             <p className="mt-4 text-muted">
@@ -180,7 +180,7 @@ export function MarketingSections() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
             Everything connected
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+          <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight">
             One platform. One church home.
           </h2>
         </motion.div>
@@ -210,7 +210,7 @@ export function MarketingSections() {
           variants={fadeUp}
           className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border bg-brand px-8 py-14 text-center text-brand-foreground sm:px-16"
         >
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
             Give your church a digital home.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
@@ -218,7 +218,7 @@ export function MarketingSections() {
             leaving Regroup.
           </p>
           <Link href="/builder" className="mt-8 inline-flex">
-            <Button size="lg" className="bg-white text-brand hover:bg-white/90">
+            <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
               Start building
               <ArrowRight className="h-4 w-4" />
             </Button>
@@ -228,7 +228,7 @@ export function MarketingSections() {
 
       <footer className="border-t border-border bg-surface px-6 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-sm font-semibold">Regroup</p>
+          <p className="font-serif text-base font-semibold text-foreground">Regroup</p>
           <p className="text-sm text-muted">
             © {new Date().getFullYear()} Regroup. Built for churches.
           </p>

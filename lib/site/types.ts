@@ -1,5 +1,6 @@
 import { BrandConfig } from "@/lib/theme/types";
 import { FeatureConfig } from "@/lib/features/types";
+import type { ChurchStory } from "./story";
 
 export const sectionTypes = [
   "navbar",
@@ -112,4 +113,5 @@ export interface SiteConfig {
   podcast?: PodcastConfig;
   giving?: GivingConfig;
   contact?: ContactInfo;
+  story?: ChurchStory;
 }

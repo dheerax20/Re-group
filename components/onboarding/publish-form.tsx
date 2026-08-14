@@ -55,8 +55,8 @@ export function PublishForm({
   if (publishedSlug) {
     const url = liveUrl(publishedSlug);
     return (
-      <div className="mt-8 rounded-2xl border border-brand/20 bg-brand-soft p-6 text-center">
-        <h2 className="text-xl font-semibold text-brand">Your site is live!</h2>
+      <div className="mt-8 rounded-2xl border border-accent/30 bg-accent-soft p-6 text-center">
+        <h2 className="font-serif text-2xl font-semibold text-foreground">Your site is live!</h2>
         <a
           href={url}
           target="_blank"
@@ -68,6 +68,9 @@ export function PublishForm({
         <div className="mt-6 flex justify-center gap-3">
           <Link href={`/dashboard?siteId=${siteId}`}>
             <Button>Go to Dashboard</Button>
+          </Link>
+          <Link href={`/dashboard/builder?siteId=${siteId}`}>
+            <Button variant="outline">Open editor</Button>
           </Link>
           <a href={url} target="_blank" rel="noopener noreferrer">
             <Button variant="outline">View Site</Button>
@@ -87,7 +90,7 @@ export function PublishForm({
             value={slug}
             onChange={(e) => setSlug(e.target.value.toLowerCase())}
           />
-          <span className="whitespace-nowrap text-sm text-neutral-500">.{ROOT_DOMAIN}</span>
+          <span className="whitespace-nowrap text-sm text-muted">.{ROOT_DOMAIN}</span>
         </div>
         {slugStatus && (
           <p className={`mt-1 text-sm ${slugStatus.available ? "text-emerald-600" : "text-red-600"}`}>

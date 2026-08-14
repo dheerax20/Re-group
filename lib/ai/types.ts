@@ -1,6 +1,7 @@
 import { BrandConfig } from "@/lib/theme/types";
 import { FeatureConfig } from "@/lib/features/types";
 import { SectionInstance, NavigationItem, SeoConfig } from "@/lib/site/types";
+import type { ChurchStory } from "@/lib/site/story";
 
 export interface RecommendationInput {
   churchName: string;
@@ -8,6 +9,7 @@ export interface RecommendationInput {
   congregationSize?: number;
   brand: BrandConfig;
   features: FeatureConfig;
+  story?: ChurchStory;
 }
 
 export type TemplateRecommendation = {
@@ -29,9 +31,11 @@ export interface SiteGenerationInput {
   churchName: string;
   tagline?: string;
   denomination?: string;
+  congregationSize?: number;
   brand: BrandConfig;
   features: FeatureConfig;
   templateId: string;
+  story?: ChurchStory;
 }
 
 export interface GeneratedSiteConfig {

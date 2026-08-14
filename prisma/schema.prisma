@@ -21,6 +21,17 @@ enum MediaType {
   OTHER
 }
 
+model User {
+  id        String   @id @default(cuid())
+  auth0Id   String   @unique
+  email     String?
+  name      String?
+  picture   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  site      Site?
+}
+
 model Site {
   id               String @id @default(cuid())
   name             String
@@ -32,7 +43,8 @@ model Site {
   primaryContactEmail String?
   primaryContactPhone String?
 
-  tagline String?
+  tagline     String?
+  storyConfig Json    @default("{}")
 
   status SiteStatus @default(DRAFT)
 
@@ -44,6 +56,9 @@ model Site {
 
   templateId      String
   templateVersion Int    @default(1)
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

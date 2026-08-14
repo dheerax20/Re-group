@@ -1,4 +1,5 @@
 import { SectionType } from "@/lib/site/types";
+import type { BrandConfig } from "@/lib/theme/types";
 
 export interface TemplateSectionSpec {
   type: SectionType;
@@ -15,5 +16,6 @@ export interface TemplateDefinition {
     style: string;
     suitableFor: string[];
   };
+  brandPreset?: Pick<BrandConfig, "colors" | "typography">;
   sections: TemplateSectionSpec[];
 }

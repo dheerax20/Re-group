@@ -1,12 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { RegroupLogo } from "@/components/layout/regroup-logo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { fadeUp, staggerContainer } from "@/lib/motion/variants";
 
 function AuthShell({
@@ -50,11 +47,10 @@ function AuthShell({
 }
 
 export function LoginForm() {
-  const router = useRouter();
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Sign in to your church workspace."
+      subtitle="Sign in to your church workspace with Auth0."
       footer={
         <>
           Don&apos;t have an account?{" "}
@@ -64,40 +60,23 @@ export function LoginForm() {
         </>
       }
     >
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          router.push("/dashboard");
-        }}
-      >
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="you@church.org" required />
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link href="/forgot-password" className="text-xs text-brand hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          <Input id="password" type="password" placeholder="••••••••" required />
-        </div>
-        <Button type="submit" className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
-          Sign in
+      <div className="space-y-3">
+        <Button asChild className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
+          <a href="/auth/login?returnTo=/post-auth">Continue to login</a>
         </Button>
-      </form>
+        <p className="text-center text-xs text-muted">
+          Password reset is available on the Auth0 login screen.
+        </p>
+      </div>
     </AuthShell>
   );
 }
 
 export function SignupForm() {
-  const router = useRouter();
   return (
     <AuthShell
       title="Create your church"
-      subtitle="Start building your digital home in minutes."
+      subtitle="Create an account, then start the website builder."
       footer={
         <>
           Already have an account?{" "}
@@ -107,67 +86,27 @@ export function SignupForm() {
         </>
       }
     >
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          router.push("/builder");
-        }}
-      >
-        <p className="mb-4 rounded-xl border border-border bg-background px-3 py-2 text-xs text-muted">
-          Demo signup only — continuing opens the real website builder wizard.
-        </p>
-        <div className="space-y-2">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" placeholder="Jordan Lee" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="you@church.org" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" placeholder="••••••••" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="church">Church Name</Label>
-          <Input id="church" placeholder="Grace Community Church" required />
-        </div>
-        <Button type="submit" className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
-          Create church
-        </Button>
-      </form>
+      <Button asChild className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
+        <a href="/auth/login?screen_hint=signup&returnTo=/post-auth">Continue to signup</a>
+      </Button>
     </AuthShell>
   );
 }
 
 export function ForgotPasswordForm() {
-  const router = useRouter();
   return (
     <AuthShell
       title="Reset password"
-      subtitle="Enter your email and we'll send reset instructions."
+      subtitle="Use Auth0 Universal Login to reset your password."
       footer={
         <Link href="/login" className="font-medium text-brand hover:underline">
           Back to sign in
         </Link>
       }
     >
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          router.push("/login");
-        }}
-      >
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="you@church.org" required />
-        </div>
-        <Button type="submit" className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
-          Reset password
-        </Button>
-      </form>
+      <Button asChild className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
+          <a href="/auth/login?returnTo=/post-auth">Open login</a>
+      </Button>
     </AuthShell>
   );
 }

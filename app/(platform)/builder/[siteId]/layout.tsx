@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSite } from "@/lib/site/actions";
+import { requireSession } from "@/lib/auth/session";
 import { BuilderSidebar } from "@/components/builder/builder-sidebar";
 import {
   SidebarInset,
@@ -15,6 +16,7 @@ export default async function BuilderLayout({
   children: React.ReactNode;
   params: Promise<{ siteId: string }>;
 }) {
+  await requireSession();
   const { siteId } = await params;
   const site = await getSite(siteId);
   if (!site) notFound();
