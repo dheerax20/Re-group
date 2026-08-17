@@ -101,7 +101,7 @@ export function SocialForm({
           <span />
         )}
         <div className="flex items-center gap-3">
-          {saved ? <span className="text-sm text-emerald-600">Saved</span> : null}
+          {saved ? <span className="text-sm text-success">Saved</span> : null}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>

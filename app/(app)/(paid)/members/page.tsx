@@ -1,122 +1,68 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import Link from "next/link";
+import { Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
-import { demoMembers } from "@/lib/demo/mock-data";
-import { fadeUp, staggerContainer } from "@/lib/motion/variants";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+
+export const metadata = { title: "Members — Regroup" };
+
+/**
+ * Members is not built yet.
+ *
+ * This screen used to render `demoMembers` — invented names and email addresses,
+ * with working search over them — behind the paywall. A church would reasonably
+ * read that as their own directory failing to load, or worse, as real data. An
+ * honest empty state is the better product and the honest one.
+ */
+const PLANNED = [
+  {
+    title: "One directory",
+    detail: "Households, contact details, and who is new — kept in one place.",
+  },
+  {
+    title: "Groups and serving teams",
+    detail: "Track who is in which small group, team, or ministry.",
+  },
+  {
+    title: "Follow-up that does not get lost",
+    detail: "See first-time visitors and who has reached out to them.",
+  },
+];
 
 export default function MembersPage() {
-  const reduceMotion = useReducedMotion();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("All");
-
-  const filtered = useMemo(() => {
-    return demoMembers.filter((member) => {
-      const matchesQuery =
-        member.name.toLowerCase().includes(query.toLowerCase()) ||
-        member.email.toLowerCase().includes(query.toLowerCase());
-      const matchesStatus = status === "All" || member.status === status;
-      return matchesQuery && matchesStatus;
-    });
-  }, [query, status]);
-
   return (
-    <motion.div
-      initial={reduceMotion ? false : "hidden"}
-      animate="visible"
-      variants={staggerContainer}
-    >
-      <motion.div variants={fadeUp}>
-        <PageHeader
-          title="Members"
-          description="A simple CRM view of your congregation."
-          actions={
-            <Button className="bg-brand text-brand-foreground hover:bg-brand/90">
-              Add member
-            </Button>
-          }
-        />
-      </motion.div>
+    <div className="mx-auto max-w-3xl">
+      <PageHeader
+        title="Members"
+        description="A directory for your congregation."
+      />
 
-      <motion.div
-        variants={fadeUp}
-        className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center"
-      >
-        <Input
-          placeholder="Search members..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="sm:max-w-xs"
-        />
-        <div className="flex flex-wrap gap-2">
-          {["All", "Active", "Pending", "Inactive"].map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setStatus(item)}
-              className={`rounded-full border px-3 py-1.5 text-sm ${
-                status === item
-                  ? "border-brand bg-brand-soft text-brand"
-                  : "border-border bg-surface text-muted"
-              }`}
-            >
-              {item}
-            </button>
+      <EmptyState
+        icon={Users}
+        title="Members is coming soon"
+        description="We are building this next. Nothing is stored here yet, so there is nothing to set up — your website and content are unaffected."
+        action={
+          <Link href="/dashboard">
+            <Button>Back to dashboard</Button>
+          </Link>
+        }
+      />
+
+      <Card variant="flat" className="mt-4">
+        <CardTitle className="text-sm">What it will do</CardTitle>
+        <CardDescription className="text-xs">
+          Planned for the members release.
+        </CardDescription>
+        <ul className="mt-4 space-y-3">
+          {PLANNED.map((item) => (
+            <li key={item.title}>
+              <p className="text-sm font-medium">{item.title}</p>
+              <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+            </li>
           ))}
-        </div>
-      </motion.div>
-
-      <motion.div
-        variants={fadeUp}
-        className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-soft)]"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-border bg-background text-xs uppercase tracking-wider text-muted">
-              <tr>
-                <th className="px-4 py-3 font-medium">Member</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Groups</th>
-                <th className="px-4 py-3 font-medium">Joined</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((member) => (
-                <tr key={member.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar initials={member.initials} />
-                      <span className="font-medium">{member.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted">{member.email}</td>
-                  <td className="px-4 py-3 text-muted">{member.groups.join(", ")}</td>
-                  <td className="px-4 py-3 text-muted">{member.joined}</td>
-                  <td className="px-4 py-3">
-                    <Badge
-                      variant={
-                        member.status === "Active"
-                          ? "default"
-                          : member.status === "Pending"
-                            ? "secondary"
-                            : "outline"
-                      }
-                    >
-                      {member.status}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-    </motion.div>
+        </ul>
+      </Card>
+    </div>
   );
 }

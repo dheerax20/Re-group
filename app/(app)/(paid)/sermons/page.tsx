@@ -1,27 +1,34 @@
 import Link from "next/link";
+import { Mic2 } from "lucide-react";
 import { resolveActiveSite } from "@/lib/site/actions";
 import { listSermons } from "@/lib/site/content-actions";
 import { SermonsManager } from "@/components/builder/sermons-manager";
+import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 
-export default async function SermonsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ siteId?: string }>;
-}) {
-  const { siteId: preferred } = await searchParams;
-  const site = await resolveActiveSite(preferred ?? null);
+export const metadata = { title: "Sermons — Regroup" };
+
+export default async function SermonsPage() {
+  const site = await resolveActiveSite();
 
   if (!site) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Sermons</h1>
-        <p className="mt-2 text-sm text-muted">
-          Create a church website first — sermons you add appear on the public site.
-        </p>
-        <Link href="/builder" className="mt-6 inline-block">
-          <Button>Create website</Button>
-        </Link>
+      <div className="mx-auto max-w-3xl">
+        <PageHeader
+          title="Sermons"
+          description="Your message library, published to the sermons page."
+        />
+        <EmptyState
+          icon={Mic2}
+          title="Build your website first"
+          description="Sermons need somewhere to live. Once your site exists, everything you add here publishes to it."
+          action={
+            <Link href="/builder">
+              <Button>Build my website</Button>
+            </Link>
+          }
+        />
       </div>
     );
   }

@@ -1,0 +1,130 @@
+import { z } from "zod";
+import { sectionTypes } from "@/lib/site/types";
+
+export const AI_GENERATED_TEMPLATE_ID = "ai-generated";
+export const AI_GENERATED_TEMPLATE_VERSION = 1;
+
+/** AI must never pick a flat grey centered hero. */
+export const themeBriefSchema = z.object({
+  styleName: z.string().min(2).max(48),
+  mood: z.string().min(8).max(180),
+  visualLanguage: z.string().min(12).max(280),
+  heroTreatment: z.enum(["cinematic", "fullscreen", "split"]),
+  navbarTreatment: z.enum(["transparent", "solid"]),
+  mobileNotes: z.string().min(12).max(240),
+  gridNotes: z.string().min(12).max(240),
+});
+
+export const layoutPlanSchema = z.object({
+  rationale: z.string().min(12).max(280),
+  sections: z
+    .array(
+      z.object({
+        type: z.enum(sectionTypes),
+        variant: z.string().min(1).max(40),
+      })
+    )
+    .min(6)
+    .max(12),
+});
+
+export const copyDeckSchema = z.object({
+  seoTitle: z.string().min(8).max(80),
+  seoDescription: z.string().min(40).max(180),
+  sections: z
+    .array(
+      z.object({
+        type: z.enum(sectionTypes),
+        eyebrow: z.string().max(48),
+        title: z.string().max(90),
+        description: z.string().max(320),
+        ctaLabel: z.string().max(32),
+        ctaHref: z.string().max(80),
+      })
+    )
+    .min(1)
+    .max(12),
+  ministries: z
+    .array(
+      z.object({
+        name: z.string().max(40),
+        description: z.string().max(140),
+      })
+    )
+    .min(3)
+    .max(4),
+  stats: z
+    .array(
+      z.object({
+        label: z.string().max(20),
+        value: z.string().max(32),
+      })
+    )
+    .min(2)
+    .max(3),
+});
+
+export const designFeedbackSchema = z.object({
+  title: z.string().min(4).max(72),
+  detail: z.string().min(12).max(200),
+  area: z.enum(["mobile", "typography", "media", "contrast", "layout", "content"]),
+});
+
+export const qaReportSchema = z.object({
+  approved: z.boolean(),
+  issues: z.array(z.string().max(160)).max(8),
+  variantFixes: z
+    .array(
+      z.object({
+        type: z.enum(sectionTypes),
+        variant: z.string().min(1).max(40),
+      })
+    )
+    .max(8),
+  mobileFeedback: z.array(designFeedbackSchema).min(2).max(5),
+  designFeedback: z.array(designFeedbackSchema).min(2).max(5),
+});
+
+export const producerBriefSchema = z.object({
+  churchArchetype: z.string().min(4).max(80),
+  designGoal: z.string().min(12).max(240),
+  mustInclude: z.array(z.string().max(80)).min(2).max(6),
+});
+
+export const mediaPlanSchema = z.object({
+  improvements: z
+    .array(
+      z.object({
+        title: z.string().min(4).max(72),
+        detail: z.string().min(12).max(180),
+        action: z.enum([
+          "upload_hero_photo",
+          "add_welcome_video",
+          "connect_youtube",
+          "add_event_photos",
+          "upload_logo",
+          "add_sermon_video",
+          "fix_mobile_hero",
+          "fix_mobile_nav",
+          "tighten_mobile_type",
+        ]),
+      })
+    )
+    .min(3)
+    .max(7),
+});
+
+export type ThemeBrief = z.infer<typeof themeBriefSchema>;
+export type LayoutPlan = z.infer<typeof layoutPlanSchema>;
+export type CopyDeck = z.infer<typeof copyDeckSchema>;
+export type QaReport = z.infer<typeof qaReportSchema>;
+export type ProducerBrief = z.infer<typeof producerBriefSchema>;
+export type MediaPlan = z.infer<typeof mediaPlanSchema>;
+export type SiteImprovement = MediaPlan["improvements"][number];
+export type DesignFeedback = z.infer<typeof designFeedbackSchema>;
+
+export type AgentLogEntry = {
+  agent: string;
+  role: string;
+  summary: string;
+};

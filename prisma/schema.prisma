@@ -72,12 +72,114 @@ model Site {
   updatedAt   DateTime  @updatedAt
   publishedAt DateTime?
 
-  socialLinks SocialLink[]
-  media       Media[]
-  sermons     Sermon[]
-  events      Event[]
+  socialLinks    SocialLink[]
+  media          Media[]
+  sermons        Sermon[]
+  events         Event[]
+  domains        SiteDomain[]
+  generationJobs SiteGenerationJob[]
 
   @@index([status])
+}
+
+enum DomainStatus {
+  // Added to the Vercel project; DNS does not point here yet.
+  PENDING_DNS
+  // Vercel returned a TXT challenge because the domain is claimed by another
+  // Vercel account. `verification` holds the record to add.
+  PENDING_VERIFICATION
+  // Verified by Vercel and DNS resolves correctly. Safe to serve.
+  ACTIVE
+}
+
+/**
+ * A custom hostname pointed at one site. Only ACTIVE rows are ever served —
+ * `proxy.ts` resolves an incoming Host header to a site slug through here.
+ *
+ * `hostname` is globally unique because a hostname can only ever route to one
+ * site, and that uniqueness is what makes the resolver cache safe.
+ */
+model SiteDomain {
+  id       String @id @default(cuid())
+  siteId   String
+  hostname String @unique
+
+  status DomainStatus @default(PENDING_DNS)
+
+  // The one hostname used to build canonical/OG URLs. At most one per site,
+  // enforced in the action layer rather than the schema, because "no primary"
+  // is a legal state while every domain is still pending.
+  isPrimary Boolean @default(false)
+
+  // Whether Vercel considers the DNS records wrong. Distinct from `status`:
+  // a domain can be verified and still misconfigured if an A record is stale.
+  misconfigured Boolean @default(true)
+
+  // TXT challenges from Vercel, shape: [{ type, domain, value, reason }].
+  verification Json @default("[]")
+
+  lastCheckedAt DateTime?
+  verifiedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@index([status])
+  @@map("site_domains")
+}
+
+enum GenerationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/**
+ * One AI website build or editor prompt, tracked so the work survives the
+ * request that started it.
+ *
+ * The crew is six sequential LLM calls; running it inside the request that the
+ * browser is waiting on meant a closed tab discarded finished work and the
+ * progress UI could only ever be a guess. The action enqueues a row, `after()`
+ * advances it, and the client polls this.
+ *
+ * It doubles as the usage ledger: the monthly cap counts rows, so the limit
+ * cannot be bypassed by clearing a cache.
+ */
+model SiteGenerationJob {
+  id     String @id @default(cuid())
+  siteId String
+
+  // "full_build" (the agent crew) | "editor_prompt" (freeform edit)
+  kind   String
+  status GenerationStatus @default(QUEUED)
+
+  // Which specialist is running, and where it sits in the run. Written as the
+  // crew advances, so the client's progress display reflects real state.
+  step       String?
+  stepIndex  Int     @default(0)
+  totalSteps Int     @default(6)
+
+  prompt    String?
+  error     String?
+  styleName String?
+  summary   String?
+  log       Json    @default("[]")
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, createdAt])
+  @@index([status])
+  @@map("site_generation_jobs")
 }
 
 model SocialLink {

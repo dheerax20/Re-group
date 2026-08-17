@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/layout/error-state";
 
 /**
  * Billing settings can fail for the same reason `/upgrade` can — a missing
@@ -10,36 +9,19 @@ import { Button } from "@/components/ui/button";
  */
 export default function BillingSettingsError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
-  React.useEffect(() => {
-    console.error("[settings/billing]", error);
-  }, [error]);
-
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border border-border bg-surface p-8 shadow-[var(--shadow-soft)]">
-        <h1 className="text-lg font-semibold text-foreground">
-          Couldn&rsquo;t load your billing details
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Your subscription is unaffected — this is a display problem on our
-          side. Try again, and if it persists contact support.
-        </p>
-
-        {process.env.NODE_ENV !== "production" ? (
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-background p-3 text-xs text-muted">
-            {error.message}
-          </pre>
-        ) : null}
-
-        <Button onClick={reset} className="mt-6">
-          Try again
-        </Button>
-      </div>
-    </div>
+    <ErrorState
+      logLabel="[settings/billing]"
+      title="We couldn't load your billing details"
+      description="Your subscription is unaffected — this is a display problem on our side. Try again, and contact us if it keeps happening."
+      error={error}
+      retry={retry}
+      homeHref={null}
+    />
   );
 }

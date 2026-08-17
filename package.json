@@ -15,7 +15,12 @@
     "db:studio": "prisma studio",
     "stripe:bootstrap": "tsx scripts/bootstrap-stripe-catalog.ts",
     "billing:backfill": "tsx scripts/backfill-plan-keys.ts",
-    "billing:prune": "tsx scripts/prune-stripe-events.ts"
+    "billing:prune": "tsx scripts/prune-stripe-events.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "db:deploy": "prisma migrate deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -60,10 +65,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

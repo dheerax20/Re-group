@@ -1,18 +1,18 @@
-# Regroup — Church Website Builder (MVP)
+# Regroup — Church Website Builder
 
-A multi-tenant-ready church website builder. One Next.js application serves
-every church — each site is a row in Postgres rendered through a shared
+A multi-tenant church website builder. One Next.js application serves every
+church — each site is a row in Postgres rendered through a shared
 Template + Theme + Feature engine, not a separate deployment.
 
-No authentication in this MVP by design (see the task spec). Anyone with a
-`siteId` can edit that draft in the builder — this is intentional for the
-MVP and is the first thing to lock down when auth is added.
+Auth0 handles authentication, Stripe handles subscriptions, and every screen
+under `app/(app)/(paid)` plus every mutating Server Function requires a live
+base plan.
 
 ## Stack
 
-Next.js (App Router) · TypeScript · Tailwind CSS · PostgreSQL · Prisma ·
-Zod · React Hook Form · LangChain (`langchain` + `@langchain/openai`) for
-the AI-ready template recommendation engine.
+Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · PostgreSQL · Prisma ·
+Zod · React Hook Form · Auth0 · Stripe · Upstash Redis · Cloudflare R2 ·
+LangChain (`langchain` + `@langchain/openai`) for the AI site-building crew.
 
 ## Getting started
 
@@ -24,63 +24,127 @@ the AI-ready template recommendation engine.
 
 2. **Configure environment**
 
-   Copy `.env.example` to `.env` and point `DATABASE_URL` at a Postgres
-   database (a local one is fine — `docker run -p 5432:5432 -e
-   POSTGRES_PASSWORD=postgres postgres` works). `OPENAI_API_KEY` is
-   optional — leave it blank and the app uses the deterministic
-   rule-based recommendation engine.
+   Copy `.env.example` to `.env` and fill it in. Every variable is documented
+   there. The minimum for a working local app is `DATABASE_URL`, the four
+   `AUTH0_*` values, and `STRIPE_SECRET_KEY`.
+
+   Optional, each degrading cleanly when unset:
+
+   | Unset | Effect |
+   | --- | --- |
+   | `OPENAI_API_KEY` | Template recommendations fall back to the rule-based engine; the AI crew reports that it is unavailable |
+   | `UPSTASH_REDIS_*` | No caching or rate limiting; reads go straight to Postgres |
+   | `R2_*` | Uploads fail; everything else works |
+   | `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` | The Domains screen explains that custom domains are switched off |
+   | `INTERNAL_API_SECRET` | Custom domains do not resolve (`proxy.ts` cannot reach the resolver) |
 
 3. **Set up the database**
 
    ```bash
-   npm run db:push    # create tables from prisma/schema.prisma
-   npm run db:seed     # seed 3 templates + a demo church ("Grace Community Church")
+   npm run db:deploy   # apply prisma/migrations
+   npm run db:seed     # seed the templates
    ```
 
-4. **Run the dev server**
+   On a database that predates the migration baseline, see
+   `prisma/migrations/README.md` first.
+
+   `SEED_DEMO_CHURCH=1 npm run db:seed` also creates a fully published demo
+   church, which is useful when working on the public renderer.
+
+4. **Set up Stripe**
+
+   ```bash
+   npm run stripe:bootstrap                                   # create the catalog
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+
+   Put the `whsec_…` the CLI prints into `STRIPE_WEBHOOK_SECRET`. It differs
+   from the one in the dashboard.
+
+5. **Run the dev server**
 
    ```bash
    npm run dev
    ```
 
-   - Website builder wizard: http://localhost:3000/builder
-   - Demo published site: http://grace-community.localhost:3000
-     (most browsers/OS resolve `*.localhost` to loopback automatically —
-     this exercises the same host-based tenant routing used in production)
+   - App: http://localhost:3000
+   - A published site: http://grace-community.localhost:3000
+     (most browsers resolve `*.localhost` to loopback automatically, which
+     exercises the same host-based tenant routing used in production)
 
 ## How multi-tenancy works
 
-`middleware.ts` reads the request hostname. If it matches
-`<slug>.regroup.app` (or `<slug>.localhost` in dev), the request is
-rewritten internally to `/sites/<slug>/...`. Every public site page lives
-under `app/sites/[siteSlug]/`; the renderer never knows or cares how the
-tenant was resolved (see `lib/domains/tenant-resolver.ts`). This is the
-same shape that supports future custom-domain support without touching
-the renderer.
+`proxy.ts` reads the request hostname and resolves it to a site slug two ways:
+
+- **Platform subdomains** — `<slug>.regroup.app` (or `<slug>.localhost` in dev)
+  are parsed directly from the host. No lookup.
+- **Custom domains** — anything else is resolved against `SiteDomain`, and only
+  `ACTIVE` rows resolve. The proxy cannot open a database connection, so it
+  reads Upstash over `fetch` and, on a cache miss, calls
+  `/api/internal/hostname` (guarded by `INTERNAL_API_SECRET`), which owns the
+  Prisma query and repopulates the cache. Negative results are cached too, so
+  pointing arbitrary DNS at the platform cannot generate database load.
+
+Either way the request is rewritten to `/sites/<slug>/...`. Every public page
+lives under `app/sites/[siteSlug]/` and the renderer never knows how the tenant
+was resolved.
+
+### Custom domains
+
+Churches connect their own domain at **/dashboard/domains**. The flow:
+
+1. The hostname is validated (`lib/domains/hostname.ts`) and attached to the
+   Vercel project (`lib/domains/vercel.ts`). Vercel is called *first*, so the
+   database never claims a hostname the platform cannot serve.
+2. The UI shows the exact DNS record to add — an `A` record for an apex domain,
+   a `CNAME` for a subdomain — plus a `TXT` challenge if the domain is claimed
+   by another Vercel account.
+3. Status is always re-read from Vercel, never inferred. A domain goes `ACTIVE`
+   only when it is both verified *and* correctly configured; serving it earlier
+   would show visitors an error page under the church's own name.
+
+Requires a Vercel API token with access to the project (and the team, if the
+project belongs to one).
 
 ## Where things live
 
-- `lib/site` — SiteConfig type, Zod validation, navigation generation,
-  publish validation, server actions for the onboarding/builder CRUD flow.
-- `lib/templates` — the 3 seeded `TemplateDefinition`s (modern / editorial
-  / minimal) and the registry.
-- `lib/features` — `FeatureConfig`, defaults, and the single source of
-  truth for feature dependency rules (e.g. sermon search requires sermons).
-- `lib/theme` — `BrandConfig`, the approved font registry, and CSS-variable
-  generation so templates never hardcode colors/fonts.
-- `lib/ai` — `TemplateRecommendationEngine` (rule-based + LangChain-backed)
-  and `SiteGenerationProvider` (deterministic; AI can implement the same
-  interface later). AI only ever returns JSON, never React code.
-- `components/website/sections` — the actual section components (hero,
-  sermons, events, ...), each with 2-3 variants.
-- `components/website/renderer` — the fixed `sectionRegistry` and
-  `WebsiteRenderer`. Components are resolved only through this registry —
-  never from user input — so untrusted data can't trigger arbitrary
-  component execution.
-- `app/(platform)/builder` — website builder wizard + site editor
-  (`/builder` → church/brand/features/templates/publish, then
-  `/builder/[siteId]` for ongoing edits).
+- `lib/site` — `SiteConfig`, Zod validation, navigation generation, publish
+  validation, and the Server Functions behind the onboarding/builder flow.
+  `to-site-config.ts` is the single boundary where `Json` columns become typed
+  values, and it coerces rather than casts.
+- `lib/domains` — hostname rules and DNS guidance, the Vercel client, the
+  resolver (app and proxy variants), and the domain Server Functions.
+- `lib/billing` — Stripe catalog, sync, entitlements, and the paywall. `sync.ts`
+  is the only writer to the billing tables.
+- `lib/auth/session.ts` — `requireOwnedPaidSite` is the gate for every
+  mutation. Layout paywalls do not cover Server Functions.
+- `lib/ai` — the recommendation engines, the multi-agent crew, the persisted
+  generation job, and the monthly AI budget. AI only ever returns JSON.
+- `lib/validation/url.ts` — the rules for anything reaching an `href` or `src`
+  on a published site.
+- `lib/features`, `lib/theme`, `lib/templates` — feature dependency rules, the
+  approved font registry and CSS-variable generation, and the stock templates.
+- `components/website/sections` — the section components, each with 2–3
+  variants; `components/website/renderer` — the fixed `sectionRegistry`.
+  Components resolve only through that registry, never from user input.
+- `app/(platform)/builder` — the onboarding wizard.
+- `app/(app)` — the authenticated product. `(paid)` inside it is the paywall;
+  `settings/billing` sits deliberately outside it.
 - `app/sites/[siteSlug]` — the public, published website.
+
+## Design tokens
+
+`app/globals.css` holds two token families and they must not be mixed:
+
+- **App tokens** (`--surface`, `--brand`, `--success`, `--editor-*`) style
+  Regroup's own chrome, consumed as `bg-surface`, `text-muted`, and so on.
+- **Site tokens** (`--color-primary`, `--font-primary`) are the *church's*
+  brand, injected per request by `ThemeProvider`, and read only through the
+  `site-` prefixed utilities (`bg-site-primary`).
+
+Styling product chrome with a `site-` utility leaks a church's colours into the
+dashboard. The app follows the OS colour scheme; published church sites do not,
+because a church picks explicit brand colours.
 
 ## Scripts
 
@@ -88,15 +152,23 @@ the renderer.
 | --- | --- |
 | `npm run dev` | Start the dev server |
 | `npm run build` | Production build |
-| `npm run db:push` | Push `prisma/schema.prisma` to the database (no migration history) |
-| `npm run db:migrate` | Create/apply a dev migration |
-| `npm run db:seed` | Seed templates + the demo church |
+| `npm run verify` | Typecheck, lint, and test — what CI runs |
+| `npm run test` | Vitest suite |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm run db:deploy` | Apply migrations (use this on any shared database) |
+| `npm run db:migrate` | Create and apply a dev migration |
+| `npm run db:push` | Push the schema with no migration history — local throwaway only |
+| `npm run db:seed` | Seed templates (`SEED_DEMO_CHURCH=1` adds the demo church) |
 | `npm run db:studio` | Open Prisma Studio |
+| `npm run stripe:bootstrap` | Create the Stripe product catalog and portal config |
+| `npm run billing:backfill` | Backfill `SubscriptionItem.planKey` on old rows |
+| `npm run billing:prune` | Prune processed Stripe event records |
 
-## What's intentionally not built (see task spec §3, §46)
+## Not built yet
 
-Authentication, billing, custom domain provisioning, a full CMS, YouTube /
-podcast sync workers, analytics, and AI-generated React code are out of
-scope for this MVP. Interfaces (`StorageProvider`, `TenantResolver`,
-`MediaProvider`, `PodcastProvider`, `SiteGenerationProvider`) are shaped so
-none of that requires rewriting the website engine.
+Members and Courses are stubs — the screens say so rather than showing sample
+data. YouTube and podcast sync workers, analytics, and AI-generated React code
+are also out of scope. The `StorageProvider`, `MediaProvider`, and
+`SiteGenerationProvider` interfaces are shaped so none of that requires
+rewriting the website engine.

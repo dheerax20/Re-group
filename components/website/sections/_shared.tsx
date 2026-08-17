@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { safeLinkTarget, safeMediaUrl } from "@/lib/validation/url";
 
 export function Container({
   className,
@@ -44,4 +45,41 @@ export function cfgString(
 ): string {
   const value = config[key];
   return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+/**
+ * Reads an image or video URL out of section config.
+ *
+ * Section config is written by the visual editor and the AI crew and lands in
+ * `src` attributes on a public page, so it is sanitized here as well as on the
+ * write path — a row saved before the schemas existed still must not ship.
+ * Returns undefined rather than an empty string so callers can fall back to the
+ * generated CSS artwork.
+ */
+export function cfgMedia(
+  config: Record<string, unknown>,
+  key: string
+): string | undefined {
+  return safeMediaUrl(config[key]);
+}
+
+/** A call-to-action from section config, with both halves validated. */
+export function cfgCta(
+  config: Record<string, unknown>,
+  key: string,
+  fallback: { label: string; href: string }
+): { label: string; href: string } {
+  const raw = config[key];
+  const cta =
+    typeof raw === "object" && raw !== null
+      ? (raw as { label?: unknown; href?: unknown })
+      : {};
+
+  return {
+    label:
+      typeof cta.label === "string" && cta.label.trim()
+        ? cta.label.trim()
+        : fallback.label,
+    href: safeLinkTarget(cta.href, fallback.href),
+  };
 }

@@ -1,65 +1,32 @@
 import { redirect } from "next/navigation";
-import { getSite, getTemplateRecommendations, selectTemplate } from "@/lib/site/actions";
-import { buildPreviewSiteConfig } from "@/lib/site/preview";
+import Link from "next/link";
+import {
+  getAiWebsiteBuildStatus,
+  getSite,
+  startAiWebsiteBuild,
+} from "@/lib/site/actions";
 import { wizardHref } from "@/lib/onboarding/steps";
-import { WebsiteRenderer } from "@/components/website/renderer/website-renderer";
-import { ThemeProvider } from "@/components/theme/theme-provider";
-import { TemplatePreviewFrame } from "@/components/onboarding/template-preview-frame";
 import { WizardStepHeader } from "@/components/onboarding/wizard-step-header";
-import { templateRegistry } from "@/lib/templates/registry";
+import { AiWebsiteStudio } from "@/components/onboarding/ai-website-studio";
+import { GenerationPreview } from "@/components/onboarding/generation-preview";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import type { TemplateRecommendation } from "@/lib/ai/types";
-import type { SiteConfig } from "@/lib/site/types";
+import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
+import { sectionTypeLabels } from "@/lib/site/section-variants";
+import { Camera, ImagePlus, Smartphone, Sparkles, Video } from "lucide-react";
 
-function TemplateCard({
-  rec,
-  config,
-  featured,
-  chooseTemplate,
-}: {
-  rec: TemplateRecommendation;
-  config: SiteConfig;
-  featured: boolean;
-  chooseTemplate: (templateId: string) => Promise<void>;
-}) {
-  const template = templateRegistry[rec.templateId];
-  return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-[var(--shadow-soft)]">
-      {featured ? (
-        <div className="bg-accent px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent-foreground">
-          Best match
-        </div>
-      ) : null}
-      <ThemeProvider brand={config.brand}>
-        <TemplatePreviewFrame>
-          <WebsiteRenderer site={config} content={{ sermons: [], events: [] }} />
-        </TemplatePreviewFrame>
-      </ThemeProvider>
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-serif text-lg font-semibold text-foreground">
-            {template?.metadata.name}
-          </h3>
-          {rec.score > 0 ? <Badge variant="secondary">Score {rec.score}</Badge> : null}
-        </div>
-        <p className="mt-1 text-sm text-muted">{template?.metadata.description}</p>
-        <ul className="mt-3 space-y-1.5 text-sm text-foreground">
-          {rec.reasons.map((reason) => (
-            <li key={reason} className="flex items-start gap-1.5">
-              <span className="text-brand">✓</span> {reason}
-            </li>
-          ))}
-        </ul>
-        <form action={chooseTemplate.bind(null, rec.templateId)} className="mt-4">
-          <Button type="submit" className="w-full">
-            Use this design
-          </Button>
-        </form>
-      </div>
-    </div>
-  );
-}
+export const maxDuration = 180;
+
+const ACTION_HINT: Record<string, string> = {
+  upload_hero_photo: "Add your sanctuary / worship photo in the website editor",
+  add_welcome_video: "Add a welcome video URL in the editor",
+  connect_youtube: "Connect YouTube in the dashboard",
+  add_event_photos: "Add photos to upcoming events",
+  upload_logo: "Upload your logo in Brand",
+  add_sermon_video: "Attach video to sermons",
+  fix_mobile_hero: "Check hero crop on phone in the editor",
+  fix_mobile_nav: "Test the mobile menu on a phone",
+  tighten_mobile_type: "Shorten headlines for small screens",
+};
 
 export default async function TemplatesPage({
   searchParams,
@@ -72,81 +39,222 @@ export default async function TemplatesPage({
   const site = await getSite(siteId);
   if (!site) redirect("/builder");
 
-  const recommendations = await getTemplateRecommendations(siteId);
-  const recommendedIds = new Set(recommendations.map((r) => r.templateId));
-  const rest = Object.values(templateRegistry).filter((t) => !recommendedIds.has(t.id));
-  const previews = await Promise.all(
-    recommendations.map(async (rec) => ({
-      rec,
-      config: await buildPreviewSiteConfig(site, rec.templateId),
-    }))
-  );
-  const extraPreviews = await Promise.all(
-    rest.map(async (template) => ({
-      rec: {
-        templateId: template.id,
-        score: 0,
-        reasons: [template.metadata.description],
-      },
-      config: await buildPreviewSiteConfig(site, template.id),
-    }))
-  );
+  // A build in flight wins over an already-built site: after "Regenerate", the
+  // previous sections are still in the database, so checking only for sections
+  // would show the old website instead of the running build.
+  const job = await getAiWebsiteBuildStatus(siteId);
+  const building = job?.status === "QUEUED" || job?.status === "RUNNING";
+  const ready =
+    !building &&
+    site.template.id === AI_GENERATED_TEMPLATE_ID &&
+    site.sections.length > 0;
+  const improvements = site.improvements ?? [];
+  const designFeedback = site.designFeedback ?? [];
+  const mobileFeedback = site.mobileFeedback ?? [];
+  const agentLog = site.agentLog ?? [];
+  const styleName = site.styleName;
 
-  async function chooseTemplate(templateId: string) {
+  async function acceptWebsite() {
     "use server";
-    await selectTemplate(siteId!, templateId);
     redirect(wizardHref("publish", siteId!));
+  }
+
+  async function rebuildWebsite() {
+    "use server";
+    // Queues the crew and returns; the studio component polls the job. The
+    // redirect lands on this page with no finished site, which renders the
+    // studio and its live progress.
+    await startAiWebsiteBuild(siteId!);
+    redirect(wizardHref("templates", siteId!));
   }
 
   return (
     <div>
       <WizardStepHeader
-        title={`${previews.length} AI-matched designs for ${site.site.name}`}
-        description="Previews use your church story, colors, and features — cinematic templates included."
+        title={
+          ready
+            ? `${site.site.name}${styleName ? ` · ${styleName}` : ""}`
+            : `Designing ${site.site.name}`
+        }
+        description={
+          ready
+            ? "AI built layout and copy. Add your church photos before you publish."
+            : "LangChain crew invents layout + copy. You’ll provide photos next."
+        }
       />
 
-      <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted">
-        Ranked by congregation size, denomination, brand tokens, and enabled modules.
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        {previews.map(({ rec, config }, i) => {
-          const template = templateRegistry[rec.templateId];
-          return (
-            <TemplateCard
-              key={rec.templateId}
-              rec={rec}
-              config={config}
-              featured={i === 0}
-              chooseTemplate={chooseTemplate}
-            />
-          );
-        })}
-      </div>
-
-      {extraPreviews.length > 0 ? (
-        <div className="mt-12">
-          <h2 className="font-serif text-lg font-semibold">Full catalog</h2>
-          <p className="mt-1 text-sm text-muted">Every layout still uses your brand and story.</p>
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            {extraPreviews.map(({ rec, config }) => (
-              <TemplateCard
-                key={rec.templateId}
-                rec={rec}
-                config={config}
-                featured={false}
-                chooseTemplate={chooseTemplate}
-              />
-            ))}
+      {!ready ? (
+        <AiWebsiteStudio siteId={siteId} />
+      ) : (
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            {site.sections
+              .filter((section) => section.enabled)
+              .map((section) => (
+                <span
+                  key={section.id}
+                  className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium"
+                >
+                  {sectionTypeLabels[section.type] ?? section.type}
+                  {section.variant ? (
+                    <span className="text-muted"> · {section.variant}</span>
+                  ) : null}
+                </span>
+              ))}
           </div>
-        </div>
-      ) : null}
 
-      <div className="mt-8">
-        <a href={wizardHref("features", siteId)} className="text-sm text-muted hover:text-foreground">
-          ← Back
-        </a>
-      </div>
+          <div className="rounded-2xl border border-brand/30 bg-brand-soft/40 p-5 shadow-[var(--shadow-soft)]">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
+                <Camera className="size-4" />
+              </span>
+              <div>
+                <h2 className="font-semibold tracking-tight">Provide your images</h2>
+                <p className="mt-1 text-sm text-muted">
+                  Hero, welcome, about, and CTA photo slots are empty on purpose. Open the editor and
+                  paste image URLs (or upload later) so the site uses your real church photos.
+                </p>
+                <div className="mt-3">
+                  <Link href="/dashboard/builder">
+                    <Button size="sm" className="bg-brand text-brand-foreground hover:bg-brand/90">
+                      Add photos in editor
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <GenerationPreview site={site} />
+
+          {(mobileFeedback.length > 0 || designFeedback.length > 0) && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {mobileFeedback.length > 0 ? (
+                <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="size-4 text-brand" />
+                    <h2 className="font-semibold">Mobile improvements</h2>
+                  </div>
+                  <ul className="mt-3 space-y-2">
+                    {mobileFeedback.map((item) => (
+                      <li
+                        key={`m-${item.title}`}
+                        className="rounded-xl border border-border bg-background px-3 py-2.5"
+                      >
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {designFeedback.length > 0 ? (
+                <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-4 text-accent" />
+                    <h2 className="font-semibold">Design feedback</h2>
+                  </div>
+                  <ul className="mt-3 space-y-2">
+                    {designFeedback.map((item) => (
+                      <li
+                        key={`d-${item.title}`}
+                        className="rounded-xl border border-border bg-background px-3 py-2.5"
+                      >
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-wider text-muted">
+                          {item.area}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {improvements.length > 0 ? (
+            <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                  <ImagePlus className="size-4" />
+                </span>
+                <div>
+                  <h2 className="font-semibold tracking-tight">Photo & media checklist</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Provide these from your church — no AI-generated images for now.
+                  </p>
+                </div>
+              </div>
+              <ul className="mt-4 space-y-2">
+                {improvements.map((item) => (
+                  <li
+                    key={`${item.action}-${item.title}`}
+                    className="rounded-xl border border-border bg-background px-4 py-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      {item.action.includes("video") || item.action.includes("youtube") ? (
+                        <Video className="mt-0.5 size-4 shrink-0 text-brand" />
+                      ) : (
+                        <Camera className="mt-0.5 size-4 shrink-0 text-brand" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                        <p className="mt-1 text-[11px] font-medium text-brand">
+                          {ACTION_HINT[item.action] ?? "Open website editor"}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4">
+                <Link href="/dashboard/builder">
+                  <Button variant="outline" size="sm">
+                    Open editor
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
+          {agentLog.length > 0 ? (
+            <details className="rounded-2xl border border-border bg-background px-4 py-3">
+              <summary className="cursor-pointer text-sm font-medium">Agent run log</summary>
+              <ul className="mt-3 space-y-2 border-t border-border pt-3">
+                {agentLog.map((entry) => (
+                  <li key={`${entry.agent}-${entry.summary}`} className="text-xs text-muted">
+                    <span className="font-medium text-foreground">{entry.role}</span>
+                    {" — "}
+                    {entry.summary}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <form action={acceptWebsite} className="sm:flex-1">
+              <Button type="submit" className="w-full">
+                Use this website
+              </Button>
+            </form>
+            <form action={rebuildWebsite}>
+              <Button type="submit" variant="outline" className="w-full sm:w-auto">
+                Regenerate with AI
+              </Button>
+            </form>
+          </div>
+
+          <Link
+            href={wizardHref("features", siteId)}
+            className="text-sm text-muted hover:text-foreground"
+          >
+            ← Back to features
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,17 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db";
-import { invalidateSiteCache } from "@/lib/cache/redis";
-import { requireOwnedSite } from "@/lib/auth/session";
+import { prisma, type DbClient } from "@/lib/db";
+import { invalidateSite } from "@/lib/site/invalidate";
+import { requireOwnedPaidSite, requireOwnedSite } from "@/lib/auth/session";
 import { toDatabaseError } from "@/lib/db/errors";
 import { slugify } from "@/lib/validation/slug";
 import { generateNavigation } from "@/lib/site/navigation";
+import { httpsUrlSchema } from "@/lib/validation/url";
 import { defaultFeatures, type FeatureConfig } from "@/lib/features/types";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-
-type DbClient = Prisma.TransactionClient | typeof prisma;
 
 function mergeFeatures(stored: unknown, patch: Partial<FeatureConfig>): FeatureConfig {
   return {
@@ -31,7 +29,7 @@ const eventSchema = z.object({
   startAt: z.string().min(1, "Start date is required"),
   endAt: z.string().optional().or(z.literal("")),
   location: z.string().max(200).optional().or(z.literal("")),
-  registrationUrl: z.string().url().optional().or(z.literal("")),
+  registrationUrl: httpsUrlSchema.optional(),
 });
 
 const sermonSchema = z.object({
@@ -40,43 +38,22 @@ const sermonSchema = z.object({
   speaker: z.string().max(120).optional().or(z.literal("")),
   series: z.string().max(120).optional().or(z.literal("")),
   date: z.string().min(1, "Date is required"),
-  videoUrl: z.string().url().optional().or(z.literal("")),
-  audioUrl: z.string().url().optional().or(z.literal("")),
+  videoUrl: httpsUrlSchema.optional(),
+  audioUrl: httpsUrlSchema.optional(),
 });
 
 const youtubeSchema = z.object({
-  channelUrl: z.string().url("Enter a valid YouTube URL").or(z.literal("")),
+  channelUrl: httpsUrlSchema,
 });
 
 function uniqueSlug(base: string, existing: string[]) {
-  let slug = slugify(base) || "item";
+  const slug = slugify(base) || "item";
   if (!existing.includes(slug)) return slug;
   let i = 2;
   while (existing.includes(`${slug}-${i}`)) i += 1;
   return `${slug}-${i}`;
 }
 
-async function revalidateSite(siteId: string) {
-  const site = await prisma.site.findUnique({ where: { id: siteId }, select: { slug: true } });
-  if (site?.slug) {
-    revalidatePath(`/sites/${site.slug}`);
-    revalidatePath(`/sites/${site.slug}/about`);
-    revalidatePath(`/sites/${site.slug}/contact`);
-    revalidatePath(`/sites/${site.slug}/giving`);
-    revalidatePath(`/sites/${site.slug}/ministries`);
-    revalidatePath(`/sites/${site.slug}/events`);
-    revalidatePath(`/sites/${site.slug}/sermons`);
-    await invalidateSiteCache(site.slug);
-  }
-  revalidatePath(`/builder/${siteId}`);
-  revalidatePath(`/builder/${siteId}/events`);
-  revalidatePath(`/builder/${siteId}/sermons`);
-  revalidatePath(`/builder/${siteId}/youtube`);
-  revalidatePath("/events");
-  revalidatePath("/sermons");
-  revalidatePath("/youtube");
-  revalidatePath("/dashboard");
-}
 
 /** Turn on a feature + matching homepage section so new content shows on the public site. */
 async function enableFeatureOnSite(
@@ -143,7 +120,7 @@ export async function listEvents(siteId: string) {
 
 export async function createEvent(siteId: string, input: unknown) {
   try {
-    await requireOwnedSite(siteId);
+    await requireOwnedPaidSite(siteId);
     const data = eventSchema.parse(input);
     const existing = await prisma.event.findMany({
       where: { siteId },
@@ -168,7 +145,7 @@ export async function createEvent(siteId: string, input: unknown) {
       return created;
     });
 
-    await revalidateSite(siteId);
+    await invalidateSite(siteId);
     return { success: true as const, event };
   } catch (error) {
     toDatabaseError(error);
@@ -177,9 +154,9 @@ export async function createEvent(siteId: string, input: unknown) {
 
 export async function deleteEvent(siteId: string, eventId: string) {
   try {
-    await requireOwnedSite(siteId);
+    await requireOwnedPaidSite(siteId);
     await prisma.event.deleteMany({ where: { id: eventId, siteId } });
-    await revalidateSite(siteId);
+    await invalidateSite(siteId);
     return { success: true as const };
   } catch (error) {
     toDatabaseError(error);
@@ -200,7 +177,7 @@ export async function listSermons(siteId: string) {
 
 export async function createSermon(siteId: string, input: unknown) {
   try {
-    await requireOwnedSite(siteId);
+    await requireOwnedPaidSite(siteId);
     const data = sermonSchema.parse(input);
     const existing = await prisma.sermon.findMany({
       where: { siteId },
@@ -226,7 +203,7 @@ export async function createSermon(siteId: string, input: unknown) {
       return created;
     });
 
-    await revalidateSite(siteId);
+    await invalidateSite(siteId);
     return { success: true as const, sermon };
   } catch (error) {
     toDatabaseError(error);
@@ -235,9 +212,9 @@ export async function createSermon(siteId: string, input: unknown) {
 
 export async function deleteSermon(siteId: string, sermonId: string) {
   try {
-    await requireOwnedSite(siteId);
+    await requireOwnedPaidSite(siteId);
     await prisma.sermon.deleteMany({ where: { id: sermonId, siteId } });
-    await revalidateSite(siteId);
+    await invalidateSite(siteId);
     return { success: true as const };
   } catch (error) {
     toDatabaseError(error);
@@ -246,7 +223,7 @@ export async function deleteSermon(siteId: string, sermonId: string) {
 
 export async function updateYoutubeChannel(siteId: string, input: unknown) {
   try {
-    await requireOwnedSite(siteId);
+    await requireOwnedPaidSite(siteId);
     const data = youtubeSchema.parse(input);
     const site = await prisma.site.findUnique({ where: { id: siteId } });
     if (!site) throw new Error("Site not found");
@@ -283,7 +260,7 @@ export async function updateYoutubeChannel(siteId: string, input: unknown) {
       });
     }
 
-    await revalidateSite(siteId);
+    await invalidateSite(siteId);
     return { success: true as const };
   } catch (error) {
     toDatabaseError(error);

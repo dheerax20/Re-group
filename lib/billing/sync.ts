@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type Stripe from "stripe";
-import type { Prisma, SubscriptionStatus } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import type { SubscriptionStatus } from "@prisma/client";
+import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { getStripe } from "./stripe";
 import {
   BASE_PLAN_KEY,
@@ -158,7 +158,7 @@ function advisoryLockKey(value: string): bigint {
  * UPDATE` because on the very first event there is no row to lock.
  */
 async function acquireUserLock(
-  tx: Prisma.TransactionClient,
+  tx: PrismaTransactionClient,
   userId: string
 ): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${advisoryLockKey(userId)})`;

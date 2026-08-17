@@ -226,6 +226,14 @@ async function seedDemoChurch() {
 
 async function main() {
   await seedTemplates();
+
+  // Opt-in: the demo church writes a full published site, which is useful for
+  // local work on the public renderer and wrong to run against a real database.
+  if (process.env.SEED_DEMO_CHURCH === "1") {
+    await seedDemoChurch();
+  } else {
+    console.log("Skipping demo church. Set SEED_DEMO_CHURCH=1 to include it.");
+  }
 }
 
 main()

@@ -16,7 +16,7 @@ export function Dialog({
       <button
         type="button"
         aria-label="Close dialog"
-        className="absolute inset-0 bg-stone-950/40 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px]"
         onClick={() => onOpenChange(false)}
       />
       <div className="relative z-10 w-full max-w-lg">{children}</div>

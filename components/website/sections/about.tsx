@@ -1,5 +1,5 @@
 import { SectionProps } from "@/lib/site/types";
-import { Container, Eyebrow, cfgString } from "./_shared";
+import { Container, Eyebrow, cfgString, cfgMedia } from "./_shared";
 import { VisualBlock } from "./visual-block";
 
 export function AboutImageRight({ site, config }: SectionProps) {
@@ -27,7 +27,12 @@ export function AboutImageRight({ site, config }: SectionProps) {
             </p>
           ) : null}
         </div>
-        <VisualBlock variant="nature" className="aspect-[4/3] w-full" label="Our story" />
+        <VisualBlock
+          variant="nature"
+          className="aspect-[4/3] w-full"
+          label="Our story"
+          imageUrl={cfgMedia(config, "imageUrl")}
+        />
       </Container>
     </section>
   );
@@ -38,7 +43,12 @@ export function AboutImageLeft({ site, config }: SectionProps) {
     <section className="bg-site-background py-20">
       <Container className="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
         <div className="order-2 md:order-1">
-          <VisualBlock variant="editorial" className="aspect-[4/3] w-full" label="Heritage" />
+          <VisualBlock
+            variant="editorial"
+            className="aspect-[4/3] w-full"
+            label="Heritage"
+            imageUrl={cfgMedia(config, "imageUrl")}
+          />
         </div>
         <div className="order-1 md:order-2">
           <Eyebrow>{cfgString(config, "eyebrow", "About Us")}</Eyebrow>

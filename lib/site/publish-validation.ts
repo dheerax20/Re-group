@@ -1,7 +1,7 @@
-import { SiteConfig } from "./types";
+import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
 import { validateFeatureDependencies } from "@/lib/features/validate";
 import { templateRegistry } from "@/lib/templates/registry";
-import { sectionTypes } from "./types";
+import { sectionTypes, type SiteConfig } from "./types";
 import { slugSchema } from "@/lib/validation/slug";
 
 export interface PublishError {
@@ -53,14 +53,17 @@ export function validateSiteForPublish(
     });
   }
 
-  const template = templateRegistry[site.template.id];
-  if (!template) {
-    errors.push({ field: "template.id", message: "Template does not exist" });
-  } else if (template.version !== site.template.version) {
-    errors.push({
-      field: "template.version",
-      message: "Template version is not supported",
-    });
+  const isGenerated = site.template.id === AI_GENERATED_TEMPLATE_ID;
+  if (!isGenerated) {
+    const template = templateRegistry[site.template.id];
+    if (!template) {
+      errors.push({ field: "template.id", message: "Template does not exist" });
+    } else if (template.version !== site.template.version) {
+      errors.push({
+        field: "template.version",
+        message: "Template version is not supported",
+      });
+    }
   }
 
   const featureErrors = validateFeatureDependencies(site.features);

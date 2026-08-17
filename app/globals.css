@@ -2,15 +2,35 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Modern Sanctuary — warm linen surfaces, sanctuary navy + stained-glass gold.
+
+  Two token families live here and must not be confused:
+
+  - APP tokens (--background, --surface, --brand, --accent, ...) style Regroup's
+    own product chrome. Components consume them through Tailwind utilities such
+    as `bg-surface` and `text-muted`.
+  - SITE tokens (--color-primary, --color-accent, --font-primary, ...) are the
+    *tenant's* brand, injected per request by `ThemeProvider` from the church's
+    saved brand config. Section components read them only via the `site-`
+    prefixed utilities (`bg-site-primary`, `text-site-accent`).
+
+  Never style product chrome with a site- utility, or a church's colours will
+  leak into the dashboard.
+*/
+
 :root {
-  /* Modern Sanctuary — warm linen surfaces, sanctuary navy + stained-glass gold */
+  color-scheme: light;
+
   --background: #faf8f5;
   --foreground: #2d2926;
   --surface: #ffffff;
   --surface-muted: #f3efea;
+  --surface-raised: #ffffff;
   --muted: #6b655f;
   --muted-foreground: #6b655f;
   --border: #e8e1d6;
+  --border-strong: #d8cfc0;
   --input: #e8e1d6;
   --ring: #d4a359;
 
@@ -20,6 +40,7 @@
   --secondary-foreground: #2d2926;
   --destructive: #b3432e;
   --destructive-foreground: #ffffff;
+  --destructive-soft: #f9e7e2;
 
   --brand: #1e293b;
   --brand-foreground: #faf8f5;
@@ -28,7 +49,31 @@
   --accent-foreground: #2d2926;
   --accent-soft: #f6ecd9;
 
-  /* Default site theme tokens */
+  /*
+    Status colours. Separate from --accent on purpose: the accent is decoration
+    and can be brand-led, while these carry meaning and must stay legible.
+  */
+  --success: #2f6a4f;
+  --success-soft: #e4efe7;
+  --warning: #8a5a11;
+  --warning-soft: #fbeed7;
+  --info: #2f5d80;
+  --info-soft: #e4edf4;
+
+  /*
+    The website editor is a deliberately dark workspace so the church's own
+    site reads as the bright object on the canvas. Tokenised rather than
+    hardcoded so the editor stays consistent and themeable.
+  */
+  --editor-shell: #141211;
+  --editor-panel: #1c1917;
+  --editor-panel-raised: #24201d;
+  --editor-border: #322c27;
+  --editor-foreground: #f4efe8;
+  --editor-muted: #a29a90;
+  --editor-canvas: #f3efea;
+
+  /* Default site theme tokens — replaced per tenant by ThemeProvider. */
   --color-primary: #134e4a;
   --color-secondary: #2a6f6a;
   --color-background: #ffffff;
@@ -53,9 +98,11 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-primary: var(--primary);
@@ -64,12 +111,29 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-editor-shell: var(--editor-shell);
+  --color-editor-panel: var(--editor-panel);
+  --color-editor-panel-raised: var(--editor-panel-raised);
+  --color-editor-border: var(--editor-border);
+  --color-editor-foreground: var(--editor-foreground);
+  --color-editor-muted: var(--editor-muted);
+  --color-editor-canvas: var(--editor-canvas);
+
   --font-sans: var(--font-jakarta);
   --font-serif: var(--font-cormorant);
   --font-mono: var(--font-geist-mono);
@@ -103,6 +167,15 @@ body {
   font-family: var(--font-jakarta), system-ui, sans-serif;
 }
 
+/*
+  One visible focus treatment across the product. Keyboard users get a ring on
+  every interactive element without each component remembering to add one.
+*/
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .theme-root {
   background-color: var(--color-background);
   color: var(--color-foreground);
@@ -120,10 +193,15 @@ body {
 .regroup-noise {
   background-image: linear-gradient(
       180deg,
-      rgba(250, 248, 245, 0.25),
-      rgba(250, 248, 245, 0.9)
+      color-mix(in oklab, var(--background) 25%, transparent),
+      color-mix(in oklab, var(--background) 90%, transparent)
     ),
-    radial-gradient(ellipse at top, rgba(212, 163, 89, 0.14), transparent 55%);
+    radial-gradient(ellipse at top, color-mix(in oklab, var(--accent) 14%, transparent), transparent 55%);
+}
+
+/* Tabular figures wherever numbers are compared down a column. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -137,14 +215,25 @@ body {
   }
 }
 
+/*
+  Dark theme. Declared once and applied two ways: the `.dark` class for an
+  explicit choice, and `prefers-color-scheme` so the product follows the
+  operating system with no JavaScript. Previously only the class existed and
+  nothing ever set it, so these values never rendered — and the sidebar block
+  still held shadcn's default blues, which clash with the linen palette.
+*/
 .dark {
+  color-scheme: dark;
+
   --background: #1a1817;
   --foreground: #f3efea;
   --surface: #24211f;
   --surface-muted: #2c2825;
-  --muted: #9a938a;
-  --muted-foreground: #9a938a;
+  --surface-raised: #2c2825;
+  --muted: #a9a199;
+  --muted-foreground: #a9a199;
   --border: #34302c;
+  --border-strong: #443e38;
   --input: #34302c;
   --ring: #d4a359;
 
@@ -152,6 +241,9 @@ body {
   --primary-foreground: #1a1817;
   --secondary: #2c2825;
   --secondary-foreground: #f3efea;
+  --destructive: #e0705a;
+  --destructive-foreground: #1a1817;
+  --destructive-soft: #3a2620;
 
   --brand: #d4a359;
   --brand-foreground: #1a1817;
@@ -160,12 +252,83 @@ body {
   --accent-foreground: #1a1817;
   --accent-soft: #3a3128;
 
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --success: #7cc39b;
+  --success-soft: #22302a;
+  --warning: #e0b264;
+  --warning-soft: #33291a;
+  --info: #8ab4d8;
+  --info-soft: #1f2a33;
+
+  --editor-canvas: #201d1b;
+
+  --sidebar: #211e1c;
+  --sidebar-foreground: #f3efea;
+  --sidebar-primary: #d4a359;
+  --sidebar-primary-foreground: #1a1817;
+  --sidebar-accent: #2f2a26;
+  --sidebar-accent-foreground: #f3efea;
+  --sidebar-border: #34302c;
+  --sidebar-ring: #d4a359;
+}
+
+@media (prefers-color-scheme: dark) {
+  /*
+    `:not(.light)` so an explicit light choice still wins over a dark OS.
+  */
+  :root:not(.light) {
+    color-scheme: dark;
+
+    --background: #1a1817;
+    --foreground: #f3efea;
+    --surface: #24211f;
+    --surface-muted: #2c2825;
+    --surface-raised: #2c2825;
+    --muted: #a9a199;
+    --muted-foreground: #a9a199;
+    --border: #34302c;
+    --border-strong: #443e38;
+    --input: #34302c;
+    --ring: #d4a359;
+
+    --primary: #d4a359;
+    --primary-foreground: #1a1817;
+    --secondary: #2c2825;
+    --secondary-foreground: #f3efea;
+    --destructive: #e0705a;
+    --destructive-foreground: #1a1817;
+    --destructive-soft: #3a2620;
+
+    --brand: #d4a359;
+    --brand-foreground: #1a1817;
+    --brand-soft: #3a3128;
+    --accent: #d4a359;
+    --accent-foreground: #1a1817;
+    --accent-soft: #3a3128;
+
+    --success: #7cc39b;
+    --success-soft: #22302a;
+    --warning: #e0b264;
+    --warning-soft: #33291a;
+    --info: #8ab4d8;
+    --info-soft: #1f2a33;
+
+    --editor-canvas: #201d1b;
+
+    --sidebar: #211e1c;
+    --sidebar-foreground: #f3efea;
+    --sidebar-primary: #d4a359;
+    --sidebar-primary-foreground: #1a1817;
+    --sidebar-accent: #2f2a26;
+    --sidebar-accent-foreground: #f3efea;
+    --sidebar-border: #34302c;
+    --sidebar-ring: #d4a359;
+  }
+
+  /*
+    Published church sites are NOT dark-mode aware — a church picks explicit
+    brand colours and those must render as chosen on every visitor's device.
+  */
+  .theme-root {
+    color-scheme: light;
+  }
 }

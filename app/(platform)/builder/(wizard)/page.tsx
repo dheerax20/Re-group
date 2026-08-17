@@ -10,7 +10,7 @@ async function startBuilder() {
   const result = await createDraftSite();
   if (!result?.siteId) redirect("/post-auth");
   if (result.existing) {
-    redirect(`/dashboard?siteId=${result.siteId}`);
+    redirect("/dashboard");
   }
   redirect(wizardHref("church", result.siteId));
 }
@@ -19,7 +19,7 @@ export default async function BuilderWizardStartPage() {
   const user = await syncCurrentUser();
   await requireActivePlan(user.id);
   if (user.site) {
-    redirect(`/dashboard?siteId=${user.site.id}`);
+    redirect("/dashboard");
   }
   return <OnboardingWelcome startAction={startBuilder} />;
 }

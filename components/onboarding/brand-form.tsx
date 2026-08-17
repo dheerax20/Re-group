@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { brandConfigSchema, BrandConfigInput } from "@/lib/validation/brand";
 import { updateBrand } from "@/lib/site/actions";
@@ -56,7 +56,7 @@ export function BrandForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { isSubmitting },
   } = useForm({
@@ -64,7 +64,9 @@ export function BrandForm({
     defaultValues: defaultValues as BrandConfigInput,
   });
 
-  const values = watch() as unknown as BrandConfig;
+  // `useWatch` rather than `watch()`: watch returns a fresh function on every
+  // render, which makes the whole component unmemoizable by the React Compiler.
+  const values = useWatch({ control }) as unknown as BrandConfig;
 
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -268,7 +270,7 @@ export function BrandForm({
           <span />
         )}
         <div className="flex items-center gap-3">
-          {saved ? <span className="text-sm text-emerald-600">Saved</span> : null}
+          {saved ? <span className="text-sm text-success">Saved</span> : null}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : submitLabel}
           </Button>

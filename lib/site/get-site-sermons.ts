@@ -20,7 +20,9 @@ export interface CachedSermon {
 /** Full sermon list for a site, cached — search/detail lookups filter this
  * in memory instead of issuing separate DB queries. */
 export async function getCachedSermons(siteId: string, slug: string): Promise<CachedSermon[]> {
-  return cached(`site:${slug}:sermons`, 3600, async () => {
+  // An empty list is a real value, not an absent one, so it never takes the
+  // negative-cache path — `?? []` only covers the `cached` signature.
+  const sermons = await cached(`site:${slug}:sermons`, 3600, async () => {
     const sermons = await prisma.sermon.findMany({
       where: { siteId },
       orderBy: { date: "desc" },
@@ -40,6 +42,8 @@ export async function getCachedSermons(siteId: string, slug: string): Promise<Ca
       transcript: s.transcript,
     }));
   });
+
+  return sermons ?? [];
 }
 
 export function filterSermons(sermons: CachedSermon[], q?: string): CachedSermon[] {

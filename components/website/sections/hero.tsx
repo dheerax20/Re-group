@@ -1,15 +1,11 @@
 import Link from "next/link";
 import { SectionProps } from "@/lib/site/types";
-import { Container, cfgString } from "./_shared";
+import { Container, cfgString, cfgCta, cfgMedia } from "./_shared";
 import { buttonVariants } from "@/components/ui/button";
 import { StatPill, VisualBlock } from "./visual-block";
 
 function ctaHref(config: Record<string, unknown>): { label: string; href: string } {
-  const cta = config.primaryCta as { label?: string; href?: string } | undefined;
-  return {
-    label: cta?.label ?? "Plan Your Visit",
-    href: cta?.href ?? "/contact",
-  };
+  return cfgCta(config, "primaryCta", { label: "Plan Your Visit", href: "/contact" });
 }
 
 function configStats(
@@ -42,8 +38,12 @@ export function HeroSplit({ site, config }: SectionProps) {
 
   return (
     <section className="relative overflow-hidden bg-site-primary text-white">
-      <div className="absolute inset-0 opacity-30">
-        <VisualBlock variant="worship" className="h-full rounded-none" />
+      <div className="absolute inset-0">
+        <VisualBlock
+          variant="worship"
+          className="h-full rounded-none"
+          imageUrl={cfgMedia(config, "imageUrl")}
+        />
       </div>
       <Container className="relative grid min-h-[620px] items-center gap-10 py-20 md:grid-cols-2">
         <div>
@@ -85,6 +85,8 @@ export function HeroSplit({ site, config }: SectionProps) {
           variant="sanctuary"
           className="min-h-[280px] md:min-h-[420px]"
           label={site.site.name}
+          imageUrl={cfgMedia(config, "imageUrl")}
+          videoUrl={cfgMedia(config, "videoUrl")}
         />
       </Container>
     </section>
@@ -120,7 +122,13 @@ export function HeroCentered({ site, config }: SectionProps) {
           {cta.label}
         </Link>
         <div className="mx-auto mt-14 max-w-4xl">
-          <VisualBlock variant="community" className="aspect-[21/9] w-full" label="This Sunday" />
+          <VisualBlock
+            variant="community"
+            className="aspect-[21/9] w-full"
+            label="This Sunday"
+            imageUrl={cfgMedia(config, "imageUrl")}
+            videoUrl={cfgMedia(config, "videoUrl")}
+          />
         </div>
       </Container>
     </section>
@@ -138,7 +146,12 @@ export function HeroFullscreen({ site, config }: SectionProps) {
 
   return (
     <section className="relative flex min-h-[85vh] items-end overflow-hidden text-white">
-      <VisualBlock variant="worship" className="absolute inset-0 rounded-none" />
+      <VisualBlock
+        variant="worship"
+        className="absolute inset-0 rounded-none"
+        imageUrl={cfgMedia(config, "imageUrl")}
+        videoUrl={cfgMedia(config, "videoUrl")}
+      />
       <Container className="relative z-10 pb-20 pt-40">
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-site-accent">
           {cfgString(config, "eyebrow", site.site.denomination || "Church")}
@@ -176,7 +189,12 @@ export function HeroCinematic({ site, config }: SectionProps) {
 
   return (
     <section className="relative flex min-h-[92vh] items-end overflow-hidden text-white">
-      <VisualBlock variant="cinematic" className="absolute inset-0 rounded-none" />
+      <VisualBlock
+        variant="cinematic"
+        className="absolute inset-0 rounded-none"
+        imageUrl={cfgMedia(config, "imageUrl")}
+        videoUrl={cfgMedia(config, "videoUrl")}
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
       <Container className="relative z-10 pb-16 pt-40 md:pb-24">
         <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-site-accent">

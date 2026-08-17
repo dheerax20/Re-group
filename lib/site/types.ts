@@ -114,4 +114,9 @@ export interface SiteConfig {
   giving?: GivingConfig;
   contact?: ContactInfo;
   story?: ChurchStory;
+  improvements?: import("@/lib/site/story").SiteImprovement[];
+  designFeedback?: import("@/lib/site/story").DesignFeedback[];
+  mobileFeedback?: import("@/lib/site/story").DesignFeedback[];
+  agentLog?: Array<{ agent: string; role: string; summary: string }>;
+  styleName?: string;
 }

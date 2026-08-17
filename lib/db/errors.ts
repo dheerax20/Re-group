@@ -1,13 +1,34 @@
 import { Prisma } from "@prisma/client";
 
+/**
+ * The database is unreachable.
+ *
+ * `message` is deliberately plain and vendor-free, because it is the string
+ * that reaches a browser when this escapes to an error boundary or a Server
+ * Function. It previously named the hosting provider and told the reader to run
+ * `npm run db:push` — instructions a church cannot act on, about infrastructure
+ * that is our responsibility.
+ *
+ * The operator-facing detail lives in `DEV_HINT` and is logged, never rendered.
+ */
 export class DatabaseUnavailableError extends Error {
-  constructor(
-    message = "Can't reach Neon. Open the Neon console to wake the project, confirm DATABASE_URL, then retry."
-  ) {
+  constructor(message = "We couldn't reach our database. Please try again in a moment.") {
     super(message);
     this.name = "DatabaseUnavailableError";
   }
 }
+
+/**
+ * What an operator should check. Logged on the server only.
+ *
+ * Kept accurate for the current setup: managed Postgres on a free tier
+ * suspends when idle, so the first request after a quiet period can fail while
+ * the instance wakes — which is also why `withDbRetry` exists.
+ */
+const DEV_HINT =
+  "Database unreachable. If this is a free-tier instance it may be paused — " +
+  "wake it in your provider's console, confirm DATABASE_URL points at the " +
+  "pooled connection string, then retry.";
 
 export function isDatabaseUnavailableError(error: unknown): boolean {
   if (error instanceof DatabaseUnavailableError) return true;
@@ -23,9 +44,10 @@ export function isDatabaseUnavailableError(error: unknown): boolean {
 
 export function toDatabaseError(error: unknown): never {
   if (isDatabaseUnavailableError(error)) {
-    throw new DatabaseUnavailableError(
-      "Can't reach Neon Postgres. Wake the project in the Neon dashboard (free tier pauses when idle), check DATABASE_URL in .env, then run `npm run db:push`."
-    );
+    // The cause and the hint go to the server log; only the plain message
+    // travels to the client.
+    console.error(`[db] ${DEV_HINT}`, error);
+    throw new DatabaseUnavailableError();
   }
   throw error;
 }

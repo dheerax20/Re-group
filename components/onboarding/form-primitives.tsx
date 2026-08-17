@@ -47,7 +47,7 @@ export function FieldHint({ children }: { children: React.ReactNode }) {
 
 export function FieldError({ children }: { children?: React.ReactNode }) {
   if (!children) return null;
-  return <p className="text-[13px] text-red-600">{children}</p>;
+  return <p className="text-[13px] text-destructive">{children}</p>;
 }
 
 export function FormActions({
