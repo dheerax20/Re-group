@@ -88,7 +88,7 @@ export function AiWebsiteStudio({ siteId }: { siteId: string }) {
               AI design studio
             </p>
             <h2 className="mt-1 font-serif text-2xl font-semibold tracking-tight">
-              Building a cinematic church homepage
+              Designing your church homepage
             </h2>
             <p className="mt-2 max-w-xl text-sm text-editor-muted">
               Specialists invent layout and copy. Photos stay empty — you&apos;ll add

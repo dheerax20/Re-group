@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["tests/setup.ts"],
     // Env vars a few modules read at import time. Set here so a developer's
     // real .env cannot change what the suite asserts.
     env: {

@@ -8,6 +8,7 @@ import { brandConfigSchema, defaultBrandConfig } from "@/lib/validation/brand";
 import { socialLinksSchema, toSocialLinkRecords } from "@/lib/validation/social";
 import { sectionConfigSchema, coerceSections } from "@/lib/validation/section";
 import { slugSchema, slugify } from "@/lib/validation/slug";
+import { wizardHref } from "@/lib/onboarding/steps";
 import { defaultFeatures, FeatureConfig } from "@/lib/features/types";
 import { validateFeatureDependencies } from "@/lib/features/validate";
 import { generateNavigation } from "@/lib/site/navigation";
@@ -73,6 +74,38 @@ export async function createDraftSite() {
   } catch (error) {
     toDatabaseError(error);
   }
+}
+
+/**
+ * Where a signed-in user with a site should land.
+ *
+ * `createDraftSite` writes the `Site` row the moment the wizard starts —
+ * before any design has been generated or published — so `user.site` being
+ * non-null was being treated as "has a website" by the post-auth and
+ * wizard-root redirects. A church that dropped off after the "church info"
+ * step got sent straight to `/dashboard` on every later visit: an empty
+ * shell with zero sections and no visible way back into setup, which reads
+ * as "there is no website here."
+ *
+ * This resolves the real state instead of assuming it: no sections yet →
+ * back into the AI design step; sections but never published → the publish
+ * step; published → the dashboard.
+ */
+export async function resumeHref(siteId: string): Promise<string> {
+  await requireOwnedSite(siteId);
+
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: { status: true, sectionConfig: true },
+  });
+  if (!site) return "/builder";
+
+  if (site.status === "PUBLISHED") return "/dashboard";
+
+  const sections = Array.isArray(site.sectionConfig) ? site.sectionConfig : [];
+  return sections.length === 0
+    ? wizardHref("templates", siteId)
+    : wizardHref("publish", siteId);
 }
 
 export async function getSite(siteId: string) {

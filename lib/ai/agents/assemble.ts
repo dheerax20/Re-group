@@ -4,8 +4,8 @@ import { mergeNavigation } from "@/lib/site/pages";
 import { sectionTypes, type SectionInstance, type SectionType } from "@/lib/site/types";
 import { composeSectionCopy } from "@/lib/ai/section-copy";
 import type { SiteGenerationInput, GeneratedSiteConfig } from "@/lib/ai/types";
-import { layoutFromFeatures, sanitizeVariant } from "./catalog";
-import type { CopyDeck, LayoutPlan, QaReport, ThemeBrief } from "./schemas";
+import { layoutFromFeatures, sanitizeVariant, type ArtDirection } from "./catalog";
+import type { CopyDeck, LayoutPlan, QaReport } from "./schemas";
 
 const REQUIRED: SectionType[] = ["navbar", "hero", "footer"];
 
@@ -20,55 +20,88 @@ function allowedType(type: SectionType, features: FeatureConfig): boolean {
   return true;
 }
 
-/** Enforce a premium church homepage — never a flat grey landing page. */
-function aestheticVariant(type: SectionType, variant: string): string {
-  let next = sanitizeVariant(type, variant);
-  if (type === "hero") {
-    if (next === "centered") next = "cinematic";
-    if (!["cinematic", "fullscreen", "split"].includes(next)) next = "cinematic";
+/**
+ * The only two rules enforced here are real defects, not style preferences.
+ *
+ * This used to also force hero to cinematic/fullscreen, welcome to split, and
+ * navbar's minimal option to transparent — a second, code-level lock on top
+ * of a system prompt that already pushed every build toward one look, which
+ * between them is why regenerating a site kept producing the same structure.
+ * Sanitizing unknown values and the two legibility fixes below are the parts
+ * of that function that were ever actually load-bearing; everything else was
+ * taste, and taste now belongs to the chosen `ArtDirection`, not a hard lock.
+ */
+function enforceLegibility(sections: Array<{ type: SectionType; variant: string }>) {
+  const navbar = sections.find((row) => row.type === "navbar");
+  const hero = sections.find((row) => row.type === "hero");
+  if (!navbar || !hero) return;
+
+  // NavbarTransparent renders `position: absolute` over whatever is below it
+  // in white/light text — legible only when the hero underneath is a
+  // full-bleed treatment (split, fullscreen, cinematic). HeroCentered's own
+  // background is the page background with only a faded decorative band, so
+  // transparent text over it can fail contrast entirely.
+  const FULL_BLEED_HEROES = new Set(["split", "fullscreen", "cinematic"]);
+  if (navbar.variant === "transparent" && !FULL_BLEED_HEROES.has(hero.variant)) {
+    navbar.variant = "solid";
   }
-  if (type === "navbar") {
-    // Transparent only works over photo heroes; keep it for cinematic/fullscreen.
-    if (next === "minimal") next = "transparent";
-  }
-  if (type === "welcome" && next === "centered") next = "split";
-  if (type === "about" && next !== "image-left" && next !== "image-right") {
-    next = "image-right";
-  }
-  if (type === "events" && next === "calendar") next = "grid";
-  return next;
+}
+
+function cleanVariant(type: SectionType, variant: string): string {
+  return sanitizeVariant(type, variant);
 }
 
 export function assembleGeneratedSite(args: {
   input: SiteGenerationInput;
-  theme?: ThemeBrief;
+  direction: ArtDirection;
   layout?: LayoutPlan;
   copy?: CopyDeck;
   qa?: QaReport;
 }): GeneratedSiteConfig {
-  const { input, theme, layout, copy, qa } = args;
-  const heroTreatment = theme?.heroTreatment ?? "cinematic";
-  const fallback = layoutFromFeatures(
-    input.features,
-    heroTreatment,
-    theme?.navbarTreatment === "solid" ? "solid" : "transparent"
-  );
+  const { input, direction, layout, copy, qa } = args;
+  const fallback = layoutFromFeatures(input.features, direction);
+
+  /**
+   * The six section types a direction actually defines a look for. Their
+   * variant comes from `direction`, full stop — never from the model.
+   *
+   * This is the fix for regenerating producing the same site: it used to be
+   * the model's job to pick these, constrained only by a prompt telling it
+   * what to prefer, and models reliably follow "prefer cinematic" by
+   * preferring cinematic every time. `direction` is chosen once per build
+   * with `pickArtDirection()`, which explicitly avoids repeating whatever the
+   * previous build used — so the structural look now genuinely varies, and
+   * varies predictably, instead of depending on the model doing something
+   * different each time.
+   *
+   * What the model keeps real creative control over: which optional sections
+   * (ministries, giving, youtube, podcast, contact) appear and in what order
+   * — via `layout.sections` — plus every word of the copy.
+   */
+  const LOCKED: Partial<Record<SectionType, string>> = {
+    navbar: direction.navbar,
+    hero: direction.hero,
+    welcome: direction.welcome,
+    about: direction.about,
+    sermons: direction.sermons,
+    events: direction.events,
+  };
 
   const planned = (layout?.sections ?? fallback)
     .filter((row) => sectionTypes.includes(row.type) && allowedType(row.type, input.features))
     .map((row) => ({
       type: row.type,
-      variant: aestheticVariant(row.type, row.variant),
+      variant: LOCKED[row.type] ?? cleanVariant(row.type, row.variant),
     }));
 
+  // Still applied for the handful of section types that aren't direction-locked
+  // (their component only has one registered variant anyway, so this is a
+  // no-op in practice, but it keeps a hallucinated QA fix from doing anything
+  // odd rather than relying on that being true forever).
   for (const fix of qa?.variantFixes ?? []) {
+    if (LOCKED[fix.type]) continue;
     const match = planned.find((row) => row.type === fix.type);
-    if (match) match.variant = aestheticVariant(fix.type, fix.variant);
-  }
-
-  // Final aesthetic lock after QA patches.
-  for (const row of planned) {
-    row.variant = aestheticVariant(row.type, row.variant);
+    if (match) match.variant = cleanVariant(fix.type, fix.variant);
   }
 
   const seen = new Set<SectionType>();
@@ -81,7 +114,7 @@ export function assembleGeneratedSite(args: {
   for (const required of REQUIRED) {
     if (!unique.some((row) => row.type === required)) {
       const seed = fallback.find((row) => row.type === required);
-      if (seed) unique.unshift({ ...seed, variant: aestheticVariant(seed.type, seed.variant) });
+      if (seed) unique.unshift({ ...seed, variant: cleanVariant(seed.type, seed.variant) });
     }
   }
 
@@ -94,11 +127,16 @@ export function assembleGeneratedSite(args: {
         const insertAt = footerIndex === -1 ? unique.length : footerIndex;
         unique.splice(insertAt, 0, {
           ...seed,
-          variant: aestheticVariant(seed.type, seed.variant),
+          variant: cleanVariant(seed.type, seed.variant),
         });
       }
     }
   }
+
+  // The one real defect check — navbar legibility against whatever hero the
+  // AI (or the fallback) actually settled on. Everything else about the look
+  // is `direction`'s call, not this function's.
+  enforceLegibility(unique);
 
   if (unique[0]?.type !== "navbar") {
     unique.sort((a, b) => {

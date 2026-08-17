@@ -4,13 +4,17 @@ import { sectionTypes } from "@/lib/site/types";
 export const AI_GENERATED_TEMPLATE_ID = "ai-generated";
 export const AI_GENERATED_TEMPLATE_VERSION = 1;
 
-/** AI must never pick a flat grey centered hero. */
+/**
+ * No `styleName`/`heroTreatment`/`navbarTreatment` here — those are decided
+ * once, deterministically, by `pickArtDirection()` before this agent ever
+ * runs (see `lib/ai/agents/catalog.ts`). Asking the model to also state them
+ * meant a validated, schema-correct answer could still just restate whatever
+ * it was biased toward, which is how "prefer cinematic" became "always
+ * cinematic." This agent's real, remaining job is describing how the fixed
+ * direction should read for THIS specific church.
+ */
 export const themeBriefSchema = z.object({
-  styleName: z.string().min(2).max(48),
-  mood: z.string().min(8).max(180),
   visualLanguage: z.string().min(12).max(280),
-  heroTreatment: z.enum(["cinematic", "fullscreen", "split"]),
-  navbarTreatment: z.enum(["transparent", "solid"]),
   mobileNotes: z.string().min(12).max(240),
   gridNotes: z.string().min(12).max(240),
 });

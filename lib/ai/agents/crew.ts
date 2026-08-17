@@ -1,6 +1,6 @@
 import type { GeneratedSiteConfig, SiteGenerationInput, SiteGenerationProvider } from "@/lib/ai/types";
 import { assembleGeneratedSite } from "./assemble";
-import { profileForAgents } from "./catalog";
+import { artDirectionByName, pickArtDirection, profileForAgents } from "./catalog";
 import {
   createChurchAgents,
   runCopywriter,
@@ -23,7 +23,7 @@ export type ChurchWebsiteBuild = GeneratedSiteConfig & {
 /** The crew's steps, in run order. The client's progress list reads this. */
 export const CREW_STEPS = [
   { id: "producer", label: "Producer", detail: "Church story & creative brief" },
-  { id: "theme-director", label: "Art director", detail: "Cinematic look & mobile grid" },
+  { id: "theme-director", label: "Art director", detail: "Visual direction & mobile grid" },
   { id: "layout-architect", label: "Layout", detail: "Unique section architecture" },
   { id: "copywriter", label: "Copywriter", detail: "Congregation-specific words" },
   { id: "media-director", label: "Media checklist", detail: "What photos you should provide" },
@@ -64,9 +64,16 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
     };
   }
 
+  /**
+   * @param previousStyleName The `styleName` from this site's last build, if
+   * any — passed straight through from the stored site record. Used only to
+   * pick a genuinely different `ArtDirection` this time; the crew never sees
+   * or reasons about the previous build's content otherwise.
+   */
   async build(
     input: SiteGenerationInput,
-    onProgress?: CrewProgress
+    onProgress?: CrewProgress,
+    previousStyleName?: string
   ): Promise<ChurchWebsiteBuild> {
     if (!this.apiKey) {
       throw new Error("OPENAI_API_KEY is missing, so the AI crew cannot build a website.");
@@ -82,12 +89,17 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
       }
     };
 
+    // Chosen once, up front — every agent below is briefed on the same fixed
+    // direction rather than each independently guessing at a "premium" look
+    // and converging on whichever one the training data rewards most.
+    const direction = pickArtDirection(artDirectionByName(previousStyleName)?.id);
+
     const log: AgentLogEntry[] = [];
     const agents = createChurchAgents(this.apiKey);
     const profile = profileForAgents(input);
 
     await report("producer");
-    const brief = await runProducer(agents, profile);
+    const brief = await runProducer(agents, profile, direction);
     log.push({
       agent: "producer",
       role: "Executive producer",
@@ -95,28 +107,28 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
     });
 
     await report("theme-director");
-    const theme = await runThemeDirector(agents, profile, brief);
+    const theme = await runThemeDirector(agents, profile, brief, direction);
     log.push({
       agent: "theme-director",
       role: "Art director",
-      summary: `${theme.styleName} · ${theme.heroTreatment} hero`,
+      summary: `${direction.name} · ${direction.hero} hero`,
     });
 
     await report("layout-architect");
-    const layout = await runLayoutArchitect(agents, profile, brief, theme);
+    const layout = await runLayoutArchitect(agents, profile, brief, theme, direction);
     log.push({
       agent: "layout-architect",
       role: "Information architect",
       summary: layout.rationale,
     });
 
-    // Parallel track: copy + media checklist (user-provided photos — no AI image gen).
+    // Parallel track: copy + media checklist are independent of each other.
     // Reported as the copywriter because that is the slower of the two and the
     // step the user is really waiting on.
     await report("copywriter");
     const [copy, media] = await Promise.all([
-      runCopywriter(agents, profile, brief, theme, layout),
-      runMediaDirector(agents, profile, layout),
+      runCopywriter(agents, profile, brief, theme, layout, direction),
+      runMediaDirector(agents, profile, layout, direction),
     ]);
 
     log.push({
@@ -135,19 +147,21 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
       agents,
       theme,
       layout,
-      JSON.stringify(input.features)
+      copy,
+      JSON.stringify(input.features),
+      direction
     );
     log.push({
       agent: "responsive-qa",
       role: "Design & mobile QA",
       summary: qa.approved
         ? `Approved · ${qa.mobileFeedback.length} mobile notes`
-        : qa.issues.slice(0, 2).join(" ") || "Applied layout patches.",
+        : qa.issues.slice(0, 2).join(" ") || "Applied copy patches.",
     });
 
     const assembled = assembleGeneratedSite({
       input,
-      theme,
+      direction,
       layout,
       copy,
       qa,
@@ -165,7 +179,7 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
     return {
       ...assembled,
       log,
-      styleName: theme.styleName,
+      styleName: direction.name,
       improvements,
       designFeedback: qa.designFeedback,
       mobileFeedback: qa.mobileFeedback,

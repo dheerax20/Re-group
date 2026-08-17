@@ -1,7 +1,7 @@
 import type { GenerationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { invalidateSite } from "@/lib/site/invalidate";
-import { parseChurchStory } from "@/lib/site/story";
+import { parseChurchStory, parseStyleName } from "@/lib/site/story";
 import { coerceSections } from "@/lib/validation/section";
 import { getChurchWebsiteCrew } from "./multi-agent-site-builder";
 import { CREW_STEPS } from "./agents/crew";
@@ -162,7 +162,8 @@ export async function runFullBuildJob(jobId: string): Promise<void> {
           where: { id: jobId },
           data: { step: step.id, stepIndex: step.index },
         });
-      }
+      },
+      parseStyleName(site.storyConfig)
     );
 
     // The crew's section list is model output: run it through the same repair

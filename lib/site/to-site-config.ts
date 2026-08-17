@@ -129,18 +129,16 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
   const navigation = coerceNavigation(site.navigationConfig);
   const seo = coerceSeo(site.seoConfig);
 
-  const sections = (coerceSections(site.sectionConfig) as SectionInstance[]).map((section) => {
-    // AI-generated sites are held to the cinematic look the crew is briefed
-    // for; a "centered" hero or welcome from an older run is upgraded on read.
-    if (site.templateId !== "ai-generated") return section;
-    if (section.type === "hero" && section.variant === "centered") {
-      return { ...section, variant: "cinematic" };
-    }
-    if (section.type === "welcome" && section.variant === "centered") {
-      return { ...section, variant: "split" };
-    }
-    return section;
-  });
+  // `coerceSections` already repairs anything invalid (unknown types, unsafe
+  // URLs, hallucinated variants). It used to also rewrite AI-generated sites'
+  // "centered" hero/welcome to cinematic/split unconditionally — a third
+  // hard-coded style lock, on top of the ones in the agent prompts and in
+  // `assemble.ts`, that ran on every read of every AI site. With the crew now
+  // deliberately choosing "centered" for some visual directions
+  // (`lib/ai/agents/catalog.ts`), this would have silently rewritten those
+  // sites back to the one look on every single page load — undoing the fix
+  // at the one layer that's actually impossible to notice from the UI.
+  const sections = coerceSections(site.sectionConfig) as SectionInstance[];
 
   const contact: ContactInfo = {
     email: site.primaryContactEmail ?? undefined,

@@ -16,7 +16,7 @@ import {
   type QaReport,
   type ThemeBrief,
 } from "./schemas";
-import { variantCatalogForPrompt } from "./catalog";
+import type { ArtDirection } from "./catalog";
 
 function structuredChain<T extends z.ZodType>(
   llm: ChatOpenAI,
@@ -36,74 +36,105 @@ function structuredChain<T extends z.ZodType>(
   return RunnableSequence.from([prompt, structured]);
 }
 
+/** Renders a direction's locked fields as an instruction block every layout-facing agent shares. */
+function directionBrief(direction: ArtDirection): string {
+  return (
+    `Visual direction: "${direction.name}".\n` +
+    `Mood: ${direction.mood}\n` +
+    `Locked layout — do not deviate from these: navbar=${direction.navbar}, hero=${direction.hero}, ` +
+    `welcome=${direction.welcome}, about=${direction.about}, sermons=${direction.sermons}, events=${direction.events}.`
+  );
+}
+
+/**
+ * Two temperatures, not one. The layout/copy schema-bearing agents stay lower
+ * so structured output parses reliably; the theme director — pure prose, no
+ * enums to get right — runs warmer so its description of the same locked
+ * direction doesn't read identically across two churches.
+ */
 export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
-  const llm = new ChatOpenAI({ apiKey, model, temperature: 0.45 });
+  const llm = new ChatOpenAI({ apiKey, model, temperature: 0.55 });
+  const proseLlm = new ChatOpenAI({ apiKey, model, temperature: 0.8 });
 
   const producer = structuredChain(
     llm,
     producerBriefSchema,
     "church_producer_brief",
     "You are the executive producer of a premium church website studio. " +
-      "You NEVER choose a stock catalog template. You brief a specialist crew to invent a unique, " +
-      "aesthetic, photo-led homepage for this congregation. " +
-      "Demand cinematic photography, clear hierarchy, and mobile-first spacing. " +
+      "A visual direction has already been chosen for this build — your job is to brief the crew on " +
+      "how THIS specific church fits that direction, not to invent a different one. " +
+      "Ground everything in the church's actual profile (denomination, city, worship style, mission, values) " +
+      "rather than generic church-website language. " +
       "Never invent miracles, addresses, or phone numbers.",
-    "Church profile:\n{profile}\n\nWrite a short production brief for the design crew."
+    "Direction:\n{direction}\n\nChurch profile:\n{profile}\n\nWrite a short production brief for the design crew."
   );
 
   const themeDirector = structuredChain(
-    llm,
+    proseLlm,
     themeBriefSchema,
     "church_theme_director",
-    "You are art director for cinematic church websites. " +
-      "heroTreatment MUST be cinematic or fullscreen (prefer cinematic). Use split only if the story is very editorial. " +
-      "NEVER propose a plain grey or centered-on-empty-canvas look. " +
-      "navbarTreatment MUST be transparent when the hero is a full-bleed photo. " +
-      "Describe mobile: single column, 16px gutters, large tap targets, readable type at 390px width.",
-    "Producer brief:\n{brief}\n\nChurch profile:\n{profile}\n\nCreate the visual brief."
+    "You are art director for church websites. The visual direction and its layout are already " +
+      "decided — your job is describing how that direction should feel for THIS church specifically. " +
+      "Reference real details from the profile (worship style, denomination, congregation size) in your " +
+      "visualLanguage. Two churches given the same direction should read as two different, specific " +
+      "answers, not the same paragraph with the name swapped. " +
+      "mobileNotes and gridNotes should be concrete enough that a designer could act on them without " +
+      "asking a follow-up question.",
+    "Direction:\n{direction}\n\nProducer brief:\n{brief}\n\nChurch profile:\n{profile}\n\nDescribe how this direction fits this church."
   );
 
   const layoutArchitect = structuredChain(
     llm,
     layoutPlanSchema,
     "church_layout_architect",
-    "You invent a unique church homepage sequence — not a catalog pick. " +
-      "HARD RULES: " +
-      "1) First = navbar (transparent). " +
-      "2) Second = hero with variant cinematic OR fullscreen only. " +
-      "3) Welcome = split (photo + story). " +
-      "4) About = image-right or image-left. " +
-      "5) Include cta + footer. " +
-      "6) Only include sermons/events/ministries/giving/youtube/podcast/contact when that feature is true. " +
-      "7) Prefer events=grid, sermons=cards for mobile. " +
-      "Use ONLY these variants:\n{variants}",
-    "Producer brief:\n{brief}\n\nTheme:\n{theme}\n\nChurch profile:\n{profile}\n\nOutput the section plan."
+    "You sequence a church homepage. " +
+      "The look of navbar, hero, welcome, about, sermons, and events is already fixed — restate exactly " +
+      "the variant given to you for each of those types; do not substitute a different one. " +
+      "Your real job is everything else: which of the church's enabled optional sections " +
+      "(ministries, giving, youtube, podcast, contact) appear, and in what order between 'about' and 'cta'. " +
+      "Order by what a first-time visitor most needs next — a church that leads with community should put " +
+      "ministries early; a giving-forward moment usually reads better late, right before the closing cta. " +
+      "Structure: navbar first, footer last, cta second-to-last. Only include a section type whose feature " +
+      "is confirmed on in the profile. " +
+      "Use ONLY these variants (already assigned per type; do not invent a new one):\n{variants}",
+    "Direction:\n{direction}\n\nProducer brief:\n{brief}\n\nTheme:\n{theme}\n\nChurch profile:\n{profile}\n\nOutput the section plan."
   );
 
   const copywriter = structuredChain(
-    llm,
+    proseLlm,
     copyDeckSchema,
     "church_copywriter",
-    "You write aesthetic website copy for churches. Specific to this congregation. " +
+    "You write website copy for one specific church, in the voice given to you — never generic " +
+      "church-website boilerplate. " +
+      "Use at least two concrete details from the church profile (city, worship style, pastor's name, " +
+      "mission, values, denomination) somewhere in the copy — a headline, a description, or a stat. " +
+      "Never reuse these overused phrases: 'a place to belong', 'join us this Sunday', 'come as you are', " +
+      "'we'd love to meet you' — say the same thing in this church's own words instead. " +
       "Short headlines that work on a phone (under ~8 words when possible). " +
-      "Avoid cliches unless you add a local detail. Never invent contact details. " +
+      "Never invent contact details. " +
       "CTA hrefs: /contact, /about, /sermons, /events, /giving only. " +
       "Every section object MUST include eyebrow, title, description, ctaLabel, ctaHref — use '' if unused.",
-    "Producer brief:\n{brief}\n\nTheme:\n{theme}\n\nLayout types: {types}\n\nChurch profile:\n{profile}\n\nWrite the copy deck."
+    "Direction:\n{direction}\n\nCopy voice: {copyVoice}\n\nProducer brief:\n{brief}\n\nTheme:\n{theme}\n\n" +
+      "Layout types: {types}\n\nChurch profile:\n{profile}\n\nWrite the copy deck."
   );
 
   const responsiveQa = structuredChain(
     llm,
     qaReportSchema,
     "church_responsive_qa",
-    "You are design QA for church websites on mobile (390px), tablet (768px), and desktop. " +
-      "Reject flat grey heroes and centered-only text heroes — fix hero to cinematic/fullscreen. " +
-      "Reject transparent navbar without a photo hero. " +
-      "Approve only if navbar+hero+footer exist and feature flags match. " +
-      "mobileFeedback: 2-5 concrete mobile UX notes (type size, stack order, CTA thumb reach, image crop). " +
-      "designFeedback: 2-5 aesthetic improvements (contrast, photo quality, whitespace, hierarchy). " +
-      "variantFixes must use ONLY:\n{variants}",
-    "Theme:\n{theme}\n\nLayout:\n{layout}\n\nFeatures:\n{features}\n\nAudit this plan for beauty and mobile."
+    "You are editorial QA for a church website on mobile (390px), tablet (768px), and desktop. " +
+      "The layout and hero/navbar treatment are already fixed and already legibility-checked — do not " +
+      "flag or change them. Your job is catching real problems in what actually varies: copy that reads " +
+      "generic instead of specific to this church, a headline too long to read on a phone in one glance, " +
+      "ministries or stats that feel like filler, or a mismatch between the stated mood and the actual " +
+      "words used. " +
+      "Approve only when the copy is genuinely specific to this church and reads well at 390px width. " +
+      "mobileFeedback: 2-5 concrete notes on copy length, tap-target spacing, and stack order on a phone. " +
+      "designFeedback: 2-5 notes on whether the words match the intended mood and where they don't. " +
+      "variantFixes should almost always be empty — only use it if a section type is missing that the " +
+      "profile's features require.",
+    "Direction:\n{direction}\n\nTheme:\n{theme}\n\nLayout:\n{layout}\n\nCopy:\n{copy}\n\nFeatures:\n{features}\n\n" +
+      "Audit this plan for specificity, mobile readability, and mood fit."
   );
 
   const mediaDirector = structuredChain(
@@ -116,7 +147,7 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
       "(always include upload_hero_photo; also welcome/about/event photos when relevant). " +
       "Include at least one mobile-related action " +
       "(fix_mobile_hero, fix_mobile_nav, or tighten_mobile_type).",
-    "Church profile:\n{profile}\n\nLayout types: {types}\n\nList media todos for the church to provide."
+    "Direction:\n{direction}\n\nChurch profile:\n{profile}\n\nLayout types: {types}\n\nList media todos for the church to provide."
   );
 
   return { producer, themeDirector, layoutArchitect, copywriter, responsiveQa, mediaDirector };
@@ -124,21 +155,31 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
 
 export type ChurchAgents = ReturnType<typeof createChurchAgents>;
 
+function directionForPrompt(direction: ArtDirection): string {
+  return directionBrief(direction);
+}
+
 export async function runProducer(
   agents: ChurchAgents,
-  profile: string
+  profile: string,
+  direction: ArtDirection
 ): Promise<ProducerBrief> {
-  return agents.producer.invoke({ profile }) as Promise<ProducerBrief>;
+  return agents.producer.invoke({
+    profile,
+    direction: directionForPrompt(direction),
+  }) as Promise<ProducerBrief>;
 }
 
 export async function runThemeDirector(
   agents: ChurchAgents,
   profile: string,
-  brief: ProducerBrief
+  brief: ProducerBrief,
+  direction: ArtDirection
 ): Promise<ThemeBrief> {
   return agents.themeDirector.invoke({
     profile,
     brief: JSON.stringify(brief),
+    direction: directionForPrompt(direction),
   }) as Promise<ThemeBrief>;
 }
 
@@ -146,13 +187,19 @@ export async function runLayoutArchitect(
   agents: ChurchAgents,
   profile: string,
   brief: ProducerBrief,
-  theme: ThemeBrief
+  theme: ThemeBrief,
+  direction: ArtDirection
 ): Promise<LayoutPlan> {
   return agents.layoutArchitect.invoke({
     profile,
     brief: JSON.stringify(brief),
     theme: JSON.stringify(theme),
-    variants: variantCatalogForPrompt(),
+    direction: directionForPrompt(direction),
+    variants:
+      `navbar: ${direction.navbar}\nhero: ${direction.hero}\nwelcome: ${direction.welcome}\n` +
+      `about: ${direction.about}\nsermons: ${direction.sermons}\nevents: ${direction.events}\n` +
+      "ministries: grid\ngiving: centered\nyoutube: featured\npodcast: featured\ncontact: standard\n" +
+      "cta: full-width\nfooter: standard",
   }) as Promise<LayoutPlan>;
 }
 
@@ -161,13 +208,16 @@ export async function runCopywriter(
   profile: string,
   brief: ProducerBrief,
   theme: ThemeBrief,
-  layout: LayoutPlan
+  layout: LayoutPlan,
+  direction: ArtDirection
 ): Promise<CopyDeck> {
   return agents.copywriter.invoke({
     profile,
     brief: JSON.stringify(brief),
     theme: JSON.stringify(theme),
     types: layout.sections.map((s) => s.type).join(", "),
+    direction: directionForPrompt(direction),
+    copyVoice: direction.copyVoice,
   }) as Promise<CopyDeck>;
 }
 
@@ -175,23 +225,28 @@ export async function runResponsiveQa(
   agents: ChurchAgents,
   theme: ThemeBrief,
   layout: LayoutPlan,
-  features: string
+  copy: CopyDeck,
+  features: string,
+  direction: ArtDirection
 ): Promise<QaReport> {
   return agents.responsiveQa.invoke({
     theme: JSON.stringify(theme),
     layout: JSON.stringify(layout),
+    copy: JSON.stringify(copy),
     features,
-    variants: variantCatalogForPrompt(),
+    direction: directionForPrompt(direction),
   }) as Promise<QaReport>;
 }
 
 export async function runMediaDirector(
   agents: ChurchAgents,
   profile: string,
-  layout: LayoutPlan
+  layout: LayoutPlan,
+  direction: ArtDirection
 ): Promise<MediaPlan> {
   return agents.mediaDirector.invoke({
     profile,
     types: layout.sections.map((s) => s.type).join(", "),
+    direction: directionForPrompt(direction),
   }) as Promise<MediaPlan>;
 }

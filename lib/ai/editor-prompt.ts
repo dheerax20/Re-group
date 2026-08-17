@@ -97,8 +97,10 @@ export async function applyEditorAiPrompt(args: {
           "Apply the pastor/admin prompt to homepage section copy and variants. " +
           "Only edit section ids that exist in the current site JSON. " +
           "Leave imageUrl alone — never invent photo URLs; tell them to upload photos via improvements. " +
-          "Hero variants only: cinematic, fullscreen, split. Navbar: transparent or solid. " +
-          "About: image-left or image-right. Welcome: prefer split over centered. " +
+          "Hero variants: cinematic, fullscreen, split, or centered — pick whichever the prompt is " +
+          "actually asking for; do not default to cinematic. Navbar: transparent, solid, or minimal " +
+          "(transparent only reads well over cinematic/fullscreen/split, never over centered). " +
+          "About: image-left or image-right. Welcome: centered or split, whichever fits the request. " +
           "ctaHref should be internal paths like /contact, /about, /events. " +
           "Empty string means leave that field unchanged. " +
           "Always refresh improvements + design/mobile feedback covering photos, content, and mobile.",
