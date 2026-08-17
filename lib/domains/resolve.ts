@@ -14,7 +14,16 @@ import { cached, invalidateHostnameCache } from "@/lib/cache/redis";
  * generate database load.
  */
 
-export const HOSTNAME_TTL_SECONDS = 300;
+/**
+ * Long on purpose. Every write that could change what a hostname serves —
+ * add, remove, verify, publish, status transition — calls
+ * `invalidateSiteHostnames`, so the cache is corrected explicitly and the TTL
+ * only bounds staleness for changes made outside the app (someone deleting the
+ * domain in the Vercel dashboard). A short TTL here meant serving depended on
+ * the resolver route being reachable every few minutes, and when it wasn't,
+ * a fully configured church domain silently fell through to the platform site.
+ */
+export const HOSTNAME_TTL_SECONDS = 6 * 60 * 60;
 export const HOSTNAME_NEGATIVE_TTL_SECONDS = 60;
 
 export function hostnameCacheKey(hostname: string): string {

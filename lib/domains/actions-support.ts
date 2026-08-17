@@ -1,6 +1,6 @@
 import type { DomainStatus, SiteDomain } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { invalidateSiteHostnames } from "./resolve";
+import { invalidateSiteHostnames, resolveHostnameToSlug } from "./resolve";
 import {
   dnsRecordsFor,
   isApex,
@@ -202,6 +202,19 @@ export async function refreshDomainStatus(domain: SiteDomain): Promise<SiteDomai
   // Whether this hostname resolves has changed, so the resolver cache must go.
   if (updated.status !== domain.status) {
     await invalidateSiteHostnames(domain.siteId);
+  }
+
+  /**
+   * Warm the mapping the moment the domain is live, instead of waiting for the
+   * first visitor to trigger a cache miss in the proxy. The proxy's miss path
+   * depends on the internal resolver route being reachable and configured;
+   * priming from here — where Prisma is available — means a correctly set up
+   * domain serves the church site even if that path is briefly broken.
+   */
+  if (updated.status === "ACTIVE") {
+    await resolveHostnameToSlug(updated.hostname).catch((error) => {
+      console.error(`[domains] cache warm failed for ${updated.hostname}`, error);
+    });
   }
 
   return updated;
