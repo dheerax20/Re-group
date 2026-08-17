@@ -1,18 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Calendar,
   Mic2,
   Video,
-  PanelsTopLeft,
   CreditCard,
   ChevronsLeft,
   ChevronsRight,
+  Globe,
   LogOut,
   UserRound,
+  Users,
+  GraduationCap,
+  Link2,
+  PencilRuler,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,11 +34,49 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/events", label: "Events", icon: Calendar },
-  { href: "/sermons", label: "Sermons", icon: Mic2 },
-  { href: "/youtube", label: "YouTube", icon: Video },
+/**
+ * Navigation is grouped by what a church is actually doing: shaping the
+ * website, keeping content current, and everything about the church itself.
+ * A flat list of eight items gave no clue that "Pages & links" belongs with the
+ * editor while "Events" does not.
+ *
+ * There are no `?siteId=` parameters here. One account owns one website, so the
+ * site comes from the session; threading an id through every link only created
+ * a second, spoofable source of truth.
+ */
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  match?: "exact" | "prefix";
+  soon?: boolean;
+};
+
+const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
+  {
+    label: "Website",
+    items: [
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard, match: "exact" },
+      { href: "/dashboard/builder", label: "Editor", icon: PencilRuler },
+      { href: "/dashboard/pages", label: "Pages & links", icon: Link2 },
+      { href: "/dashboard/domains", label: "Domains", icon: Globe },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { href: "/events", label: "Events", icon: Calendar },
+      { href: "/sermons", label: "Sermons", icon: Mic2 },
+      { href: "/youtube", label: "YouTube", icon: Video },
+    ],
+  },
+  {
+    label: "Congregation",
+    items: [
+      { href: "/members", label: "Members", icon: Users, soon: true },
+      { href: "/courses", label: "Courses", icon: GraduationCap, soon: true },
+    ],
+  },
 ];
 
 function navButtonClass(active: boolean) {
@@ -47,32 +89,32 @@ function navButtonClass(active: boolean) {
   );
 }
 
+function isActive(pathname: string, item: NavItem) {
+  if (item.match === "exact") return pathname === item.href;
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
 export function AppSidebar({
-  siteId,
   siteName,
   userEmail,
   userName,
   userPicture,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
-  siteId?: string | null;
   siteName?: string | null;
   userEmail?: string | null;
   userName?: string | null;
   userPicture?: string | null;
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
 
-  const activeSiteId = searchParams.get("siteId") ?? siteId;
-  const withSite = (href: string) =>
-    activeSiteId ? `${href}?siteId=${activeSiteId}` : href;
+  // The website editor owns the full viewport — hide the product chrome.
+  if (pathname.startsWith("/dashboard/builder")) {
+    return null;
+  }
 
-  const websiteHref = activeSiteId
-    ? `/dashboard/builder?siteId=${activeSiteId}`
-    : "/dashboard/builder";
   const churchInitial = (siteName?.trim()?.[0] ?? "C").toUpperCase();
 
   return (
@@ -88,7 +130,7 @@ export function AppSidebar({
             type="button"
             onClick={collapsed ? toggleSidebar : undefined}
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-brand text-[13px] font-bold tracking-tight text-brand-foreground shadow-[0_1px_0_rgba(255,255,255,0.18)_inset]",
+              "flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-brand text-[13px] font-bold tracking-tight text-brand-foreground",
               !collapsed && "pointer-events-none"
             )}
             title={collapsed ? "Expand sidebar" : "Regroup"}
@@ -123,8 +165,8 @@ export function AppSidebar({
           <div className={cn("px-3 pb-3", collapsed && "px-2")}>
             <div
               className={cn(
-                "flex items-center gap-2.5 rounded-xl border border-sidebar-border/80 bg-white/70 px-2.5 py-2 shadow-[0_1px_0_rgba(28,25,23,0.03)]",
-                collapsed && "justify-center border-0 bg-transparent p-0 shadow-none"
+                "flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-surface px-2.5 py-2",
+                collapsed && "justify-center border-0 bg-transparent p-0"
               )}
             >
               <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-[11px] font-semibold text-brand">
@@ -133,7 +175,7 @@ export function AppSidebar({
               <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
                 <p className="truncate text-[13px] font-medium leading-tight">{siteName}</p>
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  Active workspace
+                  Your church
                 </p>
               </div>
             </div>
@@ -142,63 +184,54 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-2 pt-1">
-        <SidebarGroup className="p-0">
-          <SidebarGroupLabel className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">
-            Workspace
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
-              {nav.map((item) => {
-                const href = withSite(item.href);
-                const active =
-                  pathname === item.href ||
-                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={item.label}
-                      className={navButtonClass(active)}
-                    >
-                      <Link href={href}>
-                        <item.icon
-                          className={cn(
-                            "size-4! opacity-80",
-                            active && "opacity-100 text-brand"
-                          )}
-                        />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {NAV_GROUPS.map((group) => (
+          <SidebarGroup key={group.label} className="p-0">
+            <SidebarGroupLabel className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(pathname, item);
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={item.soon ? `${item.label} — coming soon` : item.label}
+                        className={navButtonClass(active)}
+                      >
+                        <Link href={item.href}>
+                          <item.icon
+                            className={cn(
+                              "size-4! opacity-80",
+                              active && "opacity-100 text-brand"
+                            )}
+                          />
+                          <span className="flex-1">{item.label}</span>
+                          {item.soon ? (
+                            <span
+                              className={cn(
+                                "rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
+                                collapsed && "hidden"
+                              )}
+                            >
+                              Soon
+                            </span>
+                          ) : null}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
-      <SidebarFooter className="gap-2 border-t border-sidebar-border/80 p-2">
+      <SidebarFooter className="gap-2 border-t border-sidebar-border p-2">
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="Website"
-              className={navButtonClass(pathname.startsWith("/dashboard/builder") || pathname.startsWith("/builder/"))}
-            >
-              <Link href={websiteHref}>
-                <PanelsTopLeft className="size-4! opacity-80" />
-                <span>Website</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          {/*
-            Deliberately not in the `nav` array above: every href there is run
-            through withSite(), which appends ?siteId=. Billing is account-level,
-            not site-level, so that parameter would be meaningless on it.
-          */}
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
@@ -215,7 +248,7 @@ export function AppSidebar({
 
         <div
           className={cn(
-            "rounded-xl border border-sidebar-border/80 bg-white/70 p-2",
+            "rounded-xl border border-sidebar-border bg-surface p-2",
             collapsed && "border-0 bg-transparent p-0"
           )}
         >
@@ -248,7 +281,7 @@ export function AppSidebar({
           <a
             href="/auth/logout"
             className={cn(
-              "mt-1 flex h-9 items-center gap-2 rounded-lg px-2 text-[13px] font-medium text-red-700 hover:bg-red-50",
+              "mt-1 flex h-9 items-center gap-2 rounded-lg px-2 text-[13px] font-medium text-destructive hover:bg-destructive-soft",
               collapsed && "justify-center px-0"
             )}
           >

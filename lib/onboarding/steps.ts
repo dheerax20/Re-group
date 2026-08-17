@@ -3,7 +3,7 @@ export const wizardSteps = [
   { key: "social", label: "Social Media", path: "social" },
   { key: "brand", label: "Brand", path: "brand" },
   { key: "features", label: "Features", path: "features" },
-  { key: "templates", label: "Templates", path: "templates" },
+  { key: "templates", label: "AI website", path: "templates" },
   { key: "publish", label: "Publish", path: "publish" },
 ] as const;
 

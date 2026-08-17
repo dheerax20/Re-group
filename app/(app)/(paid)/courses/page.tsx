@@ -1,66 +1,64 @@
-"use client";
-
-import { motion, useReducedMotion } from "framer-motion";
+import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { demoCourses } from "@/lib/demo/mock-data";
-import { fadeUp, staggerContainer } from "@/lib/motion/variants";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+
+export const metadata = { title: "Courses — Regroup" };
+
+/**
+ * Courses is not built yet — see the note in `members/page.tsx`. This screen
+ * previously rendered a fabricated course catalogue behind the paywall.
+ */
+const PLANNED = [
+  {
+    title: "Learning pathways",
+    detail: "Group lessons into a course a new believer can work through.",
+  },
+  {
+    title: "Publish to your site",
+    detail: "Courses appear on your church website with no extra setup.",
+  },
+  {
+    title: "See who has finished",
+    detail: "Track progress so leaders know who to check in with.",
+  },
+];
 
 export default function CoursesPage() {
-  const reduceMotion = useReducedMotion();
-
   return (
-    <motion.div
-      initial={reduceMotion ? false : "hidden"}
-      animate="visible"
-      variants={staggerContainer}
-    >
-      <motion.div variants={fadeUp}>
-        <PageHeader
-          title="Courses"
-          description="Disciple your community with clear learning pathways."
-          actions={
-            <Button className="bg-brand text-brand-foreground hover:bg-brand/90">
-              Create course
-            </Button>
-          }
-        />
-      </motion.div>
+    <div className="mx-auto max-w-3xl">
+      <PageHeader
+        title="Courses"
+        description="Discipleship pathways for your community."
+      />
 
-      <motion.div variants={fadeUp} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {demoCourses.map((course) => (
-          <div
-            key={course.id}
-            className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="rounded-xl bg-brand-soft p-2.5 text-brand">
-                <GraduationCap className="h-5 w-5" />
-              </div>
-              <Badge variant={course.status === "Published" ? "default" : "secondary"}>
-                {course.status}
-              </Badge>
-            </div>
-            <h3 className="mt-4 text-lg font-semibold">{course.title}</h3>
-            <p className="mt-1 text-sm text-muted">{course.instructor}</p>
-            <div className="mt-5 flex items-center justify-between text-sm text-muted">
-              <span>{course.students} students</span>
-              <span>{course.lessons} lessons</span>
-            </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-background">
-              <div
-                className="h-full rounded-full bg-brand"
-                style={{ width: `${course.progress}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-muted">
-              {course.progress > 0 ? `${course.progress}% avg progress` : "Not started"}
-            </p>
-          </div>
-        ))}
-      </motion.div>
-    </motion.div>
+      <EmptyState
+        icon={GraduationCap}
+        title="Courses is coming soon"
+        description="We are building this after members. Nothing is stored here yet, so there is nothing to set up."
+        action={
+          <Link href="/dashboard">
+            <Button>Back to dashboard</Button>
+          </Link>
+        }
+      />
+
+      <Card variant="flat" className="mt-4">
+        <CardTitle className="text-sm">What it will do</CardTitle>
+        <CardDescription className="text-xs">
+          Planned for the courses release.
+        </CardDescription>
+        <ul className="mt-4 space-y-3">
+          {PLANNED.map((item) => (
+            <li key={item.title}>
+              <p className="text-sm font-medium">{item.title}</p>
+              <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </div>
   );
 }

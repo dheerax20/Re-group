@@ -16,7 +16,7 @@ export default async function PostAuthPage() {
   await requireActivePlan(user.id);
 
   if (user.site) {
-    redirect(`/dashboard?siteId=${user.site.id}`);
+    redirect("/dashboard");
   }
   redirect("/builder");
 }

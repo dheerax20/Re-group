@@ -18,7 +18,9 @@ export interface CachedEvent {
 /** Full event list for a site, cached — list/detail pages read this instead
  * of issuing their own DB queries. */
 export async function getCachedEvents(siteId: string, slug: string): Promise<CachedEvent[]> {
-  return cached(`site:${slug}:events`, 3600, async () => {
+  // An empty list is a real value, not an absent one, so it never takes the
+  // negative-cache path — `?? []` only covers the `cached` signature.
+  const events = await cached(`site:${slug}:events`, 3600, async () => {
     const events = await prisma.event.findMany({
       where: { siteId },
       orderBy: { startAt: "asc" },
@@ -36,6 +38,8 @@ export async function getCachedEvents(siteId: string, slug: string): Promise<Cac
       registrationUrl: e.registrationUrl,
     }));
   });
+
+  return events ?? [];
 }
 
 export function findEventBySlug(events: CachedEvent[], slug: string): CachedEvent | undefined {

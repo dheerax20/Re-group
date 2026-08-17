@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { Globe } from "lucide-react";
 import { checkSlugAvailable, publishSite } from "@/lib/site/actions";
-import { onboardingHref, wizardHref } from "@/lib/onboarding/steps";
+import { wizardHref } from "@/lib/onboarding/steps";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -55,26 +56,50 @@ export function PublishForm({
   if (publishedSlug) {
     const url = liveUrl(publishedSlug);
     return (
-      <div className="mt-8 rounded-2xl border border-accent/30 bg-accent-soft p-6 text-center">
-        <h2 className="font-serif text-2xl font-semibold text-foreground">Your site is live!</h2>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 block font-medium text-brand underline"
-        >
-          {url}
-        </a>
-        <div className="mt-6 flex justify-center gap-3">
-          <Link href={`/dashboard?siteId=${siteId}`}>
-            <Button>Go to Dashboard</Button>
-          </Link>
-          <Link href={`/dashboard/builder?siteId=${siteId}`}>
-            <Button variant="outline">Open editor</Button>
-          </Link>
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline">View Site</Button>
+      <div className="mt-8 space-y-4">
+        <div className="rounded-2xl border border-accent/30 bg-accent-soft p-6 text-center">
+          <h2 className="font-serif text-2xl font-semibold text-foreground">
+            Your site is live
+          </h2>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 block font-medium text-brand underline"
+          >
+            {url}
           </a>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <Link href="/dashboard">
+              <Button>Go to dashboard</Button>
+            </Link>
+            <Link href="/dashboard/builder">
+              <Button variant="outline">Open editor</Button>
+            </Link>
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">View site</Button>
+            </a>
+          </div>
+        </div>
+
+        {/* The moment a church most wants their own address is right after
+            seeing the platform one, so the offer belongs here. */}
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <Globe className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Use your own domain</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Already own something like gracechurch.org? Point it here and we
+              will show you exactly which DNS record to add.
+            </p>
+          </div>
+          <Link href="/dashboard/domains">
+            <Button variant="outline" size="sm">
+              Connect a domain
+            </Button>
+          </Link>
         </div>
       </div>
     );
@@ -93,16 +118,16 @@ export function PublishForm({
           <span className="whitespace-nowrap text-sm text-muted">.{ROOT_DOMAIN}</span>
         </div>
         {slugStatus && (
-          <p className={`mt-1 text-sm ${slugStatus.available ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`mt-1 text-sm ${slugStatus.available ? "text-success" : "text-destructive"}`}>
             {slugStatus.available ? "Available" : slugStatus.message}
           </p>
         )}
       </div>
 
       {errors.length > 0 && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-800">Fix these before publishing:</p>
-          <ul className="mt-2 list-disc pl-5 text-sm text-red-700">
+        <div className="rounded-md border border-destructive/30 bg-destructive-soft p-4">
+          <p className="text-sm font-medium text-destructive">Fix these before publishing:</p>
+          <ul className="mt-2 list-disc pl-5 text-sm text-destructive">
             {errors.map((err) => (
               <li key={err.field}>{err.message}</li>
             ))}
@@ -115,7 +140,7 @@ export function PublishForm({
           Back
         </a>
         <div className="flex gap-2">
-          <Link href={`/builder/${siteId}`}>
+          <Link href="/dashboard/builder">
             <Button type="button" variant="outline">
               Edit in Builder
             </Button>

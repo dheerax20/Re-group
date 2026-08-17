@@ -1,32 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import {
-  ACTIVE_SITE_COOKIE,
-  BUILDER_WIZARD_SEGMENTS,
-} from "@/lib/site/active-site";
+import { resolveHostnameInProxy } from "@/lib/domains/proxy-resolve";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "regroup.app";
 
-function withActiveSiteCookie(request: NextRequest, response: NextResponse) {
-  const { pathname, searchParams } = request.nextUrl;
-  const querySiteId = searchParams.get("siteId");
-
-  let pathSiteId: string | null = null;
-  const builderMatch = pathname.match(/^\/builder\/([^/]+)/);
-  if (builderMatch && !BUILDER_WIZARD_SEGMENTS.has(builderMatch[1])) {
-    pathSiteId = builderMatch[1];
-  }
-
-  const siteId = querySiteId || pathSiteId;
-  if (siteId) {
-    response.cookies.set(ACTIVE_SITE_COOKIE, siteId, {
-      path: "/",
-      sameSite: "lax",
-      httpOnly: true,
-      maxAge: 60 * 60 * 24 * 30,
-    });
-  }
-  return response;
+/** Paths that belong to the platform itself and never to a tenant site. */
+function isPlatformPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/sites") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico"
+  );
 }
 
 function copyCookies(from: NextResponse, to: NextResponse) {
@@ -37,7 +22,24 @@ function copyCookies(from: NextResponse, to: NextResponse) {
 }
 
 /**
- * Auth0 session/OAuth routes plus multi-tenant subdomain rewrites.
+ * The tenant slug for a platform subdomain (`grace.regroup.app`), or null.
+ * Custom domains are resolved separately, against the database.
+ */
+function slugFromPlatformHost(host: string): string | null {
+  if (host.endsWith(`.${ROOT_DOMAIN}`)) {
+    const candidate = host.slice(0, -1 * (ROOT_DOMAIN.length + 1));
+    return candidate && candidate !== "www" ? candidate : null;
+  }
+  // Local development: grace.localhost:3000.
+  if (host.endsWith(".localhost")) {
+    const candidate = host.slice(0, -".localhost".length);
+    return candidate && candidate !== "www" ? candidate : null;
+  }
+  return null;
+}
+
+/**
+ * Auth0 session/OAuth routes plus multi-tenant hostname rewrites.
  * Always start from auth0.middleware() so /auth/* and session cookies stay intact.
  */
 export async function proxy(request: NextRequest) {
@@ -63,33 +65,41 @@ export async function proxy(request: NextRequest) {
   const hostname = request.headers.get("host") ?? "";
   const host = hostname.split(":")[0].toLowerCase();
 
-  if (
-    pathname.startsWith("/sites") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico"
-  ) {
-    return withActiveSiteCookie(request, authResponse);
+  if (isPlatformPath(pathname)) {
+    return authResponse;
   }
 
-  let slug: string | null = null;
+  // The platform's own root domain serves the marketing site and the app.
+  const isPlatformHost =
+    host === ROOT_DOMAIN ||
+    host === `www.${ROOT_DOMAIN}` ||
+    host === "localhost" ||
+    host === "127.0.0.1";
 
-  if (host.endsWith(`.${ROOT_DOMAIN}`)) {
-    const candidate = host.slice(0, -1 * (ROOT_DOMAIN.length + 1));
-    if (candidate && candidate !== "www") slug = candidate;
-  } else if (host.endsWith(".localhost")) {
-    const candidate = host.slice(0, -".localhost".length);
-    if (candidate && candidate !== "www") slug = candidate;
+  if (isPlatformHost) {
+    return authResponse;
+  }
+
+  let slug = slugFromPlatformHost(host);
+
+  /**
+   * A host that is neither the platform nor one of its subdomains can only be a
+   * custom domain, so it is looked up. Resolution is cached (including the
+   * negative answer) because this runs on every request, and only ACTIVE
+   * domains resolve — serving a half-verified hostname would show visitors an
+   * error page under the church's own name.
+   */
+  if (!slug && host.includes(".")) {
+    slug = await resolveHostnameInProxy(host, request.nextUrl.origin);
   }
 
   if (!slug) {
-    return withActiveSiteCookie(request, authResponse);
+    return authResponse;
   }
 
   const url = request.nextUrl.clone();
   url.pathname = `/sites/${slug}${pathname === "/" ? "" : pathname}`;
-  const rewrite = copyCookies(authResponse, NextResponse.rewrite(url));
-  return withActiveSiteCookie(request, rewrite);
+  return copyCookies(authResponse, NextResponse.rewrite(url));
 }
 
 export const config = {

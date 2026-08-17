@@ -1,5 +1,6 @@
 import { SectionProps } from "@/lib/site/types";
 import { Container, Eyebrow, cfgString } from "./_shared";
+import { safeLinkTarget } from "@/lib/validation/url";
 
 export function ContactStandard({ site, config }: SectionProps) {
   const contact = site.contact ?? {};
@@ -23,7 +24,13 @@ export function ContactStandard({ site, config }: SectionProps) {
         {socials.length > 0 && (
           <div className="mt-6 flex justify-center gap-4 text-sm font-medium text-site-accent">
             {socials.map((s) => (
-              <a key={s.platform} href={s.url} target="_blank" rel="noopener noreferrer" className="capitalize hover:underline">
+              <a
+                key={s.platform}
+                href={safeLinkTarget(s.url, "#")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="capitalize hover:underline"
+              >
                 {s.platform}
               </a>
             ))}

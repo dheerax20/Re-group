@@ -1,43 +1,45 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma, withDbRetry } from "@/lib/db";
-import { invalidateSiteCache } from "@/lib/cache/redis";
 import { churchInfoSchema } from "@/lib/validation/church";
 import { brandConfigSchema, defaultBrandConfig } from "@/lib/validation/brand";
 import { socialLinksSchema, toSocialLinkRecords } from "@/lib/validation/social";
-import { sectionConfigSchema } from "@/lib/validation/section";
+import { sectionConfigSchema, coerceSections } from "@/lib/validation/section";
 import { slugSchema, slugify } from "@/lib/validation/slug";
 import { defaultFeatures, FeatureConfig } from "@/lib/features/types";
 import { validateFeatureDependencies } from "@/lib/features/validate";
 import { generateNavigation } from "@/lib/site/navigation";
+import { mergeNavigation, allowedHrefs } from "@/lib/site/pages";
+import { navigationConfigSchema } from "@/lib/validation/navigation";
 import { getTemplate } from "@/lib/templates/registry";
 import { DeterministicSiteGenerator } from "@/lib/ai/deterministic-site-generator";
 import { getTemplateRecommendationEngine } from "@/lib/ai";
+import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
+import {
+  createJob,
+  findActiveJob,
+  getLatestJob,
+  runFullBuildJob,
+  type JobView,
+} from "@/lib/ai/generation-job";
 import { validateSiteForPublish } from "@/lib/site/publish-validation";
 import { toSiteConfig } from "@/lib/site/to-site-config";
 import { parseChurchStory } from "@/lib/site/story";
-import { requireOwnedSite, syncCurrentUser } from "@/lib/auth/session";
+import { applyEditorAiPrompt } from "@/lib/ai/editor-prompt";
+import { invalidateSite } from "@/lib/site/invalidate";
+import { syncPrimaryDomain } from "@/lib/domains/actions-support";
+import {
+  requireOwnedPaidSite,
+  requireOwnedSite,
+  syncCurrentUser,
+} from "@/lib/auth/session";
 import { z } from "zod";
 import { toDatabaseError, isDatabaseUnavailableError } from "@/lib/db/errors";
 import type { Prisma } from "@prisma/client";
 
 const siteGenerator = new DeterministicSiteGenerator();
-
-const PUBLIC_SUB_PATHS = ["", "/about", "/contact", "/giving", "/ministries", "/sermons", "/events"];
-
-/** Revalidates every public sub-page + the Redis data cache for a site.
- * Resolves the slug from `siteId` if not already known by the caller. */
-async function invalidate(siteId: string, slug?: string) {
-  const resolvedSlug =
-    slug ?? (await prisma.site.findUnique({ where: { id: siteId }, select: { slug: true } }))?.slug;
-  if (!resolvedSlug) return;
-
-  for (const path of PUBLIC_SUB_PATHS) {
-    revalidatePath(`/sites/${resolvedSlug}${path}`);
-  }
-  await invalidateSiteCache(resolvedSlug);
-}
 
 /** Prisma's Json columns want InputJsonValue; our domain types are plain
  * serializable objects/arrays, so this cast is safe at every call site. */
@@ -84,7 +86,7 @@ export async function getSite(siteId: string) {
 }
 
 /** The signed-in user's site only — one website per Auth0 account. */
-export async function resolveActiveSite(_preferredSiteId?: string | null) {
+export async function resolveActiveSite() {
   try {
     return await withDbRetry(async () => {
       const user = await syncCurrentUser();
@@ -100,7 +102,7 @@ export async function resolveActiveSite(_preferredSiteId?: string | null) {
 }
 
 export async function updateChurchInfo(siteId: string, input: unknown) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const data = churchInfoSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -122,12 +124,12 @@ export async function updateChurchInfo(siteId: string, input: unknown) {
       }),
     },
   });
-  await invalidate(siteId);
+  await invalidateSite(siteId);
   return { success: true };
 }
 
 export async function updateSocialLinks(siteId: string, input: unknown) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const data = socialLinksSchema.parse(input);
   const records = toSocialLinkRecords(data);
 
@@ -138,18 +140,18 @@ export async function updateSocialLinks(siteId: string, input: unknown) {
     ),
   ]);
 
-  await invalidate(siteId);
+  await invalidateSite(siteId);
   return { success: true };
 }
 
 export async function updateBrand(siteId: string, input: unknown) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const data = brandConfigSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
     data: { brandConfig: toJson(data) },
   });
-  await invalidate(siteId);
+  await invalidateSite(siteId);
   return { success: true };
 }
 
@@ -165,7 +167,7 @@ const featureConfigSchema = z.object({
 });
 
 export async function updateFeatures(siteId: string, input: unknown) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const data = featureConfigSchema.parse(input) as FeatureConfig;
   const errors = validateFeatureDependencies(data);
   if (errors.length > 0) {
@@ -179,12 +181,12 @@ export async function updateFeatures(siteId: string, input: unknown) {
       navigationConfig: toJson(generateNavigation(data)),
     },
   });
-  await invalidate(siteId);
+  await invalidateSite(siteId);
   return { success: true };
 }
 
 export async function getTemplateRecommendations(siteId: string) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const site = await prisma.site.findUnique({ where: { id: siteId } });
   if (!site) throw new Error("Site not found");
 
@@ -200,7 +202,7 @@ export async function getTemplateRecommendations(siteId: string) {
 }
 
 export async function selectTemplate(siteId: string, templateId: string) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const template = getTemplate(templateId);
   if (!template) throw new Error("Unknown template");
 
@@ -228,7 +230,7 @@ export async function selectTemplate(siteId: string, templateId: string) {
     data: {
       templateId: template.id,
       templateVersion: template.version,
-      sectionConfig: toJson(generated.sections),
+      sectionConfig: toJson(coerceSections(generated.sections)),
       navigationConfig: toJson(generated.navigation),
       seoConfig: toJson(generated.seo),
       ...(applyPreset && preset
@@ -243,19 +245,172 @@ export async function selectTemplate(siteId: string, templateId: string) {
     },
   });
 
-  await invalidate(siteId);
+  await invalidateSite(siteId);
   return { success: true };
 }
 
-export async function updateSections(siteId: string, input: unknown) {
+/**
+ * Queues an AI website build and returns immediately.
+ *
+ * The work itself runs in `after()`, against a row the client can poll. That is
+ * what makes the six-agent run survive a closed tab, and what lets the progress
+ * display report the specialist that is actually working rather than a timer.
+ */
+export async function startAiWebsiteBuild(siteId: string) {
+  const user = await requireOwnedPaidSite(siteId);
+
+  const existing = await findActiveJob(siteId, "full_build");
+  if (existing) {
+    // Already running. Returning it rather than starting a second one is what
+    // makes a double-click or a refresh cost nothing.
+    return { job: await getLatestJob(siteId, "full_build") };
+  }
+
+  await assertAiBudget(siteId, user.id, "full_build");
+
+  const job = await createJob(siteId, "full_build");
+  after(() => runFullBuildJob(job.id));
+
+  return { job };
+}
+
+/** Poll target for the generation UI. */
+export async function getAiWebsiteBuildStatus(siteId: string): Promise<JobView | null> {
   await requireOwnedSite(siteId);
+  return getLatestJob(siteId, "full_build");
+}
+
+export async function getAiBudgetSummary(siteId: string) {
+  await requireOwnedSite(siteId);
+  const [build, prompt] = await Promise.all([
+    getAiBudget(siteId, "full_build"),
+    getAiBudget(siteId, "editor_prompt"),
+  ]);
+  return {
+    build: { used: build.used, limit: build.limit, remaining: build.remaining },
+    prompt: { used: prompt.used, limit: prompt.limit, remaining: prompt.remaining },
+    resetsAt: build.resetsAt.toISOString(),
+  };
+}
+
+/** In-editor AI: apply a freeform prompt to the current homepage, refresh checklist. */
+export async function applyWebsiteAiPrompt(
+  siteId: string,
+  prompt: string,
+  sectionsInput?: unknown
+) {
+  const user = await requireOwnedPaidSite(siteId);
+  const trimmed = prompt.trim();
+  if (trimmed.length < 8) {
+    throw new Error("Write a short prompt describing what you want changed.");
+  }
+  if (trimmed.length > 1200) {
+    throw new Error("Keep the prompt under 1200 characters.");
+  }
+
+  await assertAiBudget(siteId, user.id, "editor_prompt");
+
+  const site = await prisma.site.findUnique({ where: { id: siteId } });
+  if (!site) throw new Error("Site not found");
+
+  const sections = sectionConfigSchema.parse(
+    coerceSections(sectionsInput ?? site.sectionConfig ?? [])
+  );
+
+  // Logged before the call, so a failed prompt still counts against the budget
+  // — the provider was billed either way.
+  const job = await createJob(siteId, "editor_prompt", trimmed);
+
+  try {
+    const result = await applyEditorAiPrompt({
+      churchName: site.name,
+      prompt: trimmed,
+      sections,
+      features: (site.featureConfig as Record<string, unknown>) ?? {},
+    });
+
+    // Model output, repaired rather than trusted: an invented variant or an
+    // unsafe href would otherwise be written straight to a published site.
+    const nextSections = coerceSections(result.sections);
+
+    await prisma.$transaction([
+      prisma.site.update({
+        where: { id: siteId },
+        data: {
+          sectionConfig: toJson(nextSections),
+          storyConfig: toJson({
+            ...parseChurchStory(site.storyConfig),
+            improvements: result.improvements,
+            designFeedback: result.designFeedback,
+            mobileFeedback: result.mobileFeedback,
+          }),
+        },
+      }),
+      prisma.siteGenerationJob.update({
+        where: { id: job.id },
+        data: {
+          status: "SUCCEEDED",
+          stepIndex: 1,
+          summary: result.summary,
+          finishedAt: new Date(),
+        },
+      }),
+    ]);
+
+    await invalidateSite(siteId);
+    return {
+      success: true as const,
+      summary: result.summary,
+      sections: nextSections,
+      improvements: result.improvements,
+      designFeedback: result.designFeedback,
+      mobileFeedback: result.mobileFeedback,
+    };
+  } catch (error) {
+    console.error("[applyWebsiteAiPrompt]", error);
+    const message = error instanceof Error ? error.message : "AI prompt failed";
+    await prisma.siteGenerationJob.update({
+      where: { id: job.id },
+      data: { status: "FAILED", error: message.slice(0, 280), finishedAt: new Date() },
+    });
+    throw new Error(message.slice(0, 280));
+  }
+}
+
+export async function updateSections(siteId: string, input: unknown) {
+  await requireOwnedPaidSite(siteId);
   const data = sectionConfigSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
     data: { sectionConfig: toJson(data) },
   });
-  await invalidate(siteId);
+  await invalidateSite(siteId);
   return { success: true };
+}
+
+export async function updateNavigation(siteId: string, input: unknown) {
+  await requireOwnedPaidSite(siteId);
+  const parsed = navigationConfigSchema.parse(input);
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: { featureConfig: true },
+  });
+  if (!site) throw new Error("Site not found");
+
+  const features = site.featureConfig as unknown as FeatureConfig;
+  const allowed = allowedHrefs(features);
+  const invalid = parsed.find((item) => !allowed.has(item.href));
+  if (invalid) {
+    throw new Error(`Page ${invalid.href} is not available for this church`);
+  }
+
+  const navigation = mergeNavigation(features, parsed);
+  await prisma.site.update({
+    where: { id: siteId },
+    data: { navigationConfig: toJson(navigation) },
+  });
+  await invalidateSite(siteId);
+  return { success: true, navigation };
 }
 
 export async function checkSlugAvailable(slug: string, excludeSiteId?: string) {
@@ -275,42 +430,58 @@ export async function suggestSlug(name: string) {
 }
 
 export async function publishSite(siteId: string, slug: string) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const parsedSlug = slugSchema.parse(slug);
 
-  await prisma.site.update({
+  const before = await prisma.site.findUnique({
     where: { id: siteId },
-    data: { slug: parsedSlug },
+    select: { slug: true },
   });
 
-  const site = await prisma.site.findUnique({
+  // Validate BEFORE mutating. The old order renamed the site, then bailed out
+  // on a validation error, leaving the slug changed on a site that never got
+  // published — and the previous slug's caches never cleared.
+  const candidate = await prisma.site.findUnique({
     where: { id: siteId },
     include: { socialLinks: true },
   });
-  if (!site) throw new Error("Site not found");
+  if (!candidate) throw new Error("Site not found");
 
-  const siteConfig = toSiteConfig(site);
-  const result = validateSiteForPublish(siteConfig);
+  const result = validateSiteForPublish(toSiteConfig({ ...candidate, slug: parsedSlug }));
   if (!result.valid) {
-    return { success: false, errors: result.errors };
+    return { success: false as const, errors: result.errors };
+  }
+
+  const taken = await prisma.site.findUnique({ where: { slug: parsedSlug } });
+  if (taken && taken.id !== siteId) {
+    return {
+      success: false as const,
+      errors: [{ field: "slug", message: "This address is already taken" }],
+    };
   }
 
   await prisma.site.update({
     where: { id: siteId },
-    data: { status: "PUBLISHED", publishedAt: new Date() },
+    data: { slug: parsedSlug, status: "PUBLISHED", publishedAt: new Date() },
   });
 
-  await invalidate(siteId, parsedSlug);
+  // A rename leaves the old slug's cache entries pointing at live content.
+  if (before?.slug && before.slug !== parsedSlug) {
+    await invalidateSite(siteId, { slug: before.slug });
+  }
+  await invalidateSite(siteId, { slug: parsedSlug });
+  await syncPrimaryDomain(siteId);
+  revalidatePath("/dashboard/domains");
 
-  return { success: true, slug: parsedSlug };
+  return { success: true as const, slug: parsedSlug };
 }
 
 export async function unpublishSite(siteId: string) {
-  await requireOwnedSite(siteId);
+  await requireOwnedPaidSite(siteId);
   const site = await prisma.site.update({
     where: { id: siteId },
     data: { status: "DRAFT" },
   });
-  await invalidate(siteId, site.slug);
+  await invalidateSite(siteId, { slug: site.slug });
   return { success: true };
 }

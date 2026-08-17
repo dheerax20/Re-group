@@ -599,6 +599,16 @@ function SidebarMenuBadge({
   )
 }
 
+const SKELETON_WIDTHS = ["52%", "68%", "84%", "61%", "76%"] as const
+
+function hashCode(value: string) {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
@@ -606,10 +616,11 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // Varied widths so a stack of skeletons reads as text rather than bars.
+  // Cycled from a fixed table, not Math.random(): a random width computed
+  // during render is impure and produces a hydration mismatch.
+  const id = React.useId()
+  const width = SKELETON_WIDTHS[hashCode(id) % SKELETON_WIDTHS.length]
 
   return (
     <div

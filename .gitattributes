@@ -1,0 +1,17 @@
+# Normalize to LF in the repository. Without this, Windows checkouts rewrite
+# every touched file to CRLF and bury real diffs in whitespace noise.
+* text=auto eol=lf
+
+# Binary assets must never be normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Generated — collapse in diffs and reviews.
+package-lock.json linguist-generated=true -diff

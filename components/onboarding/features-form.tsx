@@ -90,7 +90,7 @@ export function FeaturesForm({
           ))}
         </div>
         {errors.length > 0 ? (
-          <p className="text-sm text-red-600">{errors.map((e) => e.message).join(" ")}</p>
+          <p className="text-sm text-destructive">{errors.map((e) => e.message).join(" ")}</p>
         ) : null}
       </FieldGroup>
 
@@ -103,7 +103,7 @@ export function FeaturesForm({
           <span />
         )}
         <div className="flex items-center gap-3">
-          {saved ? <span className="text-sm text-emerald-600">Saved</span> : null}
+          {saved ? <span className="text-sm text-success">Saved</span> : null}
           <Button
             type="button"
             onClick={onSubmit}

@@ -1,3 +1,11 @@
+/**
+ * MARKETING MOCKUPS ONLY.
+ *
+ * These records are invented. They exist to populate the screenshots on the
+ * public landing page (`components/marketing/sections.tsx`) and must never be
+ * imported by an authenticated screen — a church seeing fabricated members or
+ * courses inside the product cannot tell them from their own data.
+ */
 export const demoChurch = {
   name: "Grace Community Church",
   location: "Austin, TX",

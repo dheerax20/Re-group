@@ -16,7 +16,7 @@ function SheetOverlay({
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
-      className={cn("fixed inset-0 z-50 bg-stone-950/40", className)}
+      className={cn("fixed inset-0 z-50 bg-foreground/40", className)}
       {...props}
     />
   );

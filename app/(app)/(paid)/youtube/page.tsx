@@ -1,26 +1,33 @@
 import Link from "next/link";
+import { Video } from "lucide-react";
 import { getSite, resolveActiveSite } from "@/lib/site/actions";
 import { YoutubeManager } from "@/components/builder/youtube-manager";
+import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 
-export default async function YoutubePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ siteId?: string }>;
-}) {
-  const { siteId: preferred } = await searchParams;
-  const active = await resolveActiveSite(preferred ?? null);
+export const metadata = { title: "YouTube — Regroup" };
+
+export default async function YoutubePage() {
+  const active = await resolveActiveSite();
 
   if (!active) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">YouTube</h1>
-        <p className="mt-2 text-sm text-muted">
-          Create a church website first to connect a YouTube channel.
-        </p>
-        <Link href="/builder" className="mt-6 inline-block">
-          <Button>Create website</Button>
-        </Link>
+      <div className="mx-auto max-w-3xl">
+        <PageHeader
+          title="YouTube"
+          description="Show your latest services without uploading anything twice."
+        />
+        <EmptyState
+          icon={Video}
+          title="Build your website first"
+          description="Once your site exists you can connect a channel and your videos appear on it automatically."
+          action={
+            <Link href="/builder">
+              <Button>Build my website</Button>
+            </Link>
+          }
+        />
       </div>
     );
   }

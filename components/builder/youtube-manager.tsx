@@ -12,6 +12,7 @@ import {
   FieldHint,
   FormActions,
 } from "@/components/onboarding/form-primitives";
+import { cn } from "@/lib/utils";
 
 export function YoutubeManager({
   siteId,
@@ -42,7 +43,7 @@ export function YoutubeManager({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+    <div className={cn("mx-auto max-w-3xl space-y-6", pending && "opacity-70")}>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">YouTube</h1>
         <p className="mt-1 text-sm text-muted">
@@ -63,8 +64,8 @@ export function YoutubeManager({
             />
             <FieldHint>Leave empty to hide the YouTube section on the public site.</FieldHint>
           </Field>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {message ? <p className="text-sm text-success">{message}</p> : null}
           <FormActions>
             <span />
             <Button type="submit" disabled={pending}>

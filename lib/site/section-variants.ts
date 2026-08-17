@@ -8,7 +8,7 @@ import { SectionType } from "./types";
  */
 export const sectionVariantOptions: Record<SectionType, string[]> = {
   navbar: ["transparent", "solid", "minimal"],
-  hero: ["split", "centered", "fullscreen"],
+  hero: ["split", "centered", "fullscreen", "cinematic"],
   welcome: ["centered", "split"],
   sermons: ["cards", "featured", "list"],
   events: ["grid", "list", "calendar"],

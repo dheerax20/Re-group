@@ -1,5 +1,5 @@
 import { SectionProps } from "@/lib/site/types";
-import { Container, Eyebrow, cfgString } from "./_shared";
+import { Container, Eyebrow, cfgString, cfgMedia } from "./_shared";
 import { VisualBlock } from "./visual-block";
 
 export function WelcomeCentered({ site, config }: SectionProps) {
@@ -26,7 +26,13 @@ export function WelcomeSplit({ site, config }: SectionProps) {
   return (
     <section className="bg-site-background py-20">
       <Container className="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
-        <VisualBlock variant="community" className="h-72 w-full" label="Belong here" />
+        <VisualBlock
+          variant="community"
+          className="h-72 w-full"
+          label="Belong here"
+          imageUrl={cfgMedia(config, "imageUrl")}
+          videoUrl={cfgMedia(config, "videoUrl")}
+        />
         <div>
           <Eyebrow>{cfgString(config, "eyebrow", "Welcome Home")}</Eyebrow>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-site-foreground sm:text-4xl">

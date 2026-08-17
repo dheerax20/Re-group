@@ -12,9 +12,9 @@ const copySchema = z.object({
     .array(
       z.object({
         type: z.string(),
-        eyebrow: z.string().max(48).optional(),
-        title: z.string().max(90).optional(),
-        description: z.string().max(320).optional(),
+        eyebrow: z.string().max(48),
+        title: z.string().max(90),
+        description: z.string().max(320),
       })
     )
     .max(12),

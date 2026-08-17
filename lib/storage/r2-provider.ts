@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import type { StorageProvider, UploadResult } from "./provider";
+import type { StorageProvider, UploadOptions, UploadResult } from "./provider";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -31,27 +32,41 @@ export class R2StorageProvider implements StorageProvider {
     this.publicUrl = requiredEnv("R2_PUBLIC_URL").replace(/\/+$/, "");
   }
 
-  async upload(file: File | Buffer, filename: string): Promise<UploadResult> {
-    const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+  async upload(
+    file: File | Buffer,
+    filename: string,
+    options: UploadOptions = {}
+  ): Promise<UploadResult> {
+    // A UUID prefix rather than `Date.now()`: two uploads of the same filename
+    // inside one millisecond would otherwise overwrite each other, and the
+    // timestamp let a caller guess other tenants' object keys.
+    const sanitized = filename.replace(/[^a-zA-Z0-9.\-_]/g, "_").slice(0, 80);
+    const key = `${randomUUID()}-${sanitized}`;
 
     let body: Buffer;
-    let contentType: string | undefined;
+    let contentType = options.contentType;
     if (Buffer.isBuffer(file)) {
       body = file;
     } else {
       body = Buffer.from(await file.arrayBuffer());
-      contentType = file.type || undefined;
+      contentType = contentType ?? file.type ?? undefined;
     }
 
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: safeName,
+        Key: key,
         Body: body,
         ContentType: contentType,
+        // Objects are content-addressed by their UUID key and never rewritten,
+        // so they can be cached indefinitely.
+        CacheControl: "public, max-age=31536000, immutable",
+        // Belt and braces: even if an unexpected type reaches the bucket, the
+        // browser must not be allowed to sniff its way to executing it.
+        ContentDisposition: "inline",
       })
     );
 
-    return { url: `${this.publicUrl}/${safeName}`, filename: safeName };
+    return { url: `${this.publicUrl}/${key}`, filename: key };
   }
 }

@@ -8,6 +8,8 @@ import {
 export * from "./types";
 export { RuleBasedRecommendationEngine } from "./rule-based-recommendation-engine";
 export { DeterministicSiteGenerator } from "./deterministic-site-generator";
+export { ChurchWebsiteCrew } from "./agents/crew";
+export { getChurchWebsiteCrew, buildChurchWebsite } from "./multi-agent-site-builder";
 
 const ruleBasedEngine = new RuleBasedRecommendationEngine();
 

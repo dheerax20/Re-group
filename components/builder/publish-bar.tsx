@@ -43,7 +43,7 @@ export function PublishBar({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+    <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center gap-3">
         <Badge variant={status === "PUBLISHED" ? "success" : "secondary"}>{status}</Badge>
         {status === "PUBLISHED" && (
@@ -51,7 +51,7 @@ export function PublishBar({
             href={liveUrl(slug)}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium text-neutral-700 underline"
+            className="text-sm font-medium text-foreground underline"
           >
             {liveUrl(slug)}
           </a>

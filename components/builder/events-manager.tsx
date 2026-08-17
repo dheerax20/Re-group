@@ -12,6 +12,7 @@ import {
   FieldGroup,
   FormActions,
 } from "@/components/onboarding/form-primitives";
+import { cn } from "@/lib/utils";
 
 type EventRow = {
   id: string;
@@ -70,7 +71,7 @@ export function EventsManager({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+    <div className={cn("mx-auto max-w-3xl space-y-6", pending && "opacity-70")}>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
         <p className="mt-1 text-sm text-muted">
@@ -120,7 +121,7 @@ export function EventsManager({
               rows={3}
             />
           </Field>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <FormActions>
             <span />
             <Button type="submit" disabled={pending}>

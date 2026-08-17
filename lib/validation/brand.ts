@@ -1,8 +1,17 @@
 import { z } from "zod";
+import { fontRegistry } from "@/lib/theme/fonts";
+import { mediaUrlSchema } from "./url";
 
 const hexColor = z
   .string()
   .regex(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/, "Must be a valid hex color");
+
+/**
+ * Fonts are restricted to the registry because the value becomes a CSS
+ * custom property on the published page — an arbitrary string there is a
+ * style-injection vector, and an unloaded family silently falls back.
+ */
+const fontKey = z.enum(Object.keys(fontRegistry) as [string, ...string[]]);
 
 export const brandConfigSchema = z.object({
   colors: z.object({
@@ -13,15 +22,17 @@ export const brandConfigSchema = z.object({
     accent: hexColor,
   }),
   typography: z.object({
-    primaryFont: z.string().min(1),
-    secondaryFont: z.string().min(1),
+    primaryFont: fontKey,
+    secondaryFont: fontKey,
   }),
   logo: z.object({
-    url: z.string().min(1),
-    alt: z.string().default(""),
+    // Allowed to be empty: a church can publish without a logo, and the
+    // renderer falls back to the church name.
+    url: mediaUrlSchema.default(""),
+    alt: z.string().max(160).default(""),
   }),
   favicon: z.object({
-    url: z.string().default(""),
+    url: mediaUrlSchema.default(""),
   }),
   tagline: z.string().max(160).optional(),
 });

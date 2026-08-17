@@ -1,6 +1,16 @@
 import { syncCurrentUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+export const metadata = { title: "Profile — Regroup" };
+
+/** The raw enum is a database detail, not something to show a church. */
+const SITE_STATUS_LABEL: Record<"DRAFT" | "PUBLISHED" | "ARCHIVED", string> = {
+  DRAFT: "Draft",
+  PUBLISHED: "Live",
+  ARCHIVED: "Archived",
+};
 
 export default async function ProfilePage() {
   const user = await syncCurrentUser();
@@ -10,7 +20,7 @@ export default async function ProfilePage() {
     <div className="mx-auto max-w-xl">
       <PageHeader
         title="Profile"
-        description="Your Auth0 account, linked to this workspace."
+        description="The account you sign in with."
         actions={
           <Button asChild variant="outline">
             <a href="/auth/logout">Log out</a>
@@ -39,13 +49,24 @@ export default async function ProfilePage() {
         </div>
 
         <dl className="mt-6 space-y-3 text-sm">
-          <div className="flex justify-between gap-4 border-t border-border pt-3">
+          <div className="flex items-center justify-between gap-4 border-t border-border pt-3">
             <dt className="text-muted">Website</dt>
-            <dd className="font-medium">{user.site?.name ?? "Not created yet"}</dd>
+            <dd className="font-medium">{user.site?.name ?? "Not built yet"}</dd>
           </div>
-          <div className="flex justify-between gap-4 border-t border-border pt-3">
+          <div className="flex items-center justify-between gap-4 border-t border-border pt-3">
             <dt className="text-muted">Status</dt>
-            <dd className="font-medium">{user.site?.status ?? "—"}</dd>
+            <dd>
+              {user.site ? (
+                <Badge
+                  variant={user.site.status === "PUBLISHED" ? "success" : "warning"}
+                  dot
+                >
+                  {SITE_STATUS_LABEL[user.site.status]}
+                </Badge>
+              ) : (
+                <span className="text-muted">—</span>
+              )}
+            </dd>
           </div>
         </dl>
       </div>

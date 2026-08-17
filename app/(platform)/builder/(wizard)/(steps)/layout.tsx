@@ -14,7 +14,7 @@ export default async function WizardLayout({
   return (
     <div className="min-h-screen bg-background regroup-noise">
       <StepProgress />
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-soft)] sm:p-8">
           {children}
         </div>

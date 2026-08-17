@@ -11,8 +11,8 @@ const statusCopy: Record<string, string> = {
   church: "Gathering context for tone, size, and messaging.",
   social: "Mapping community links into navigation and footer.",
   brand: "Building your design tokens from colors and type.",
-  features: "Scoping templates to the modules you enable.",
-  templates: "Scoring layouts against your profile…",
+  features: "Scoping modules the AI crew will include.",
+  templates: "AI crew is inventing layout, copy, and imagery…",
   publish: "Validating slug, SEO basics, and publish readiness.",
 };
 
@@ -31,14 +31,14 @@ export function StepProgress() {
 
   return (
     <div className="border-b border-border bg-surface/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
         <RegroupLogo href="/" />
         <p className="tabular-nums text-sm text-muted">
           {step + 1} / {wizardSteps.length}
         </p>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-4 px-6 pb-5">
+      <div className="mx-auto max-w-5xl space-y-4 px-6 pb-5">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {wizardSteps.map((s, i) => (
             <div key={s.key} className="flex items-center gap-1.5">
