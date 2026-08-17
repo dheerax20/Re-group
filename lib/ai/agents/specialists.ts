@@ -17,6 +17,7 @@ import {
   type ThemeBrief,
 } from "./schemas";
 import type { ArtDirection } from "./catalog";
+import { modelForRole, type AgentRole, type Gateway } from "./model-config";
 
 function structuredChain<T extends z.ZodType>(
   llm: ChatOpenAI,
@@ -47,17 +48,39 @@ function directionBrief(direction: ArtDirection): string {
 }
 
 /**
- * Two temperatures, not one. The layout/copy schema-bearing agents stay lower
- * so structured output parses reliably; the theme director — pure prose, no
- * enums to get right — runs warmer so its description of the same locked
- * direction doesn't read identically across two churches.
+ * One client per role, not one shared client for all six.
+ *
+ * Each agent resolves its own model name through `modelForRole()` — every
+ * role defaults to the same "gpt-4o-mini" that used to be hardcoded here, so
+ * behavior is unchanged until an `AI_MODEL_<ROLE>` env var opts a specific
+ * agent into something else (a stronger model for the copywriter, a smaller
+ * one for the rest, or an OpenRouter model when `AI_PROVIDER=openrouter`).
+ *
+ * Temperature stays grouped by task, same as before: schema-bearing agents
+ * (producer, layout, QA, media) run cooler so structured output parses
+ * reliably; the theme director and copywriter are pure prose with no enums to
+ * get right, and run warmer so two churches given the same locked direction
+ * don't read like the same paragraph with the name swapped.
  */
-export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
-  const llm = new ChatOpenAI({ apiKey, model, temperature: 0.55 });
-  const proseLlm = new ChatOpenAI({ apiKey, model, temperature: 0.8 });
+function buildLlm(gateway: Gateway, role: AgentRole, temperature: number): ChatOpenAI {
+  return new ChatOpenAI({
+    apiKey: gateway.apiKey,
+    model: modelForRole(role),
+    temperature,
+    ...(gateway.configuration ? { configuration: gateway.configuration } : {}),
+  });
+}
+
+export function createChurchAgents(gateway: Gateway) {
+  const producerLlm = buildLlm(gateway, "producer", 0.55);
+  const themeLlm = buildLlm(gateway, "themeDirector", 0.8);
+  const layoutLlm = buildLlm(gateway, "layoutArchitect", 0.55);
+  const copywriterLlm = buildLlm(gateway, "copywriter", 0.8);
+  const qaLlm = buildLlm(gateway, "responsiveQa", 0.55);
+  const mediaLlm = buildLlm(gateway, "mediaDirector", 0.55);
 
   const producer = structuredChain(
-    llm,
+    producerLlm,
     producerBriefSchema,
     "church_producer_brief",
     "You are the executive producer of a premium church website studio. " +
@@ -70,7 +93,7 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
   );
 
   const themeDirector = structuredChain(
-    proseLlm,
+    themeLlm,
     themeBriefSchema,
     "church_theme_director",
     "You are art director for church websites. The visual direction and its layout are already " +
@@ -84,7 +107,7 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
   );
 
   const layoutArchitect = structuredChain(
-    llm,
+    layoutLlm,
     layoutPlanSchema,
     "church_layout_architect",
     "You sequence a church homepage. " +
@@ -101,7 +124,7 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
   );
 
   const copywriter = structuredChain(
-    proseLlm,
+    copywriterLlm,
     copyDeckSchema,
     "church_copywriter",
     "You write website copy for one specific church, in the voice given to you — never generic " +
@@ -119,7 +142,7 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
   );
 
   const responsiveQa = structuredChain(
-    llm,
+    qaLlm,
     qaReportSchema,
     "church_responsive_qa",
     "You are editorial QA for a church website on mobile (390px), tablet (768px), and desktop. " +
@@ -138,7 +161,7 @@ export function createChurchAgents(apiKey: string, model = "gpt-4o-mini") {
   );
 
   const mediaDirector = structuredChain(
-    llm,
+    mediaLlm,
     mediaPlanSchema,
     "church_media_director",
     "You are media director. Do NOT generate or invent images. " +

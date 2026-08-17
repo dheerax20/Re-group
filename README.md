@@ -130,6 +130,22 @@ project belongs to one).
   mutation. Layout paywalls do not cover Server Functions.
 - `lib/ai` — the recommendation engines, the multi-agent crew, the persisted
   generation job, and the monthly AI budget. AI only ever returns JSON.
+  - `lib/ai/agents/catalog.ts` holds the six `ArtDirection` archetypes the
+    crew builds from — real combinations of the section variants that
+    actually have components, not a free-text style the model invents.
+    `pickArtDirection()` chooses one per build and avoids repeating whatever
+    the site's previous build used, which is what makes "Regenerate"
+    produce a structurally different site instead of the same layout with
+    different words.
+  - `lib/ai/agents/model-config.ts` decides which LLM answers each of the
+    six agents. Nothing here changes behavior until you opt in via env
+    vars (documented in `.env.example`) — every agent defaults to
+    `gpt-4o-mini` against OpenAI directly. `AI_PROVIDER=openrouter` routes
+    the whole crew through OpenRouter instead (one key, many providers —
+    Llama, Mistral, Gemini, Claude — no new package, since OpenRouter
+    speaks the same OpenAI-compatible API `@langchain/openai` already
+    uses); `AI_MODEL_<ROLE>` overrides one agent's model independently of
+    the rest, e.g. a stronger model for just the copywriter.
 - `lib/validation/url.ts` — the rules for anything reaching an `href` or `src`
   on a published site.
 - `lib/features`, `lib/theme`, `lib/templates` — feature dependency rules, the

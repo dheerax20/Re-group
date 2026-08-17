@@ -11,6 +11,7 @@ import {
   runThemeDirector,
 } from "./specialists";
 import type { AgentLogEntry, DesignFeedback, SiteImprovement } from "./schemas";
+import { resolveGateway, type Gateway } from "./model-config";
 
 export type ChurchWebsiteBuild = GeneratedSiteConfig & {
   log: AgentLogEntry[];
@@ -51,9 +52,7 @@ function stepIndex(id: CrewStepId): number {
  * Does not select stock catalog templates — invents layout/copy/media.
  */
 export class ChurchWebsiteCrew implements SiteGenerationProvider {
-  constructor(
-    private readonly apiKey: string | undefined = process.env.OPENAI_API_KEY
-  ) {}
+  constructor(private readonly gateway: Gateway | null = resolveGateway()) {}
 
   async generateSiteConfig(input: SiteGenerationInput): Promise<GeneratedSiteConfig> {
     const built = await this.build(input);
@@ -75,8 +74,10 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
     onProgress?: CrewProgress,
     previousStyleName?: string
   ): Promise<ChurchWebsiteBuild> {
-    if (!this.apiKey) {
-      throw new Error("OPENAI_API_KEY is missing, so the AI crew cannot build a website.");
+    if (!this.gateway) {
+      throw new Error(
+        "No AI provider is configured: set OPENAI_API_KEY, or AI_PROVIDER=openrouter with OPENROUTER_API_KEY."
+      );
     }
 
     const total = CREW_STEPS.length;
@@ -95,7 +96,7 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
     const direction = pickArtDirection(artDirectionByName(previousStyleName)?.id);
 
     const log: AgentLogEntry[] = [];
-    const agents = createChurchAgents(this.apiKey);
+    const agents = createChurchAgents(this.gateway);
     const profile = profileForAgents(input);
 
     await report("producer");
