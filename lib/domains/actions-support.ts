@@ -1,7 +1,12 @@
 import type { DomainStatus, SiteDomain } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { invalidateSiteHostnames } from "./resolve";
-import { dnsRecordsFor, isApex, type DnsRecord } from "./hostname";
+import {
+  dnsRecordsFor,
+  isApex,
+  registrableDomain,
+  type DnsRecord,
+} from "./hostname";
 import {
   getDomainConfig,
   getProjectDomain,
@@ -41,6 +46,82 @@ function verificationRecords(value: unknown): DnsRecord[] {
       note: "Vercel needs this to confirm you own the domain.",
     }))
     .filter((record) => record.value !== "");
+}
+
+/**
+ * One domain as a church thinks of it: "gracechurch.org", including its `www.`
+ * partner, with a single status and one combined list of DNS records.
+ *
+ * The database stores the apex and the `www.` as separate rows because Vercel
+ * and the hostname resolver both work per-hostname. Showing that split in the UI
+ * made a church read two cards, each half-configured, and guess whether they
+ * were supposed to act on both.
+ */
+export type DomainGroup = {
+  /** The registrable domain, used as the group's identity and heading. */
+  root: string;
+  /** Rows in this group; the apex first when it is present. */
+  hostnames: DomainView[];
+  /** Worst status in the group — the group is only live when everything is. */
+  status: DomainStatus;
+  isPrimary: boolean;
+  /** Every record the church must add, across the whole group, deduplicated. */
+  records: DnsRecord[];
+  verification: DnsRecord[];
+  lastCheckedAt: string | null;
+};
+
+const STATUS_SEVERITY: Record<DomainStatus, number> = {
+  ACTIVE: 0,
+  PENDING_DNS: 1,
+  PENDING_VERIFICATION: 2,
+};
+
+function dedupeRecords(records: DnsRecord[]): DnsRecord[] {
+  const seen = new Set<string>();
+  return records.filter((record) => {
+    const key = `${record.type}|${record.name}|${record.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function groupDomains(domains: SiteDomain[]): DomainGroup[] {
+  const groups = new Map<string, DomainView[]>();
+
+  for (const domain of domains) {
+    const root = registrableDomain(domain.hostname);
+    const existing = groups.get(root) ?? [];
+    existing.push(toDomainView(domain));
+    groups.set(root, existing);
+  }
+
+  return [...groups.entries()].map(([root, hostnames]) => {
+    // Apex first, so the DNS records read in the order a registrar form does.
+    hostnames.sort((a, b) => Number(b.isApex) - Number(a.isApex));
+
+    const status = hostnames.reduce<DomainStatus>(
+      (worst, view) =>
+        STATUS_SEVERITY[view.status] > STATUS_SEVERITY[worst] ? view.status : worst,
+      "ACTIVE"
+    );
+
+    const checked = hostnames
+      .map((view) => view.lastCheckedAt)
+      .filter((value): value is string => value !== null)
+      .sort();
+
+    return {
+      root,
+      hostnames,
+      status,
+      isPrimary: hostnames.some((view) => view.isPrimary),
+      records: dedupeRecords(hostnames.flatMap((view) => view.records)),
+      verification: dedupeRecords(hostnames.flatMap((view) => view.verification)),
+      lastCheckedAt: checked.length > 0 ? checked[checked.length - 1] : null,
+    };
+  });
 }
 
 export function toDomainView(domain: SiteDomain): DomainView {

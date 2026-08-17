@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   AlertTriangle,
-  ChevronDown,
+  CheckCircle2,
   Globe,
   Loader2,
   RefreshCw,
@@ -18,7 +18,7 @@ import {
   verifyDomain,
   type DomainsState,
 } from "@/lib/domains/actions";
-import type { DomainView } from "@/lib/domains/actions-support";
+import type { DomainGroup } from "@/lib/domains/actions-support";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -26,59 +26,82 @@ import { CopyField } from "@/components/ui/copy-field";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 /**
- * Connecting a domain is the step where churches get stuck, and the reason is
- * always the same: they cannot tell whether they are waiting on DNS, waiting on
- * us, or have made a typo. So every domain shows which of the three it is, what
- * to type at the registrar, and a way to re-check without reloading.
+ * Connecting a domain is where churches get stuck, and always for the same
+ * reason: they cannot tell whether they are waiting on DNS, waiting on us, or
+ * have made a typo.
+ *
+ * Two decisions follow from that. One domain is one card — the apex and its
+ * `www.` are shown together with a single status, because "gracechurch.org" is
+ * one thing to the person reading it. And there are no options: the www. version
+ * is always connected, since asking made a church guess at DNS trivia and
+ * getting it wrong meant visitors who type `www.` hit an error.
  */
 
-type StatusPresentation = {
+function presentStatus(group: DomainGroup): {
   label: string;
   variant: "success" | "warning" | "info";
   explanation: string;
-};
-
-function presentStatus(domain: DomainView): StatusPresentation {
-  if (domain.status === "ACTIVE") {
+} {
+  if (group.status === "ACTIVE") {
     return {
-      label: "Live",
+      label: "Working",
       variant: "success",
-      explanation: "Visitors can reach your site at this address.",
+      explanation: "Visitors can reach your website at this address.",
     };
   }
-  if (domain.status === "PENDING_VERIFICATION") {
+  if (group.status === "PENDING_VERIFICATION") {
     return {
-      label: "Confirm ownership",
+      label: "Needs one more record",
       variant: "warning",
       explanation:
-        "This domain is registered with another Vercel account. Add the TXT record below to prove it is yours.",
+        "This domain is registered with another Vercel account, so we need proof it is yours. Add the TXT record below.",
     };
   }
   return {
-    label: "Waiting for DNS",
+    label: "Waiting for your registrar",
     variant: "info",
     explanation:
-      "Add the record below at your domain registrar. Changes usually appear within an hour.",
+      "Add the records below where you bought the domain. They usually start working within an hour.",
   };
 }
 
-function DomainRow({
+function RecordRow({
+  record,
+}: {
+  record: { type: string; name: string; value: string; note?: string };
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-start">
+      <div className="flex items-center gap-2 sm:flex-col sm:items-start sm:gap-1">
+        <Badge variant="outline">{record.type}</Badge>
+        <code className="font-mono text-xs text-muted">{record.name}</code>
+      </div>
+      <div className="min-w-0">
+        <CopyField value={record.value} />
+        {record.note ? (
+          <p className="mt-1 text-[11px] text-muted">{record.note}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DomainCard({
   siteId,
-  domain,
+  group,
   onChanged,
 }: {
   siteId: string;
-  domain: DomainView;
+  group: DomainGroup;
   onChanged: (next: DomainsState) => void;
 }) {
-  const [open, setOpen] = useState(domain.status !== "ACTIVE");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const status = presentStatus(domain);
+  const status = presentStatus(group);
+  const isWorking = group.status === "ACTIVE";
 
   function run(work: () => Promise<string | null>) {
     setMessage(null);
@@ -92,16 +115,23 @@ function DomainRow({
   return (
     <Card padding="none" className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 p-4">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-muted">
-          <Globe className="size-4" />
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+            isWorking ? "bg-success-soft text-success" : "bg-surface-muted text-muted"
+          )}
+        >
+          {isWorking ? (
+            <CheckCircle2 className="size-4" />
+          ) : (
+            <Globe className="size-4" />
+          )}
         </span>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate font-medium">{domain.hostname}</p>
-            {domain.isPrimary ? (
-              <Badge variant="accent">Main address</Badge>
-            ) : null}
+            <p className="truncate font-medium">{group.root}</p>
+            {group.isPrimary ? <Badge variant="accent">Main address</Badge> : null}
           </div>
           <p className="mt-0.5 text-xs text-muted">{status.explanation}</p>
         </div>
@@ -111,14 +141,14 @@ function DomainRow({
         </Badge>
 
         <div className="flex items-center gap-1">
-          {domain.status === "ACTIVE" && !domain.isPrimary ? (
+          {isWorking && !group.isPrimary ? (
             <Button
               variant="ghost"
               size="sm"
               disabled={pending}
               onClick={() =>
                 run(async () => {
-                  const result = await setPrimaryDomain(siteId, domain.id);
+                  const result = await setPrimaryDomain(siteId, group.root);
                   return result.success ? null : result.error;
                 })
               }
@@ -131,109 +161,98 @@ function DomainRow({
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Remove ${domain.hostname}`}
+            aria-label={`Disconnect ${group.root}`}
             disabled={pending}
             onClick={() =>
               run(async () => {
-                const result = await removeDomain(siteId, domain.id);
+                const result = await removeDomain(siteId, group.root);
                 return result.success ? null : result.error;
               })
             }
           >
             <Trash2 className="size-3.5" />
           </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={open ? "Hide DNS records" : "Show DNS records"}
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-          >
-            <ChevronDown
-              className={cn("size-4 transition-transform", open && "rotate-180")}
-            />
-          </Button>
         </div>
       </div>
 
-      {open ? (
-        <div className="border-t border-border bg-background px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            {domain.isApex ? "Add this A record" : "Add this CNAME record"}
-          </p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-[6rem_1fr]">
-            {domain.records.map((record) => (
-              <RecordRow key={`${record.type}-${record.name}`} record={record} />
+      {/*
+        Records stay visible until the domain works. A church that has not
+        finished setting up DNS should never have to find a disclosure triangle
+        to see what they still owe; once it works, the detail is just noise.
+      */}
+      {isWorking ? (
+        <div className="border-t border-border bg-background px-4 py-3">
+          <p className="text-xs text-muted">
+            Reaching your site at{" "}
+            {group.hostnames.map((view, index) => (
+              <span key={view.hostname}>
+                {index > 0 ? " and " : ""}
+                <span className="font-medium text-foreground">{view.hostname}</span>
+              </span>
             ))}
+            .
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4 border-t border-border bg-background px-4 py-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Add these at your registrar
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Wherever you bought {group.root} — GoDaddy, Namecheap, Google
+              Domains — find the DNS settings and add each row exactly as shown.
+            </p>
+            <div className="mt-3 space-y-3">
+              {group.records.map((record) => (
+                <RecordRow key={`${record.type}-${record.name}`} record={record} />
+              ))}
+            </div>
           </div>
 
-          {domain.verification.length > 0 ? (
-            <>
-              <p className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">
-                Then add this TXT record to prove ownership
+          {group.verification.length > 0 ? (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Then add this one to prove the domain is yours
               </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-[6rem_1fr]">
-                {domain.verification.map((record) => (
+              <div className="mt-3 space-y-3">
+                {group.verification.map((record) => (
                   <RecordRow key={record.value} record={record} />
                 ))}
               </div>
-            </>
+            </div>
           ) : null}
 
           {message ? (
-            <p className="mt-4 flex items-start gap-2 text-sm text-warning">
+            <p className="flex items-start gap-2 text-sm text-warning">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               {message}
             </p>
           ) : null}
 
-          {domain.status !== "ACTIVE" ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  run(async () => {
-                    const result = await verifyDomain(siteId, domain.id);
-                    return result.success ? null : result.error;
-                  })
-                }
-              >
-                {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                Check again
-              </Button>
-              <span className="text-xs text-muted">
-                {domain.lastCheckedAt
-                  ? `Last checked ${new Date(domain.lastCheckedAt).toLocaleTimeString()}`
-                  : "Not checked yet"}
-              </span>
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                run(async () => {
+                  const result = await verifyDomain(siteId, group.root);
+                  return result.success ? null : result.error;
+                })
+              }
+            >
+              {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              I&rsquo;ve added them — check now
+            </Button>
+            <span className="text-xs text-muted">
+              {group.lastCheckedAt
+                ? `Last checked ${new Date(group.lastCheckedAt).toLocaleTimeString()}`
+                : "Not checked yet"}
+            </span>
+          </div>
         </div>
-      ) : null}
+      )}
     </Card>
-  );
-}
-
-function RecordRow({
-  record,
-}: {
-  record: { type: string; name: string; value: string; note?: string };
-}) {
-  return (
-    <>
-      <div className="flex items-start gap-2 sm:flex-col sm:gap-1">
-        <Badge variant="outline">{record.type}</Badge>
-        <code className="font-mono text-xs text-muted">{record.name}</code>
-      </div>
-      <div className="min-w-0">
-        <CopyField value={record.value} />
-        {record.note ? (
-          <p className="mt-1 text-[11px] text-muted">{record.note}</p>
-        ) : null}
-      </div>
-    </>
   );
 }
 
@@ -246,7 +265,6 @@ export function DomainManager({
 }) {
   const [state, setState] = useState(initialState);
   const [hostname, setHostname] = useState("");
-  const [includeWww, setIncludeWww] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -257,24 +275,15 @@ export function DomainManager({
     setNotice(null);
 
     startTransition(async () => {
-      const result = await addDomain(siteId, hostname, { includeWww });
+      const result = await addDomain(siteId, hostname);
       if (!result.success) {
         setError(result.error);
         return;
       }
       setHostname("");
       setNotice(
-        result.alsoAdded
-          ? `Added ${result.domain.hostname} and ${result.alsoAdded.hostname}. Add the DNS records below to finish.`
-          : `Added ${result.domain.hostname}. Add the DNS record below to finish.`
+        `${result.root} is connected. Add the DNS records below to finish.`
       );
-      setState(await refreshDomains(siteId));
-    });
-  }
-
-  function recheckAll() {
-    setError(null);
-    startTransition(async () => {
       setState(await refreshDomains(siteId));
     });
   }
@@ -283,8 +292,8 @@ export function DomainManager({
     return (
       <EmptyState
         icon={Globe}
-        title="Custom domains are not switched on yet"
-        description="This deployment has no Vercel API credentials, so domains cannot be connected. Your site is still live on its Regroup address."
+        title="Custom domains aren't switched on yet"
+        description="Your website is still live on its Regroup address — this deployment just cannot connect outside domains."
         action={
           <a
             href={`https://${state.platformHost}`}
@@ -301,9 +310,11 @@ export function DomainManager({
   return (
     <div className="space-y-5">
       <Card>
-        <CardTitle className="text-base">Connect a domain you own</CardTitle>
+        <CardTitle className="text-base">Use a domain you own</CardTitle>
         <CardDescription>
-          Buy a domain at any registrar, then point it here. Your Regroup address{" "}
+          Type the domain you bought. We connect it along with its{" "}
+          <code className="font-mono text-xs">www.</code> version, so both work.
+          Your Regroup address{" "}
           <span className="font-medium text-foreground">{state.platformHost}</span>{" "}
           keeps working either way.
         </CardDescription>
@@ -326,18 +337,9 @@ export function DomainManager({
             </div>
             <Button type="submit" disabled={pending || hostname.trim() === ""}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              Connect domain
+              Connect
             </Button>
           </div>
-
-          <label className="flex items-center gap-2.5 text-sm text-muted">
-            <Switch
-              checked={includeWww}
-              onCheckedChange={setIncludeWww}
-              aria-label="Also connect the www version"
-            />
-            Also connect the <code className="font-mono text-xs">www.</code> version
-          </label>
 
           {error ? (
             <p
@@ -356,42 +358,45 @@ export function DomainManager({
         <Card variant="flat" className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
           <p className="text-sm text-muted">
-            Your website is still a draft. A connected domain will not show
-            anything to visitors until you publish.
+            Your website is still a draft, so a connected domain will show
+            visitors nothing until you publish it.
           </p>
         </Card>
       ) : null}
 
-      {state.domains.length === 0 ? (
+      {state.groups.length === 0 ? (
         <EmptyState
           icon={Globe}
-          title="No domains connected"
-          description="Add your church's domain above and we will show you exactly which DNS record to create."
+          title="No domain connected yet"
+          description="Add the domain your church owns above, and we will show you exactly what to change at your registrar."
           compact
         />
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium">
-              Connected domains
-              <span className="ml-1.5 text-muted">({state.domains.length})</span>
+              Your domains
+              <span className="ml-1.5 text-muted">({state.groups.length})</span>
             </h2>
             <Button
               variant="ghost"
               size="sm"
-              onClick={recheckAll}
               disabled={pending}
+              onClick={() => {
+                setError(null);
+                startTransition(async () => setState(await refreshDomains(siteId)));
+              }}
             >
               <RefreshCw className={cn("size-3.5", pending && "animate-spin")} />
-              Re-check all
+              Check all
             </Button>
           </div>
 
-          {state.domains.map((domain) => (
-            <DomainRow
-              key={domain.id}
+          {state.groups.map((group) => (
+            <DomainCard
+              key={group.root}
               siteId={siteId}
-              domain={domain}
+              group={group}
               onChanged={setState}
             />
           ))}

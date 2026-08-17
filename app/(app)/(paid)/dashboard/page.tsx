@@ -110,7 +110,7 @@ export default async function DashboardPage() {
           <Link href="/dashboard/domains">
             <Button variant="ghost" size="sm">
               <Globe className="size-3.5" />
-              {domains.domains.length > 0 ? "Manage domains" : "Add your domain"}
+              {domains.groups.length > 0 ? "Manage domains" : "Add your domain"}
             </Button>
           </Link>
           {published ? (

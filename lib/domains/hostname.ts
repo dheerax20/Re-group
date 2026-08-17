@@ -174,8 +174,39 @@ export function dnsRecordsFor(hostname: string): DnsRecord[] {
   ];
 }
 
-/** The `www.` companion we offer to add alongside an apex domain. */
-export function wwwVariant(hostname: string): string | null {
-  if (!isApex(hostname)) return null;
-  return `www.${hostname}`;
+/**
+ * The registrable domain a hostname belongs to.
+ *
+ * `www.gracechurch.org` and `gracechurch.org` share one — which is what lets
+ * the UI show a church a single "gracechurch.org" entry instead of two rows
+ * they have to reason about separately.
+ */
+export function registrableDomain(hostname: string): string {
+  if (isApex(hostname)) return hostname;
+  const suffix = MULTI_PART_SUFFIXES.find((candidate) =>
+    hostname.endsWith(`.${candidate}`)
+  );
+  const keep = suffix ? suffix.split(".").length + 1 : 2;
+  return hostname.split(".").slice(-keep).join(".");
+}
+
+/**
+ * Every hostname to attach when a church asks for one domain.
+ *
+ * A church that types `gracechurch.org` means "our website should be at our
+ * domain", and a visitor who types `www.` in front must not get an error. So the
+ * apex and its `www.` are always connected as a pair, in whichever order they
+ * were given — there is no version of this a church would sensibly decline, and
+ * asking made them guess at DNS trivia.
+ *
+ * Deeper subdomains (`give.gracechurch.org`) stand alone: there is no
+ * conventional partner for them.
+ */
+export function pairedHostnames(hostname: string): string[] {
+  if (isApex(hostname)) return [hostname, `www.${hostname}`];
+
+  const root = registrableDomain(hostname);
+  if (hostname === `www.${root}`) return [root, hostname];
+
+  return [hostname];
 }

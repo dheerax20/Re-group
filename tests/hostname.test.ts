@@ -3,8 +3,9 @@ import {
   dnsRecordsFor,
   isApex,
   normalizeHostname,
+  pairedHostnames,
+  registrableDomain,
   validateHostname,
-  wwwVariant,
 } from "@/lib/domains/hostname";
 
 describe("normalizeHostname", () => {
@@ -92,9 +93,41 @@ describe("dnsRecordsFor", () => {
   });
 });
 
-describe("wwwVariant", () => {
-  it("offers www only for an apex", () => {
-    expect(wwwVariant("grace.org")).toBe("www.grace.org");
-    expect(wwwVariant("www.grace.org")).toBeNull();
+describe("registrableDomain", () => {
+  it("collapses a www host onto its apex", () => {
+    expect(registrableDomain("www.grace.org")).toBe("grace.org");
+    expect(registrableDomain("grace.org")).toBe("grace.org");
+  });
+
+  it("handles multi-part suffixes", () => {
+    expect(registrableDomain("www.grace.co.uk")).toBe("grace.co.uk");
+    expect(registrableDomain("grace.co.uk")).toBe("grace.co.uk");
+  });
+
+  it("collapses a deeper subdomain onto the registrable domain", () => {
+    expect(registrableDomain("give.grace.org")).toBe("grace.org");
+  });
+});
+
+describe("pairedHostnames", () => {
+  it("pairs an apex with its www, apex first", () => {
+    expect(pairedHostnames("grace.org")).toEqual(["grace.org", "www.grace.org"]);
+  });
+
+  it("pairs a www input with its apex, apex first", () => {
+    // Whichever half a church types, both get connected and the apex leads —
+    // so the DNS list always reads A record then CNAME.
+    expect(pairedHostnames("www.grace.org")).toEqual(["grace.org", "www.grace.org"]);
+  });
+
+  it("pairs across a multi-part suffix", () => {
+    expect(pairedHostnames("grace.co.uk")).toEqual([
+      "grace.co.uk",
+      "www.grace.co.uk",
+    ]);
+  });
+
+  it("leaves a deeper subdomain alone, having no conventional partner", () => {
+    expect(pairedHostnames("give.grace.org")).toEqual(["give.grace.org"]);
   });
 });

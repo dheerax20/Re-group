@@ -96,12 +96,22 @@ Churches connect their own domain at **/dashboard/domains**. The flow:
 1. The hostname is validated (`lib/domains/hostname.ts`) and attached to the
    Vercel project (`lib/domains/vercel.ts`). Vercel is called *first*, so the
    database never claims a hostname the platform cannot serve.
-2. The UI shows the exact DNS record to add — an `A` record for an apex domain,
-   a `CNAME` for a subdomain — plus a `TXT` challenge if the domain is claimed
-   by another Vercel account.
-3. Status is always re-read from Vercel, never inferred. A domain goes `ACTIVE`
+2. The apex and its `www.` are always connected together — `pairedHostnames()`
+   — in whichever order they were typed. This is not optional: a church has no
+   basis to decline it, and one that did would have visitors typing `www.` land
+   on an error.
+3. The UI shows the exact records to add — an `A` record for the apex, a `CNAME`
+   for `www.` — plus a `TXT` challenge if the domain is claimed by another
+   Vercel account.
+4. Status is always re-read from Vercel, never inferred. A domain goes `ACTIVE`
    only when it is both verified *and* correctly configured; serving it earlier
    would show visitors an error page under the church's own name.
+
+**One domain is one card.** The database stores each hostname as its own
+`SiteDomain` row, because Vercel and the resolver both work per-hostname, but
+`groupDomains()` collapses them by registrable domain for display. A group is
+live only when every hostname in it is, and verify/remove/set-primary all act on
+the whole group — keyed by the registrable domain, not a row id.
 
 Requires a Vercel API token with access to the project (and the team, if the
 project belongs to one).
