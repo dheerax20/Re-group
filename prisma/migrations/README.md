@@ -10,6 +10,13 @@ npx prisma migrate resolve --applied 00000000000000_init
 
 On a fresh database, nothing special is needed — `migrate deploy` runs it.
 
+`migration_lock.toml` (declares the provider, `postgresql`) is required by
+Prisma's tooling and should have existed from the start; it didn't, because
+the baseline above was hand-generated with `migrate diff` rather than through
+a normal `migrate dev`/`deploy` run. Added retroactively — if you ever see
+"Could not determine the connector from the migrations directory," this file
+is what's missing.
+
 From here on:
 
 - **Local schema change:** edit `schema.prisma`, then `npm run db:migrate`, which

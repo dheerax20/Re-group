@@ -1,15 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import {
-  Camera,
-  CheckCircle2,
-  Circle,
-  ListChecks,
-  Smartphone,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Camera, CheckCircle2, Circle, ListChecks, Smartphone, Sparkles, Wand2 } from "lucide-react";
 import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
 import type { SectionInstance, SiteConfig } from "@/lib/site/types";
 import {
@@ -18,9 +10,7 @@ import {
   type EditorNeed,
   type EditorNeedCategory,
 } from "@/lib/builder/checklist";
-import { applyWebsiteAiPrompt } from "@/lib/site/actions";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { SiteChatPanel } from "@/components/builder/site-chat-panel";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_LABEL: Record<EditorNeedCategory, string> = {
@@ -30,12 +20,6 @@ const CATEGORY_LABEL: Record<EditorNeedCategory, string> = {
   design: "Design",
   pages: "Pages",
 };
-
-const PROMPT_EXAMPLES = [
-  "Make the hero warmer and more welcoming for first-time visitors",
-  "Shorten all headlines for mobile and strengthen the visit CTA",
-  "More traditional tone — less trendy language",
-];
 
 type ImproveTab = "needs" | "ai";
 
@@ -57,10 +41,6 @@ export function EditorImprovePanel({
   }) => void;
 }) {
   const [tab, setTab] = useState<ImproveTab>("needs");
-  const [prompt, setPrompt] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const liveSite = useMemo(
     () => ({
@@ -87,29 +67,6 @@ export function EditorImprovePanel({
     if (!need.sectionType) return;
     const match = sections.find((s) => s.type === need.sectionType);
     if (match) onSelectSection(match.id, need.sectionType);
-  }
-
-  function runPrompt(text?: string) {
-    const value = (text ?? prompt).trim();
-    setError(null);
-    setSummary(null);
-    startTransition(async () => {
-      try {
-        const result = await applyWebsiteAiPrompt(site.site.id, value, sections);
-        setSummary(result.summary);
-        setPrompt("");
-        onApplied({
-          sections: result.sections,
-          improvements: result.improvements,
-          designFeedback: result.designFeedback,
-          mobileFeedback: result.mobileFeedback,
-          summary: result.summary,
-        });
-        setTab("needs");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "AI prompt failed");
-      }
-    });
   }
 
   return (
@@ -140,11 +97,11 @@ export function EditorImprovePanel({
           )}
         >
           <Wand2 className="size-3.5" />
-          AI prompt
+          Chat
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className={cn("min-h-0 flex-1", tab === "needs" && "overflow-y-auto p-3")}>
         {tab === "needs" ? (
           <div className="space-y-4">
             <div>
@@ -204,56 +161,7 @@ export function EditorImprovePanel({
             ))}
           </div>
         ) : (
-          <div className="space-y-3">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                AI prompt
-              </p>
-              <p className="mt-1 text-xs text-white/55">
-                Describe changes in plain language. AI updates copy & layout notes — you still add
-                real photos.
-              </p>
-            </div>
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g. Make copy warmer for young families, keep traditional tone…"
-              className="min-h-28 border-white/15 bg-white/5 text-sm text-white placeholder:text-white/35"
-              maxLength={1200}
-            />
-            <div className="flex flex-wrap gap-1.5">
-              {PROMPT_EXAMPLES.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  onClick={() => setPrompt(example)}
-                  className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-white/60 hover:border-accent/40 hover:text-accent"
-                >
-                  {example.slice(0, 42)}…
-                </button>
-              ))}
-            </div>
-            {error ? (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {error}
-              </p>
-            ) : null}
-            {summary ? (
-              <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs text-success">
-                {summary}
-              </p>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              disabled={pending || prompt.trim().length < 8}
-              onClick={() => runPrompt()}
-              className="w-full bg-accent text-editor-shell hover:bg-accent/90"
-            >
-              <Wand2 className="size-3.5" />
-              {pending ? "Applying…" : "Apply AI prompt"}
-            </Button>
-          </div>
+          <SiteChatPanel siteId={site.site.id} onApplied={onApplied} />
         )}
       </div>
     </div>

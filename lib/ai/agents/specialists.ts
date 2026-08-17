@@ -17,7 +17,7 @@ import {
   type ThemeBrief,
 } from "./schemas";
 import type { ArtDirection } from "./catalog";
-import { modelForRole, type AgentRole, type Gateway } from "./model-config";
+import { buildRoleLlm, type Gateway } from "./model-config";
 
 function structuredChain<T extends z.ZodType>(
   llm: ChatOpenAI,
@@ -62,22 +62,13 @@ function directionBrief(direction: ArtDirection): string {
  * get right, and run warmer so two churches given the same locked direction
  * don't read like the same paragraph with the name swapped.
  */
-function buildLlm(gateway: Gateway, role: AgentRole, temperature: number): ChatOpenAI {
-  return new ChatOpenAI({
-    apiKey: gateway.apiKey,
-    model: modelForRole(role),
-    temperature,
-    ...(gateway.configuration ? { configuration: gateway.configuration } : {}),
-  });
-}
-
 export function createChurchAgents(gateway: Gateway) {
-  const producerLlm = buildLlm(gateway, "producer", 0.55);
-  const themeLlm = buildLlm(gateway, "themeDirector", 0.8);
-  const layoutLlm = buildLlm(gateway, "layoutArchitect", 0.55);
-  const copywriterLlm = buildLlm(gateway, "copywriter", 0.8);
-  const qaLlm = buildLlm(gateway, "responsiveQa", 0.55);
-  const mediaLlm = buildLlm(gateway, "mediaDirector", 0.55);
+  const producerLlm = buildRoleLlm(gateway, "producer", 0.55);
+  const themeLlm = buildRoleLlm(gateway, "themeDirector", 0.8);
+  const layoutLlm = buildRoleLlm(gateway, "layoutArchitect", 0.55);
+  const copywriterLlm = buildRoleLlm(gateway, "copywriter", 0.8);
+  const qaLlm = buildRoleLlm(gateway, "responsiveQa", 0.55);
+  const mediaLlm = buildRoleLlm(gateway, "mediaDirector", 0.55);
 
   const producer = structuredChain(
     producerLlm,

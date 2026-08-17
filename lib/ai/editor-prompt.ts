@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
 import { sectionTypes, type SectionInstance } from "@/lib/site/types";
 import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
+import { buildRoleLlm, resolveGateway } from "@/lib/ai/agents/model-config";
 
 const editorPromptResultSchema = z.object({
   summary: z.string().min(8).max(200),
@@ -70,22 +70,37 @@ export type EditorPromptResult = {
   mobileFeedback: DesignFeedback[];
 };
 
+export type ChatTurn = { role: "user" | "assistant"; content: string };
+
 /**
  * Apply a freeform church/editor prompt to the current homepage sections.
  * Does not generate images — reminds the user to provide photos.
+ *
+ * This is the one place a prompt turns into a validated section diff, and it
+ * has exactly two callers: the editor's one-shot "AI prompt" box
+ * (`applyWebsiteAiPrompt` in `lib/site/actions.ts`) and the site chatbot's
+ * edit node (`lib/ai/chat/graph.ts`). Both go through the same schema and the
+ * same `coerceSections` repair pass at the write site — the chatbot is not a
+ * second, less-checked way to touch a site's content.
  */
 export async function applyEditorAiPrompt(args: {
   churchName: string;
   prompt: string;
   sections: SectionInstance[];
   features: Record<string, unknown>;
+  /**
+   * Recent turns of an ongoing conversation, oldest first. Optional — the
+   * one-shot editor box has none. Kept short by the caller; this function
+   * does not cap it further.
+   */
+  history?: ChatTurn[];
 }): Promise<EditorPromptResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is missing.");
+  const gateway = resolveGateway();
+  if (!gateway) {
+    throw new Error("No AI provider is configured (set OPENAI_API_KEY).");
   }
 
-  const llm = new ChatOpenAI({ apiKey, model: "gpt-4o-mini", temperature: 0.45 });
+  const llm = buildRoleLlm(gateway, "editor", 0.45);
   const structured = llm.withStructuredOutput(editorPromptResultSchema, {
     name: "editor_ai_prompt",
   });
@@ -103,19 +118,29 @@ export async function applyEditorAiPrompt(args: {
           "About: image-left or image-right. Welcome: centered or split, whichever fits the request. " +
           "ctaHref should be internal paths like /contact, /about, /events. " +
           "Empty string means leave that field unchanged. " +
+          "If a conversation history is included, use it to understand what 'that', 'it', or 'the last " +
+          "change' refers to — but only act on the CURRENT prompt's request. " +
           "Always refresh improvements + design/mobile feedback covering photos, content, and mobile.",
       ],
       [
         "human",
-        "Church: {churchName}\nFeatures: {features}\n\nUser prompt:\n{prompt}\n\nCurrent sections JSON:\n{sections}\n\nAllowed section types: {types}",
+        "Church: {churchName}\nFeatures: {features}\n\n{history}User prompt:\n{prompt}\n\n" +
+          "Current sections JSON:\n{sections}\n\nAllowed section types: {types}",
       ],
     ]),
     structured,
   ]);
 
+  const historyBlock = args.history?.length
+    ? `Recent conversation:\n${args.history
+        .map((turn) => `${turn.role === "user" ? "Pastor/admin" : "Assistant"}: ${turn.content}`)
+        .join("\n")}\n\n`
+    : "";
+
   const result = (await chain.invoke({
     churchName: args.churchName,
     features: JSON.stringify(args.features),
+    history: historyBlock,
     prompt: args.prompt.slice(0, 1200),
     sections: JSON.stringify(
       args.sections.map((s) => ({

@@ -15,6 +15,9 @@ const ENV_KEYS = [
   "OPENROUTER_BASE_URL",
   "AI_MODEL_PRODUCER",
   "AI_MODEL_COPYWRITER",
+  "AI_MODEL_EDITOR",
+  "AI_MODEL_CHAT_CLASSIFIER",
+  "AI_MODEL_CHAT_ANSWER",
 ] as const;
 
 let saved: Record<string, string | undefined>;
@@ -45,6 +48,17 @@ describe("modelForRole", () => {
 
   it("ignores a blank override rather than sending an empty model name", () => {
     process.env.AI_MODEL_PRODUCER = "   ";
+    expect(modelForRole("producer")).toBe("gpt-4o-mini");
+  });
+
+  it("covers the editor and chatbot roles independently of the crew's six", () => {
+    process.env.AI_MODEL_EDITOR = "gpt-4o";
+    process.env.AI_MODEL_CHAT_CLASSIFIER = "gpt-4o-mini";
+    expect(modelForRole("editor")).toBe("gpt-4o");
+    expect(modelForRole("chatClassifier")).toBe("gpt-4o-mini");
+    // Untouched roles still default — one role's override must not bleed
+    // into another's.
+    expect(modelForRole("chatAnswer")).toBe("gpt-4o-mini");
     expect(modelForRole("producer")).toBe("gpt-4o-mini");
   });
 });

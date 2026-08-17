@@ -17,7 +17,7 @@ import { navigationConfigSchema } from "@/lib/validation/navigation";
 import { getTemplate } from "@/lib/templates/registry";
 import { DeterministicSiteGenerator } from "@/lib/ai/deterministic-site-generator";
 import { getTemplateRecommendationEngine } from "@/lib/ai";
-import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
+import { assertAiBudget } from "@/lib/ai/usage";
 import {
   createJob,
   findActiveJob,
@@ -28,7 +28,6 @@ import {
 import { validateSiteForPublish } from "@/lib/site/publish-validation";
 import { toSiteConfig } from "@/lib/site/to-site-config";
 import { parseChurchStory } from "@/lib/site/story";
-import { applyEditorAiPrompt } from "@/lib/ai/editor-prompt";
 import { invalidateSite } from "@/lib/site/invalidate";
 import { syncPrimaryDomain } from "@/lib/domains/actions-support";
 import {
@@ -311,103 +310,6 @@ export async function startAiWebsiteBuild(siteId: string) {
 export async function getAiWebsiteBuildStatus(siteId: string): Promise<JobView | null> {
   await requireOwnedSite(siteId);
   return getLatestJob(siteId, "full_build");
-}
-
-export async function getAiBudgetSummary(siteId: string) {
-  await requireOwnedSite(siteId);
-  const [build, prompt] = await Promise.all([
-    getAiBudget(siteId, "full_build"),
-    getAiBudget(siteId, "editor_prompt"),
-  ]);
-  return {
-    build: { used: build.used, limit: build.limit, remaining: build.remaining },
-    prompt: { used: prompt.used, limit: prompt.limit, remaining: prompt.remaining },
-    resetsAt: build.resetsAt.toISOString(),
-  };
-}
-
-/** In-editor AI: apply a freeform prompt to the current homepage, refresh checklist. */
-export async function applyWebsiteAiPrompt(
-  siteId: string,
-  prompt: string,
-  sectionsInput?: unknown
-) {
-  const user = await requireOwnedPaidSite(siteId);
-  const trimmed = prompt.trim();
-  if (trimmed.length < 8) {
-    throw new Error("Write a short prompt describing what you want changed.");
-  }
-  if (trimmed.length > 1200) {
-    throw new Error("Keep the prompt under 1200 characters.");
-  }
-
-  await assertAiBudget(siteId, user.id, "editor_prompt");
-
-  const site = await prisma.site.findUnique({ where: { id: siteId } });
-  if (!site) throw new Error("Site not found");
-
-  const sections = sectionConfigSchema.parse(
-    coerceSections(sectionsInput ?? site.sectionConfig ?? [])
-  );
-
-  // Logged before the call, so a failed prompt still counts against the budget
-  // — the provider was billed either way.
-  const job = await createJob(siteId, "editor_prompt", trimmed);
-
-  try {
-    const result = await applyEditorAiPrompt({
-      churchName: site.name,
-      prompt: trimmed,
-      sections,
-      features: (site.featureConfig as Record<string, unknown>) ?? {},
-    });
-
-    // Model output, repaired rather than trusted: an invented variant or an
-    // unsafe href would otherwise be written straight to a published site.
-    const nextSections = coerceSections(result.sections);
-
-    await prisma.$transaction([
-      prisma.site.update({
-        where: { id: siteId },
-        data: {
-          sectionConfig: toJson(nextSections),
-          storyConfig: toJson({
-            ...parseChurchStory(site.storyConfig),
-            improvements: result.improvements,
-            designFeedback: result.designFeedback,
-            mobileFeedback: result.mobileFeedback,
-          }),
-        },
-      }),
-      prisma.siteGenerationJob.update({
-        where: { id: job.id },
-        data: {
-          status: "SUCCEEDED",
-          stepIndex: 1,
-          summary: result.summary,
-          finishedAt: new Date(),
-        },
-      }),
-    ]);
-
-    await invalidateSite(siteId);
-    return {
-      success: true as const,
-      summary: result.summary,
-      sections: nextSections,
-      improvements: result.improvements,
-      designFeedback: result.designFeedback,
-      mobileFeedback: result.mobileFeedback,
-    };
-  } catch (error) {
-    console.error("[applyWebsiteAiPrompt]", error);
-    const message = error instanceof Error ? error.message : "AI prompt failed";
-    await prisma.siteGenerationJob.update({
-      where: { id: job.id },
-      data: { status: "FAILED", error: message.slice(0, 280), finishedAt: new Date() },
-    });
-    throw new Error(message.slice(0, 280));
-  }
 }
 
 export async function updateSections(siteId: string, input: unknown) {

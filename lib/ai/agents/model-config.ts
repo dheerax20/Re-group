@@ -1,3 +1,4 @@
+import { ChatOpenAI } from "@langchain/openai";
 import type { ClientOptions } from "openai";
 
 /**
@@ -14,7 +15,10 @@ export type AgentRole =
   | "layoutArchitect"
   | "copywriter"
   | "responsiveQa"
-  | "mediaDirector";
+  | "mediaDirector"
+  | "editor"
+  | "chatClassifier"
+  | "chatAnswer";
 
 const ROLE_ENV_VAR: Record<AgentRole, string> = {
   producer: "AI_MODEL_PRODUCER",
@@ -23,6 +27,13 @@ const ROLE_ENV_VAR: Record<AgentRole, string> = {
   copywriter: "AI_MODEL_COPYWRITER",
   responsiveQa: "AI_MODEL_RESPONSIVE_QA",
   mediaDirector: "AI_MODEL_MEDIA_DIRECTOR",
+  // The in-editor one-shot prompt (lib/ai/editor-prompt.ts).
+  editor: "AI_MODEL_EDITOR",
+  // The site chatbot (lib/ai/chat) — two roles because "is this a question or
+  // an edit request" is a much smaller job than answering or editing, and is
+  // worth routing to a cheaper model independently of the other.
+  chatClassifier: "AI_MODEL_CHAT_CLASSIFIER",
+  chatAnswer: "AI_MODEL_CHAT_ANSWER",
 };
 
 const DEFAULT_MODEL = "gpt-4o-mini";
@@ -71,4 +82,19 @@ export function resolveGateway(): Gateway | null {
 
   const apiKey = process.env.OPENAI_API_KEY;
   return apiKey ? { apiKey } : null;
+}
+
+/**
+ * One `ChatOpenAI` client for one role, through whichever gateway the caller
+ * resolved. Shared by every agent group in `lib/ai` (the site-generation
+ * crew, the in-editor prompt, the chatbot) so a role's model and the gateway
+ * it travels through are decided in exactly one place.
+ */
+export function buildRoleLlm(gateway: Gateway, role: AgentRole, temperature: number): ChatOpenAI {
+  return new ChatOpenAI({
+    apiKey: gateway.apiKey,
+    model: modelForRole(role),
+    temperature,
+    ...(gateway.configuration ? { configuration: gateway.configuration } : {}),
+  });
 }

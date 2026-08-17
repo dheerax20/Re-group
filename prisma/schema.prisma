@@ -78,6 +78,7 @@ model Site {
   events         Event[]
   domains        SiteDomain[]
   generationJobs SiteGenerationJob[]
+  chatMessages   ChatMessage[]
 
   @@index([status])
 }
@@ -180,6 +181,33 @@ model SiteGenerationJob {
   @@index([siteId, createdAt])
   @@index([status])
   @@map("site_generation_jobs")
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+/**
+ * One growing conversation per site — not a list of named threads, since
+ * nothing in the product needs more than one ongoing chat with a site's
+ * editor agent. `appliedSummary` is set only on an ASSISTANT message that
+ * actually changed the live site, which is what lets the chat UI show
+ * "Applied" on some replies and a plain answer on others, and doubles as
+ * the audit trail for what changed and when.
+ */
+model ChatMessage {
+  id             String   @id @default(cuid())
+  siteId         String
+  role           ChatRole
+  content        String
+  appliedSummary String?
+  createdAt      DateTime @default(now())
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, createdAt])
+  @@map("chat_messages")
 }
 
 model SocialLink {
