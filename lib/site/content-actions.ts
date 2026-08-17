@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/db";
+import { prisma, type DbClient } from "@/lib/db";
 import { invalidateSite } from "@/lib/site/invalidate";
 import { requireOwnedPaidSite, requireOwnedSite } from "@/lib/auth/session";
 import { toDatabaseError } from "@/lib/db/errors";
@@ -10,8 +10,6 @@ import { httpsUrlSchema } from "@/lib/validation/url";
 import { defaultFeatures, type FeatureConfig } from "@/lib/features/types";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-
-type DbClient = Prisma.TransactionClient | typeof prisma;
 
 function mergeFeatures(stored: unknown, patch: Partial<FeatureConfig>): FeatureConfig {
   return {
