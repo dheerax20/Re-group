@@ -137,17 +137,13 @@ project belongs to one).
     the site's previous build used, which is what makes "Regenerate"
     produce a structurally different site instead of the same layout with
     different words.
-  - `lib/ai/agents/model-config.ts` decides which LLM answers each agent —
-    the crew's six, plus `editor` (the in-editor prompt) and
+  - `lib/ai/agents/model-config.ts` decides which OpenAI model answers each
+    agent — the crew's six, plus `editor` (the in-editor prompt) and
     `chatClassifier`/`chatAnswer` (the site chatbot below). Nothing here
     changes behavior until you opt in via env vars (documented in
-    `.env.example`) — every role defaults to `gpt-4o-mini` against OpenAI
-    directly. `AI_PROVIDER=openrouter` routes everything through OpenRouter
-    instead (one key, many providers — Llama, Mistral, Gemini, Claude — no
-    new package, since OpenRouter speaks the same OpenAI-compatible API
-    `@langchain/openai` already uses); `AI_MODEL_<ROLE>` overrides one
-    role's model independently of the rest, e.g. a stronger model for just
-    the copywriter.
+    `.env.example`) — every role defaults to `gpt-4o-mini`.
+    `AI_MODEL_<ROLE>` overrides one role's model independently of the rest,
+    e.g. a stronger model for just the copywriter.
   - `lib/ai/chat` — the site chatbot, and the first real
     [LangGraph](https://langchain-ai.github.io/langgraphjs/) in the
     codebase rather than a hand-written chain. A message is classified as

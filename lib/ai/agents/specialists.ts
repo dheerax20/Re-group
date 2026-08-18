@@ -53,8 +53,8 @@ function directionBrief(direction: ArtDirection): string {
  * Each agent resolves its own model name through `modelForRole()` — every
  * role defaults to the same "gpt-4o-mini" that used to be hardcoded here, so
  * behavior is unchanged until an `AI_MODEL_<ROLE>` env var opts a specific
- * agent into something else (a stronger model for the copywriter, a smaller
- * one for the rest, or an OpenRouter model when `AI_PROVIDER=openrouter`).
+ * agent into a different OpenAI model — a stronger one for the copywriter,
+ * say, while the rest stay on the small default.
  *
  * Temperature stays grouped by task, same as before: schema-bearing agents
  * (producer, layout, QA, media) run cooler so structured output parses

@@ -76,7 +76,7 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
   ): Promise<ChurchWebsiteBuild> {
     if (!this.gateway) {
       throw new Error(
-        "No AI provider is configured: set OPENAI_API_KEY, or AI_PROVIDER=openrouter with OPENROUTER_API_KEY."
+        "No AI provider is configured: set OPENAI_API_KEY."
       );
     }
 

@@ -9,10 +9,7 @@ import { modelForRole, resolveGateway } from "@/lib/ai/agents/model-config";
  */
 
 const ENV_KEYS = [
-  "AI_PROVIDER",
   "OPENAI_API_KEY",
-  "OPENROUTER_API_KEY",
-  "OPENROUTER_BASE_URL",
   "AI_MODEL_PRODUCER",
   "AI_MODEL_COPYWRITER",
   "AI_MODEL_EDITOR",
@@ -68,31 +65,8 @@ describe("resolveGateway", () => {
     expect(resolveGateway()).toBeNull();
   });
 
-  it("defaults to OpenAI directly, with no extra configuration, when only OPENAI_API_KEY is set", () => {
+  it("resolves the OpenAI key with nothing else attached", () => {
     process.env.OPENAI_API_KEY = "sk-test";
     expect(resolveGateway()).toEqual({ apiKey: "sk-test" });
-  });
-
-  it("switches to OpenRouter only when AI_PROVIDER is explicitly set", () => {
-    process.env.OPENAI_API_KEY = "sk-test";
-    process.env.AI_PROVIDER = "openrouter";
-    process.env.OPENROUTER_API_KEY = "or-test";
-
-    const gateway = resolveGateway();
-    expect(gateway?.apiKey).toBe("or-test");
-    expect(gateway?.configuration?.baseURL).toBe("https://openrouter.ai/api/v1");
-  });
-
-  it("returns null under openrouter mode if its key is missing, even if OPENAI_API_KEY is set", () => {
-    process.env.OPENAI_API_KEY = "sk-test";
-    process.env.AI_PROVIDER = "openrouter";
-    expect(resolveGateway()).toBeNull();
-  });
-
-  it("honors a custom OpenRouter base URL", () => {
-    process.env.AI_PROVIDER = "openrouter";
-    process.env.OPENROUTER_API_KEY = "or-test";
-    process.env.OPENROUTER_BASE_URL = "https://proxy.example.com/v1";
-    expect(resolveGateway()?.configuration?.baseURL).toBe("https://proxy.example.com/v1");
   });
 });
