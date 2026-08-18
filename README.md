@@ -161,6 +161,22 @@ project belongs to one).
     `chat_message` kind — a flat monthly quota per site,
     `AI_MONTHLY_CHAT_LIMIT`, counted in Postgres so it can't be reset by
     clearing a cache).
+- `lib/slack` — connects a church's Slack workspace to their site
+  (`/dashboard/slack`). **Connection only, so far** — a workspace and a site
+  can be introduced to each other; sending a message from Slack into the
+  chatbot above is a separate, not-yet-built piece, and the UI says so
+  rather than implying otherwise.
+  - The OAuth flow is stateless: `lib/slack/state.ts` signs a short-lived,
+    HMAC'd `state` param carrying the `siteId` through the redirect, which
+    is both the CSRF protection Slack's flow expects and how
+    `app/api/slack/oauth/callback/route.ts` knows which site an install is
+    for. No server-side row to store or expire.
+  - `SlackConnection.botAccessToken` is encrypted before it touches
+    Postgres (`lib/slack/crypto.ts`, AES-256-GCM) — the first third-party
+    bearer credential this app keeps in its own database rather than only
+    in env vars, since it's a live ability to post into a church's Slack.
+  - One workspace per site and one site per workspace, both directions
+    unique — matching `Site.userId`'s shape elsewhere in the schema.
 - `lib/validation/url.ts` — the rules for anything reaching an `href` or `src`
   on a published site.
 - `lib/features`, `lib/theme`, `lib/templates` — feature dependency rules, the

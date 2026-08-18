@@ -79,6 +79,7 @@ model Site {
   domains        SiteDomain[]
   generationJobs SiteGenerationJob[]
   chatMessages   ChatMessage[]
+  slackConnection SlackConnection?
 
   @@index([status])
 }
@@ -208,6 +209,38 @@ model ChatMessage {
 
   @@index([siteId, createdAt])
   @@map("chat_messages")
+}
+
+/**
+ * One Slack workspace connected to one site — both directions unique,
+ * matching `Site.userId`'s "one of these per that" shape elsewhere in this
+ * schema. A church that reinstalls into the same Slack workspace should
+ * reconnect to the same row, not accumulate a second one.
+ *
+ * `botAccessToken` is encrypted before it ever reaches this table
+ * (`lib/slack/crypto.ts`) — it is a live bearer credential for posting into
+ * the church's Slack as the bot, the first third-party secret this app
+ * stores in Postgres rather than only in its own env vars, and is treated
+ * with the same care as one.
+ */
+model SlackConnection {
+  id     String @id @default(cuid())
+  siteId String @unique
+
+  slackTeamId   String @unique
+  slackTeamName String
+  botUserId     String
+
+  botAccessToken String
+
+  installedByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@map("slack_connections")
 }
 
 model SocialLink {

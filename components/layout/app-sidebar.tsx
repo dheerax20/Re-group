@@ -11,6 +11,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Globe,
+  MessageSquare,
   LogOut,
   UserRound,
   Users,
@@ -60,6 +61,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { href: "/dashboard/builder", label: "Editor", icon: PencilRuler },
       { href: "/dashboard/pages", label: "Pages & links", icon: Link2 },
       { href: "/dashboard/domains", label: "Domains", icon: Globe },
+      { href: "/dashboard/slack", label: "Slack", icon: MessageSquare },
     ],
   },
   {
