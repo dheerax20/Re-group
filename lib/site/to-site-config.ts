@@ -4,6 +4,7 @@ import { isValidFontKey } from "@/lib/theme/fonts";
 import { FeatureConfig, defaultFeatures } from "@/lib/features/types";
 import { defaultBrandConfig } from "@/lib/validation/brand";
 import { coerceSections } from "@/lib/validation/section";
+import { toPageBlocks } from "@/lib/site/blocks/schema";
 import { safeMediaUrl } from "@/lib/validation/url";
 import {
   ContactInfo,
@@ -168,6 +169,18 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
     givingUrl: safeMediaUrl(givingSection?.config.givingUrl),
   };
 
+  // `blockConfig` is the AI-composed page when one exists; otherwise the
+  // block tree is synthesized from the legacy `sectionConfig` so sites built
+  // before the composer (and template-instantiated ones) still render through
+  // the same generic renderer. Note `sections` above is always read from
+  // `sectionConfig` regardless — that's what keeps the giving/YouTube/podcast
+  // URLs above working on a composed site, since those live in section config.
+  const blocks = toPageBlocks(site.blockConfig ?? site.sectionConfig, {
+    youtubeChannelUrl: youtube.channelUrl,
+    podcastRssUrl: podcast.rssUrl,
+    givingUrl: giving.givingUrl,
+  });
+
   return {
     site: {
       id: site.id,
@@ -182,6 +195,7 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
     template: { id: site.templateId, version: site.templateVersion },
     navigation,
     sections,
+    blocks,
     seo,
     socialLinks,
     youtube,

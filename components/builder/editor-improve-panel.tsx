@@ -98,6 +98,11 @@ export function EditorImprovePanel({
         >
           <Wand2 className="size-3.5" />
           Chat
+          {tab !== "ai" ? (
+            <span className="rounded-full bg-accent px-1.5 text-[9px] font-bold uppercase tracking-wide text-editor-shell">
+              AI
+            </span>
+          ) : null}
         </button>
       </div>
 

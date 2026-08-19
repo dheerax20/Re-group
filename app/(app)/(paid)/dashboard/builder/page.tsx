@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PanelsTopLeft } from "lucide-react";
 import { resolveActiveSite, getSite } from "@/lib/site/actions";
 import { getSiteContent } from "@/lib/site/get-site-content";
-import { VisualEditor } from "@/components/builder/visual-editor";
+import { BuilderWorkspace } from "@/components/builder/builder-workspace";
 import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Website editor — Regroup" };
@@ -38,7 +38,7 @@ export default async function DashboardBuilderPage() {
     return (
       <EditorNotice
         title="Build your website first"
-        description="The visual editor opens once your site exists."
+        description="The editor opens once your site exists."
         action={
           <Link href="/builder">
             <Button>Build my website</Button>
@@ -67,5 +67,5 @@ export default async function DashboardBuilderPage() {
     );
   }
 
-  return <VisualEditor site={site} content={content} />;
+  return <BuilderWorkspace site={site} content={content} />;
 }

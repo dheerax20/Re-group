@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Monitor, Smartphone, Tablet } from "lucide-react";
 import { ThemeProvider } from "@/components/theme/theme-provider";
-import { WebsiteRenderer } from "@/components/website/renderer/website-renderer";
+import { BlockTree } from "@/components/website/blocks/block-renderer";
 import type { SiteConfig } from "@/lib/site/types";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,7 @@ export function GenerationPreview({ site }: { site: SiteConfig }) {
           style={{ width: "100%", maxWidth: width }}
         >
           <ThemeProvider brand={site.brand}>
-            <WebsiteRenderer site={site} content={{ sermons: [], events: [] }} />
+            <BlockTree nodes={site.blocks} site={site} content={{ sermons: [], events: [] }} />
           </ThemeProvider>
         </div>
       </div>

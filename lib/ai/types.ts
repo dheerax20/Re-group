@@ -2,6 +2,7 @@ import { BrandConfig } from "@/lib/theme/types";
 import { FeatureConfig } from "@/lib/features/types";
 import { SectionInstance, NavigationItem, SeoConfig } from "@/lib/site/types";
 import type { ChurchStory } from "@/lib/site/story";
+import type { BlockNode } from "@/lib/site/blocks/types";
 
 export interface RecommendationInput {
   churchName: string;
@@ -40,6 +41,8 @@ export interface SiteGenerationInput {
 
 export interface GeneratedSiteConfig {
   sections: SectionInstance[];
+  /** Present only from the AI page-composer path (`assembleGeneratedBlocks`) — the block tree that's actually persisted for that build, instead of `sections`. */
+  blocks?: BlockNode[];
   navigation: NavigationItem[];
   seo: SeoConfig;
 }

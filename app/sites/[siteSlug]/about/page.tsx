@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
-import { resolveSectionComponent } from "@/components/website/renderer/section-registry";
-import { AboutImageRight } from "@/components/website/sections/about";
-import { MinistryGrid } from "@/components/website/sections/ministries";
+import { BlockTree } from "@/components/website/blocks/block-renderer";
+import type { BlockNode } from "@/lib/site/blocks/types";
 
 export const revalidate = 300;
 
+/**
+ * A secondary page: a small deterministic block composition (not its own AI
+ * agent — see the plan's cost/scope tradeoff) built from real site fields,
+ * still rendered through the same generic `BlockTree` as the homepage.
+ */
 export default async function AboutPage({
   params,
 }: {
@@ -16,18 +20,37 @@ export default async function AboutPage({
   if (!data) notFound();
 
   const { site, content } = data;
-  const aboutSection = site.sections.find((s) => s.type === "about");
-  const About =
-    (aboutSection && resolveSectionComponent("about", aboutSection.variant)) ||
-    AboutImageRight;
 
-  return (
-    <>
-      {/* eslint-disable-next-line react-hooks/static-components -- resolved from a fixed, static section registry, not created per render */}
-      <About site={site} config={aboutSection?.config ?? {}} content={content} />
-      {site.features.ministries && (
-        <MinistryGrid site={site} config={{}} content={content} />
-      )}
-    </>
-  );
+  const blocks: BlockNode[] = [
+    {
+      id: "about-page",
+      type: "section",
+      style: { padding: "lg", align: "center" },
+      children: [
+        { id: "about-eyebrow", type: "eyebrow", text: "About Us" },
+        { id: "about-heading", type: "heading", text: `Who We Are`, scale: "h1" },
+        {
+          id: "about-text",
+          type: "text",
+          text:
+            site.brand.tagline ||
+            `${site.site.name} exists to help people know God and grow in community. We gather to worship, learn, and serve together.`,
+        },
+      ],
+    },
+  ];
+
+  if (site.features.ministries) {
+    blocks.push({
+      id: "about-ministries",
+      type: "section",
+      style: { padding: "lg" },
+      children: [
+        { id: "ministries-heading", type: "heading", text: "Ministries", scale: "h2" },
+        { id: "ministries-collection", type: "ministryCollection" },
+      ],
+    });
+  }
+
+  return <BlockTree nodes={blocks} site={site} content={content} />;
 }

@@ -1,35 +1,10 @@
 import { PrismaClient, Prisma } from "@prisma/client";
-import { allTemplates } from "../lib/templates/registry";
-import { instantiateTemplateSections } from "../lib/templates/instantiate";
+import { AI_GENERATED_TEMPLATE_ID, AI_GENERATED_TEMPLATE_VERSION } from "../lib/ai/agents/schemas";
 import { generateNavigation } from "../lib/site/navigation";
 import { defaultFeatures } from "../lib/features/types";
 import { slugify } from "../lib/validation/slug";
 
 const prisma = new PrismaClient();
-
-async function seedTemplates() {
-  for (const template of allTemplates) {
-    await prisma.template.upsert({
-      where: { id: template.id },
-      update: {
-        name: template.metadata.name,
-        description: template.metadata.description,
-        category: template.metadata.style,
-        version: template.version,
-        metadata: template.metadata,
-      },
-      create: {
-        id: template.id,
-        name: template.metadata.name,
-        description: template.metadata.description,
-        category: template.metadata.style,
-        version: template.version,
-        metadata: template.metadata,
-      },
-    });
-  }
-  console.log(`Seeded ${allTemplates.length} templates.`);
-}
 
 async function seedDemoChurch() {
   const churchName = "Grace Community Church";
@@ -43,26 +18,9 @@ async function seedDemoChurch() {
     ministries: true,
   };
 
-  const template = allTemplates[0];
-  const sections = instantiateTemplateSections(template).map((section) => {
-    if (section.type === "hero") {
-      return {
-        ...section,
-        config: {
-          eyebrow: "Welcome",
-          title: "A place to belong",
-          description: "Join us this Sunday for worship, community, and hope.",
-        },
-      };
-    }
-    if (section.type === "youtube") {
-      return { ...section, config: { channelUrl: "https://youtube.com/@gracecommunity" } };
-    }
-    if (section.type === "giving") {
-      return { ...section, config: { givingUrl: "https://give.example.com/grace" } };
-    }
-    return section;
-  });
+  // No stock templates any more: a seeded church starts with an empty page
+  // and gets its homepage from the AI crew, exactly like a real signup does.
+  const sections: unknown[] = [];
 
   const navigation = generateNavigation(features);
 
@@ -114,8 +72,8 @@ async function seedDemoChurch() {
         mission: "Helping people know God, find family, and live with purpose.",
         values: "Faith, hospitality, justice",
       } as Prisma.InputJsonValue,
-      templateId: template.id,
-      templateVersion: template.version,
+      templateId: AI_GENERATED_TEMPLATE_ID,
+      templateVersion: AI_GENERATED_TEMPLATE_VERSION,
     },
   });
 
@@ -225,8 +183,6 @@ async function seedDemoChurch() {
 }
 
 async function main() {
-  await seedTemplates();
-
   // Opt-in: the demo church writes a full published site, which is useful for
   // local work on the public renderer and wrong to run against a real database.
   if (process.env.SEED_DEMO_CHURCH === "1") {

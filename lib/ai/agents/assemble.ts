@@ -2,10 +2,18 @@ import type { FeatureConfig } from "@/lib/features/types";
 import { generateNavigation } from "@/lib/site/navigation";
 import { mergeNavigation } from "@/lib/site/pages";
 import { sectionTypes, type SectionInstance, type SectionType } from "@/lib/site/types";
+import type { BlockNode } from "@/lib/site/blocks/types";
+import { coerceBlocks, defaultNavBlock, defaultFooterBlock } from "@/lib/site/blocks/schema";
 import { composeSectionCopy } from "@/lib/ai/section-copy";
 import type { SiteGenerationInput, GeneratedSiteConfig } from "@/lib/ai/types";
-import { layoutFromFeatures, sanitizeVariant, type ArtDirection } from "./catalog";
-import type { CopyDeck, LayoutPlan, QaReport } from "./schemas";
+import {
+  layoutFromFeatures,
+  sanitizeVariant,
+  sanitizeTraits,
+  TRAIT_ELIGIBLE_TYPES,
+  type ArtDirection,
+} from "./catalog";
+import type { CopyDeck, LayoutPlan, PageComposerOutput, QaReport } from "./schemas";
 
 const REQUIRED: SectionType[] = ["navbar", "hero", "footer"];
 
@@ -190,6 +198,28 @@ export function assembleGeneratedSite(args: {
     });
   }
 
+  // Structural traits (alignment, density, accent, media treatment) — how a
+  // section renders beyond its locked/chosen variant. Only meaningful for
+  // the types in TRAIT_ELIGIBLE_TYPES; sanitized against hallucinated or
+  // missing values the same way variants are.
+  if (layout) {
+    const traitsByType = new Map(layout.sections.map((item) => [item.type, item.traits]));
+    sections = sections.map((section) => {
+      if (!TRAIT_ELIGIBLE_TYPES.has(section.type)) return section;
+      const traits = sanitizeTraits(traitsByType.get(section.type));
+      return {
+        ...section,
+        config: {
+          ...section.config,
+          align: traits.align,
+          density: traits.density,
+          accent: traits.accent,
+          mediaTreatment: traits.mediaTreatment,
+        },
+      };
+    });
+  }
+
   // Photos are left empty — the church provides their own images in the editor.
   sections = sections.map((section) => {
     if (!["hero", "welcome", "about", "cta"].includes(section.type)) return section;
@@ -217,5 +247,52 @@ export function assembleGeneratedSite(args: {
     sections,
     navigation: mergeNavigation(input.features, generateNavigation(input.features)),
     seo,
+  };
+}
+
+/**
+ * The page-composer path: the AI already wrote the layout as a block tree
+ * (`runComposer`), so there's no variant-locking or copy-overlay step here —
+ * just safety. `coerceBlocks` repairs/validates the model's raw output, and
+ * a nav/footer band is injected if the model omitted the reserved
+ * `id: "nav"` / `id: "footer"` blocks the public layout looks for.
+ */
+export function assembleGeneratedBlocks(args: {
+  input: SiteGenerationInput;
+  composed: PageComposerOutput;
+}): GeneratedSiteConfig & { blocks: BlockNode[] } {
+  const { input, composed } = args;
+
+  let blocks = coerceBlocks(composed.blocks);
+
+  // Nav + footer alone is not a homepage. `pageComposerResponseSchema` repairs
+  // whatever it can out of the model's reply rather than throwing, so an
+  // unusable reply arrives here as an empty tree instead of an exception —
+  // this is the point where that has to become a failed job, not a blank site
+  // published over the church's existing one.
+  if (blocks.length === 0) {
+    throw new Error("The AI returned an unusable layout. Try again.");
+  }
+
+  if (!blocks.some((b) => b.id === "nav")) blocks = [defaultNavBlock(), ...blocks];
+  if (!blocks.some((b) => b.id === "footer")) blocks = [...blocks, defaultFooterBlock()];
+
+  return {
+    sections: [],
+    blocks,
+    navigation: mergeNavigation(input.features, generateNavigation(input.features)),
+    // Same reason as `blocks`: the SEO strings are best-effort on the reply,
+    // and an empty <title> is worse than a plain one built from what the
+    // church already told us.
+    seo: {
+      title:
+        composed.seoTitle ||
+        `${input.churchName}${input.tagline ? ` — ${input.tagline}` : ""}`,
+      description:
+        composed.seoDescription ||
+        input.story?.mission ||
+        input.tagline ||
+        `${input.churchName} is a church community. Join us for worship, sermons, and events.`,
+    },
   };
 }

@@ -14,9 +14,6 @@ import { validateFeatureDependencies } from "@/lib/features/validate";
 import { generateNavigation } from "@/lib/site/navigation";
 import { mergeNavigation, allowedHrefs } from "@/lib/site/pages";
 import { navigationConfigSchema } from "@/lib/validation/navigation";
-import { getTemplate } from "@/lib/templates/registry";
-import { DeterministicSiteGenerator } from "@/lib/ai/deterministic-site-generator";
-import { getTemplateRecommendationEngine } from "@/lib/ai";
 import { assertAiBudget } from "@/lib/ai/usage";
 import {
   createJob,
@@ -38,8 +35,6 @@ import {
 import { z } from "zod";
 import { toDatabaseError, isDatabaseUnavailableError } from "@/lib/db/errors";
 import type { Prisma } from "@prisma/client";
-
-const siteGenerator = new DeterministicSiteGenerator();
 
 /** Prisma's Json columns want InputJsonValue; our domain types are plain
  * serializable objects/arrays, so this cast is safe at every call site. */
@@ -213,70 +208,6 @@ export async function updateFeatures(siteId: string, input: unknown) {
       navigationConfig: toJson(generateNavigation(data)),
     },
   });
-  await invalidateSite(siteId);
-  return { success: true };
-}
-
-export async function getTemplateRecommendations(siteId: string) {
-  await requireOwnedPaidSite(siteId);
-  const site = await prisma.site.findUnique({ where: { id: siteId } });
-  if (!site) throw new Error("Site not found");
-
-  const engine = getTemplateRecommendationEngine();
-  return engine.recommend({
-    churchName: site.name,
-    denomination: site.denomination ?? undefined,
-    congregationSize: site.congregationSize ?? undefined,
-    brand: site.brandConfig as never,
-    features: site.featureConfig as never,
-    story: parseChurchStory(site.storyConfig),
-  });
-}
-
-export async function selectTemplate(siteId: string, templateId: string) {
-  await requireOwnedPaidSite(siteId);
-  const template = getTemplate(templateId);
-  if (!template) throw new Error("Unknown template");
-
-  const site = await prisma.site.findUnique({ where: { id: siteId } });
-  if (!site) throw new Error("Site not found");
-
-  const generated = await siteGenerator.generateSiteConfig({
-    churchName: site.name,
-    tagline: site.tagline ?? undefined,
-    denomination: site.denomination ?? undefined,
-    congregationSize: site.congregationSize ?? undefined,
-    brand: site.brandConfig as never,
-    features: site.featureConfig as never,
-    templateId: template.id,
-    story: parseChurchStory(site.storyConfig),
-  });
-
-  const currentBrand = site.brandConfig as typeof defaultBrandConfig;
-  const preset = template.brandPreset;
-  const applyPreset =
-    Boolean(preset) && currentBrand?.colors?.primary === defaultBrandConfig.colors.primary;
-
-  await prisma.site.update({
-    where: { id: siteId },
-    data: {
-      templateId: template.id,
-      templateVersion: template.version,
-      sectionConfig: toJson(coerceSections(generated.sections)),
-      navigationConfig: toJson(generated.navigation),
-      seoConfig: toJson(generated.seo),
-      ...(applyPreset && preset
-        ? {
-            brandConfig: toJson({
-              ...currentBrand,
-              colors: preset.colors,
-              typography: preset.typography,
-            }),
-          }
-        : {}),
-    },
-  });
-
   await invalidateSite(siteId);
   return { success: true };
 }

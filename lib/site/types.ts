@@ -1,6 +1,7 @@
 import { BrandConfig } from "@/lib/theme/types";
 import { FeatureConfig } from "@/lib/features/types";
 import type { ChurchStory } from "./story";
+import type { BlockNode } from "./blocks/types";
 
 export const sectionTypes = [
   "navbar",
@@ -107,6 +108,15 @@ export interface SiteConfig {
   };
   navigation: NavigationItem[];
   sections: SectionInstance[];
+  /**
+   * The generic AI-generated page tree (`lib/site/blocks/types.ts`) that the
+   * public renderer (`components/website/blocks/block-renderer.tsx`) walks.
+   * `sections` above stays for the builder's existing per-section editing UI
+   * (out of scope to rework alongside this) — `blocks` is what a published
+   * page actually renders from, whether it came from a fresh AI build or was
+   * synthesized from old `sections` data via `legacySectionsToBlocks`.
+   */
+  blocks: BlockNode[];
   seo: SeoConfig;
   socialLinks: Array<{ platform: string; url: string }>;
   youtube?: YoutubeConfig;

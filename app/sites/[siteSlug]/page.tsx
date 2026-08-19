@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
-import { WebsiteRenderer } from "@/components/website/renderer/website-renderer";
+import { BlockTree } from "@/components/website/blocks/block-renderer";
+import { NAV_BLOCK_ID, FOOTER_BLOCK_ID } from "@/lib/site/blocks/types";
 
 export const revalidate = 300;
 
@@ -15,11 +16,9 @@ export default async function SiteHomePage({
 
   const { site, content } = data;
 
-  // navbar/footer are rendered once by the layout; the home page renders
-  // every other section in the template's configured order.
-  const pageSections = site.sections.filter(
-    (s) => s.type !== "navbar" && s.type !== "footer"
-  );
+  // nav/footer are rendered once by the layout; the home page renders every
+  // other block in the AI-composed (or legacy-adapted) order.
+  const pageBlocks = site.blocks.filter((b) => b.id !== NAV_BLOCK_ID && b.id !== FOOTER_BLOCK_ID);
 
-  return <WebsiteRenderer site={{ ...site, sections: pageSections }} content={content} />;
+  return <BlockTree nodes={pageBlocks} site={site} content={content} />;
 }

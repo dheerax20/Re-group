@@ -1,64 +1,34 @@
-import Link from "next/link";
-import { GraduationCap } from "lucide-react";
-import { PageHeader } from "@/components/layout/page-header";
-import { EmptyState } from "@/components/layout/empty-state";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { redirect } from "next/navigation";
+import { syncCurrentUser } from "@/lib/auth/session";
+import { COURSES_SSO_URL, isGhlConfigured } from "@/lib/ghl/config";
+import { ensureGhlAccount } from "@/lib/ghl/provision";
 
 export const metadata = { title: "Courses — Regroup" };
 
 /**
- * Courses is not built yet — see the note in `members/page.tsx`. This screen
- * previously rendered a fabricated course catalogue behind the paywall.
+ * Courses lives in GoHighLevel, reached over SSO (`ghl.md`). This route is the
+ * handoff, and exists rather than pointing the sidebar straight at the SSO URL
+ * so that:
+ *
+ *   - provisioning can be re-checked here. The Stripe webhook is the primary
+ *     trigger, but if GHL was down at the moment of payment the user would
+ *     otherwise land on an SSO page with no account behind it. `ensureGhlAccount`
+ *     is idempotent, so this is a single indexed read in the normal case.
+ *   - the third-party URL stays server-side and deployment-configurable
+ *     instead of being baked into the client bundle.
+ *
+ * Already inside `(paid)`, so the plan gate is inherited.
  */
-const PLANNED = [
-  {
-    title: "Learning pathways",
-    detail: "Group lessons into a course a new believer can work through.",
-  },
-  {
-    title: "Publish to your site",
-    detail: "Courses appear on your church website with no extra setup.",
-  },
-  {
-    title: "See who has finished",
-    detail: "Track progress so leaders know who to check in with.",
-  },
-];
+export default async function CoursesPage() {
+  const user = await syncCurrentUser();
 
-export default function CoursesPage() {
-  return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Courses"
-        description="Discipleship pathways for your community."
-      />
+  if (isGhlConfigured()) {
+    const result = await ensureGhlAccount(user.id);
+    if (!result.ok && !result.skipped) {
+      // Don't dump them at an SSO page that cannot sign them in.
+      console.error(`[courses] GHL not ready for user ${user.id}: ${result.reason}`);
+    }
+  }
 
-      <EmptyState
-        icon={GraduationCap}
-        title="Courses is coming soon"
-        description="We are building this after members. Nothing is stored here yet, so there is nothing to set up."
-        action={
-          <Link href="/dashboard">
-            <Button>Back to dashboard</Button>
-          </Link>
-        }
-      />
-
-      <Card variant="flat" className="mt-4">
-        <CardTitle className="text-sm">What it will do</CardTitle>
-        <CardDescription className="text-xs">
-          Planned for the courses release.
-        </CardDescription>
-        <ul className="mt-4 space-y-3">
-          {PLANNED.map((item) => (
-            <li key={item.title}>
-              <p className="text-sm font-medium">{item.title}</p>
-              <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </div>
-  );
+  redirect(COURSES_SSO_URL);
 }

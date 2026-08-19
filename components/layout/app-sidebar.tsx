@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Link2,
   PencilRuler,
+  ExternalLink,
 } from "lucide-react";
 import {
   Sidebar,
@@ -51,6 +52,12 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   match?: "exact" | "prefix";
   soon?: boolean;
+  /**
+   * Opens in a new tab. Used for hand-offs to another product (Courses lives
+   * in GoHighLevel), so the user keeps their Regroup work in the current tab.
+   * The href stays internal — the route itself owns the redirect.
+   */
+  newTab?: boolean;
 };
 
 const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
@@ -76,7 +83,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     label: "Congregation",
     items: [
       { href: "/members", label: "Members", icon: Users, soon: true },
-      { href: "/courses", label: "Courses", icon: GraduationCap, soon: true },
+      { href: "/courses", label: "Courses", icon: GraduationCap, newTab: true },
     ],
   },
 ];
@@ -203,7 +210,12 @@ export function AppSidebar({
                         tooltip={item.soon ? `${item.label} — coming soon` : item.label}
                         className={navButtonClass(active)}
                       >
-                        <Link href={item.href}>
+                        <Link
+                          href={item.href}
+                          {...(item.newTab
+                            ? { target: "_blank", rel: "noopener noreferrer" }
+                            : {})}
+                        >
                           <item.icon
                             className={cn(
                               "size-4! opacity-80",
@@ -211,6 +223,14 @@ export function AppSidebar({
                             )}
                           />
                           <span className="flex-1">{item.label}</span>
+                          {item.newTab ? (
+                            <ExternalLink
+                              className={cn(
+                                "size-3 opacity-50",
+                                collapsed && "hidden"
+                              )}
+                            />
+                          ) : null}
                           {item.soon ? (
                             <span
                               className={cn(

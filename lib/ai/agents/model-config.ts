@@ -9,9 +9,9 @@ import { ChatOpenAI } from "@langchain/openai";
 
 export type AgentRole =
   | "producer"
+  | "creativeDirector"
   | "themeDirector"
-  | "layoutArchitect"
-  | "copywriter"
+  | "composer"
   | "responsiveQa"
   | "mediaDirector"
   | "editor"
@@ -20,9 +20,12 @@ export type AgentRole =
 
 const ROLE_ENV_VAR: Record<AgentRole, string> = {
   producer: "AI_MODEL_PRODUCER",
+  // Producer + theme director in one call — see `creativeBriefSchema`.
+  creativeDirector: "AI_MODEL_CREATIVE_DIRECTOR",
   themeDirector: "AI_MODEL_THEME_DIRECTOR",
-  layoutArchitect: "AI_MODEL_LAYOUT_ARCHITECT",
-  copywriter: "AI_MODEL_COPYWRITER",
+  // The page composer (lib/ai/agents/specialists.ts) — writes the homepage
+  // directly as a block tree instead of picking among fixed section variants.
+  composer: "AI_MODEL_COMPOSER",
   responsiveQa: "AI_MODEL_RESPONSIVE_QA",
   mediaDirector: "AI_MODEL_MEDIA_DIRECTOR",
   // The in-editor one-shot prompt (lib/ai/editor-prompt.ts).
@@ -35,6 +38,10 @@ const ROLE_ENV_VAR: Record<AgentRole, string> = {
 };
 
 const DEFAULT_MODEL = "gpt-4o-mini";
+
+/** Per-request ceiling for any single agent call, and how hard we retry it. */
+const AGENT_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 90_000;
+const AGENT_MAX_RETRIES = Number(process.env.AI_MAX_RETRIES) || 2;
 
 /**
  * The model name for one agent. Independently overridable per role — e.g.
@@ -70,5 +77,15 @@ export function buildRoleLlm(gateway: Gateway, role: AgentRole, temperature: num
     apiKey: gateway.apiKey,
     model: modelForRole(role),
     temperature,
+    // LangChain retries 6 times by default with exponential backoff. On a
+    // 429 or a 500 that turns one slow agent into minutes of silent waiting
+    // while the church stares at a progress bar, and the crew is already
+    // wrapped in a job that can simply be re-run. Two is enough to ride out a
+    // blip without hiding a real outage.
+    maxRetries: AGENT_MAX_RETRIES,
+    // A hung socket must not hold the whole build open until the platform
+    // kills the function. Fail the attempt and let the retry (or the job) deal
+    // with it.
+    timeout: AGENT_TIMEOUT_MS,
   });
 }

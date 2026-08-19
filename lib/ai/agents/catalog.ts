@@ -1,6 +1,7 @@
 import { sectionVariantOptions } from "@/lib/site/section-variants";
 import { sectionTypes, type SectionType } from "@/lib/site/types";
 import type { FeatureConfig } from "@/lib/features/types";
+import type { LayoutTraits } from "./schemas";
 
 export function variantCatalogForPrompt(): string {
   return sectionTypes
@@ -11,6 +12,38 @@ export function variantCatalogForPrompt(): string {
 export function sanitizeVariant(type: SectionType, variant: string): string {
   const options = sectionVariantOptions[type];
   return options.includes(variant) ? variant : options[0];
+}
+
+/** Section types whose components read layout traits. Everyone else ignores them. */
+export const TRAIT_ELIGIBLE_TYPES: ReadonlySet<SectionType> = new Set([
+  "hero",
+  "welcome",
+  "about",
+  "sermons",
+  "events",
+  "cta",
+]);
+
+export type SanitizedTraits = {
+  align: "left" | "center";
+  density: "compact" | "spacious";
+  accent: "none" | "line" | "bordered" | "numbered";
+  mediaTreatment: "rounded" | "square" | "framed";
+};
+
+/** Clamps a (possibly hallucinated or absent) trait object to safe defaults, same defensive pattern as `sanitizeVariant`. */
+export function sanitizeTraits(traits: LayoutTraits | undefined): SanitizedTraits {
+  const align = traits?.align === "center" ? "center" : "left";
+  const density = traits?.density === "spacious" ? "spacious" : "compact";
+  const accent =
+    traits?.accent && ["none", "line", "bordered", "numbered"].includes(traits.accent)
+      ? traits.accent
+      : "none";
+  const mediaTreatment =
+    traits?.mediaTreatment && ["rounded", "square", "framed"].includes(traits.mediaTreatment)
+      ? traits.mediaTreatment
+      : "rounded";
+  return { align, density, accent, mediaTreatment };
 }
 
 /**

@@ -1,9 +1,13 @@
+import { after } from "next/server";
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/billing/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/billing/sync";
+import { hasBasePlan } from "@/lib/billing/entitlements";
+import { isGhlConfigured } from "@/lib/ghl/config";
+import { ensureGhlAccount } from "@/lib/ghl/provision";
 
 // Signature verification needs Node crypto, so the Edge runtime is not an option.
 export const runtime = "nodejs";
@@ -101,6 +105,19 @@ function subscriptionIdForEvent(event: Stripe.Event): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * The app user behind a synced subscription. `SyncResult.subscriptionId` is
+ * OUR `Subscription.id` (not the Stripe id), so this walks the relation rather
+ * than querying Stripe again.
+ */
+async function userIdForSubscription(subscriptionId: string): Promise<string | null> {
+  const subscription = await prisma.subscription.findUnique({
+    where: { id: subscriptionId },
+    select: { billingCustomer: { select: { userId: true } } },
+  });
+  return subscription?.billingCustomer.userId ?? null;
 }
 
 export async function POST(request: NextRequest) {
@@ -227,6 +244,26 @@ export async function POST(request: NextRequest) {
     }
 
     await markCompleted(event.id);
+
+    // Provision the user's GoHighLevel sub-account now that they've paid
+    // (`ghl.md`). Deliberately in `after()` and deliberately swallowing its
+    // failure: Stripe must still get a fast 200, and a GHL outage must not
+    // make Stripe retry the whole billing sync — the entitlements above are
+    // already committed. `ensureGhlAccount` records the failure on the row,
+    // and the Courses handoff retries it on first use.
+    if (result.synced && isGhlConfigured()) {
+      after(async () => {
+        try {
+          const userId = await userIdForSubscription(result.subscriptionId);
+          if (userId && (await hasBasePlan(userId))) {
+            await ensureGhlAccount(userId);
+          }
+        } catch (error) {
+          console.error("[stripe:webhook] GHL provisioning failed", error);
+        }
+      });
+    }
+
     return NextResponse.json({ received: true, result });
   } catch (error) {
     // Release the claim so Stripe's retry can genuinely reprocess this event,

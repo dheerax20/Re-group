@@ -1,6 +1,5 @@
 import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
 import { validateFeatureDependencies } from "@/lib/features/validate";
-import { templateRegistry } from "@/lib/templates/registry";
 import { sectionTypes, type SiteConfig } from "./types";
 import { slugSchema } from "@/lib/validation/slug";
 
@@ -53,17 +52,14 @@ export function validateSiteForPublish(
     });
   }
 
-  const isGenerated = site.template.id === AI_GENERATED_TEMPLATE_ID;
-  if (!isGenerated) {
-    const template = templateRegistry[site.template.id];
-    if (!template) {
-      errors.push({ field: "template.id", message: "Template does not exist" });
-    } else if (template.version !== site.template.version) {
-      errors.push({
-        field: "template.version",
-        message: "Template version is not supported",
-      });
-    }
+  // Every site is composed by the AI crew now; the stock-template registry
+  // (and the "does this template id exist / is its version supported" check
+  // that went with it) is gone, so anything else is a stale record.
+  if (site.template.id !== AI_GENERATED_TEMPLATE_ID) {
+    errors.push({
+      field: "template.id",
+      message: "This site predates the AI builder. Rebuild it before publishing.",
+    });
   }
 
   const featureErrors = validateFeatureDependencies(site.features);

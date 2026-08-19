@@ -38,6 +38,45 @@ model User {
   site            Site?
   billingCustomer BillingCustomer?
   entitlements    Entitlement[]
+  ghlAccount      GhlAccount?
+}
+
+enum GhlProvisionStatus {
+  PENDING
+  PROVISIONING
+  ACTIVE
+  FAILED
+}
+
+/**
+ * The user's matching GoHighLevel sub-account (see `ghl.md`).
+ *
+ * One per user, created when their subscription activates. `locationId` is
+ * written the moment `POST /locations/` succeeds — BEFORE the user call — so a
+ * retry after a half-failure reuses that Location instead of creating a second
+ * one. Sub-accounts are billable on GHL's Agency Pro plan, so accidentally
+ * creating two is a real cost, not just untidy data.
+ *
+ * No GHL password is stored. `POST /users/` requires one, so a random value is
+ * generated per user and discarded — SSO is the login path, and an unused
+ * credential sitting in a table is a liability rather than a feature.
+ */
+model GhlAccount {
+  id         String             @id @default(cuid())
+  userId     String             @unique
+  locationId String?
+  ghlUserId  String?
+  status     GhlProvisionStatus @default(PENDING)
+  /// Last failure message, kept for support rather than shown to the user.
+  error      String?
+  attempts   Int                @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ghl_accounts")
 }
 
 model Site {
@@ -60,6 +99,17 @@ model Site {
   featureConfig    Json
   navigationConfig Json
   sectionConfig    Json
+  /**
+   * The AI-composed page as a generic block tree (`lib/site/blocks/types.ts`).
+   * Deliberately a SEPARATE column from `sectionConfig` rather than reusing
+   * it: many writers (the visual editor's `updateSections`, the AI chat
+   * editor, `enableFeatureOnSite`) still read/write `sectionConfig` in the
+   * legacy `SectionInstance[]` shape, and overloading one column with two
+   * incompatible shapes let any of them silently destroy a composed page.
+   * Null means "no block tree yet" — the read path then synthesizes one from
+   * `sectionConfig` via `legacySectionsToBlocks`.
+   */
+  blockConfig      Json?
   seoConfig        Json
 
   templateId      String
@@ -210,6 +260,7 @@ model ChatMessage {
   @@index([siteId, createdAt])
   @@map("chat_messages")
 }
+
 
 /**
  * One Slack workspace connected to one site — both directions unique,

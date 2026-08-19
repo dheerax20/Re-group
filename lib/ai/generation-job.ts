@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { invalidateSite } from "@/lib/site/invalidate";
 import { parseChurchStory, parseStyleName } from "@/lib/site/story";
 import { coerceSections } from "@/lib/validation/section";
+import { coerceBlocks } from "@/lib/site/blocks/schema";
 import { getChurchWebsiteCrew } from "./multi-agent-site-builder";
 import { CREW_STEPS } from "./agents/crew";
 import {
@@ -166,9 +167,16 @@ export async function runFullBuildJob(jobId: string): Promise<void> {
       parseStyleName(site.storyConfig)
     );
 
-    // The crew's section list is model output: run it through the same repair
-    // the read path uses so an invented variant or URL cannot be persisted.
-    const sections = coerceSections(built.sections);
+    // The crew's output is model output: run it through the same repair the
+    // read path uses so an invented block/URL cannot be persisted.
+    //
+    // The composed page goes to `blockConfig`, NOT `sectionConfig`. Those are
+    // two different shapes, and `sectionConfig` still has other writers (the
+    // visual editor, the AI chat editor, `enableFeatureOnSite`) that would
+    // overwrite a block tree with legacy sections and destroy the build. It
+    // also still holds the giving/YouTube/podcast URLs the read path derives.
+    const blocks = built.blocks ? coerceBlocks(built.blocks) : [];
+    const legacySections = built.blocks ? null : coerceSections(built.sections);
 
     await prisma.$transaction([
       prisma.site.update({
@@ -176,7 +184,8 @@ export async function runFullBuildJob(jobId: string): Promise<void> {
         data: {
           templateId: AI_GENERATED_TEMPLATE_ID,
           templateVersion: AI_GENERATED_TEMPLATE_VERSION,
-          sectionConfig: toJson(sections),
+          ...(legacySections ? { sectionConfig: toJson(legacySections) } : {}),
+          blockConfig: blocks.length > 0 ? toJson(blocks) : undefined,
           navigationConfig: toJson(built.navigation),
           seoConfig: toJson(built.seo),
           storyConfig: toJson({
