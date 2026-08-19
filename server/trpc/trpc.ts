@@ -83,12 +83,21 @@ export const authedProcedure = publicProcedure.use(({ ctx, next }) => {
 /**
  * Read access to the caller's own site.
  *
- * Reads the `siteId` off the parsed input rather than context, which is what
- * makes the check impossible to skip: a procedure that takes a `siteId` and
- * forgets the guard does not typecheck against this builder at all.
+ * Reads the `siteId` off the input rather than context, which is what makes
+ * the check impossible to skip: a procedure that takes a `siteId` and forgets
+ * the guard does not typecheck against this builder at all.
+ *
+ * `getRawInput()`, NOT the `input` argument. This middleware is attached to
+ * the BUILDER, so it runs before the `.input()` parser that each concrete
+ * procedure registers afterwards — at this point in the chain `input` is
+ * always `undefined`, and reading it made every site-scoped call fail with
+ * "This request must name a site." The raw value is safe to read here because
+ * nothing is trusted from it: the only use is an equality check against
+ * `ctx.user.site.id`, which comes from the session, and the registered zod
+ * schema still validates the same field immediately after.
  */
-export const ownedSiteProcedure = authedProcedure.use(({ ctx, input, next }) => {
-  const siteId = readSiteId(input);
+export const ownedSiteProcedure = authedProcedure.use(async ({ ctx, getRawInput, next }) => {
+  const siteId = readSiteId(await getRawInput());
   if (!ctx.user.site || ctx.user.site.id !== siteId) {
     throw new TRPCError({
       code: "FORBIDDEN",
