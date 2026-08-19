@@ -1,7 +1,6 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { PanelsTopLeft } from "lucide-react";
-import { resolveActiveSite, getSite } from "@/lib/site/actions";
-import { getSiteContent } from "@/lib/site/get-site-content";
 import { BuilderWorkspace } from "@/components/builder/builder-workspace";
 import { Button } from "@/components/ui/button";
 
@@ -32,7 +31,7 @@ function EditorNotice({
 }
 
 export default async function DashboardBuilderPage() {
-  const active = await resolveActiveSite();
+  const active = await (await api()).site.mine();
 
   if (!active) {
     return (
@@ -48,10 +47,7 @@ export default async function DashboardBuilderPage() {
     );
   }
 
-  const [site, content] = await Promise.all([
-    getSite(active.id),
-    getSiteContent(active.id),
-  ]);
+  const { site, content } = await (await api()).site.get({ siteId: active.id });
 
   if (!site) {
     return (

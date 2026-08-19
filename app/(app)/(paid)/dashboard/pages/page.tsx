@@ -1,7 +1,7 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PencilRuler } from "lucide-react";
-import { getSite, resolveActiveSite } from "@/lib/site/actions";
 import { PagesLinker } from "@/components/builder/pages-linker";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,10 @@ import { availableSitePages } from "@/lib/site/pages";
 export const metadata = { title: "Pages & links — Regroup" };
 
 export default async function DashboardPagesPage() {
-  const active = await resolveActiveSite();
+  const active = await (await api()).site.mine();
   if (!active) redirect("/builder");
 
-  const site = await getSite(active.id);
+  const site = await (await api()).site.config({ siteId: active.id });
   if (!site) redirect("/builder");
 
   const catalog = availableSitePages(site.features);

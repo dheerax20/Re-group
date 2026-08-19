@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { churchInfoSchema, type ChurchInfoInput } from "@/lib/validation/church";
-import { updateChurchInfo } from "@/lib/site/actions";
+import { trpc } from "@/lib/trpc/client";
 import { SiteConfig } from "@/lib/site/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,7 @@ export function ChurchForm({
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState(false);
+  const updateInfo = trpc.site.updateInfo.useMutation();
   const {
     register,
     handleSubmit,
@@ -58,7 +59,7 @@ export function ChurchForm({
   });
 
   const onSubmit = handleSubmit(async (data) => {
-    await updateChurchInfo(siteId, data);
+    await updateInfo.mutateAsync({ siteId, data });
     if (nextHref) {
       router.push(nextHref);
     } else {
@@ -71,6 +72,7 @@ export function ChurchForm({
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-5">
       <FieldGroup
+        index={1}
         title="Church profile"
         description="Used for recommendations, SEO, and site-wide copy."
       >
@@ -121,6 +123,7 @@ export function ChurchForm({
       </FieldGroup>
 
       <FieldGroup
+        index={2}
         title="How you gather"
         description="More detail lets AI write specific copy instead of generic church language."
       >
@@ -160,6 +163,7 @@ export function ChurchForm({
       </FieldGroup>
 
       <FieldGroup
+        index={3}
         title="Primary contact"
         description="Optional — helps personalize contact sections later."
       >
@@ -188,6 +192,9 @@ export function ChurchForm({
       <FormActions>
         <span />
         <div className="flex items-center gap-3">
+          {updateInfo.error ? (
+            <span className="text-sm text-destructive">{updateInfo.error.message}</span>
+          ) : null}
           {saved ? <span className="text-sm text-success">Saved</span> : null}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : submitLabel}

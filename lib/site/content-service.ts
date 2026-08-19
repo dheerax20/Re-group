@@ -1,8 +1,6 @@
-"use server";
 
 import { prisma, type DbClient } from "@/lib/db";
 import { invalidateSite } from "@/lib/site/invalidate";
-import { requireOwnedPaidSite, requireOwnedSite } from "@/lib/auth/session";
 import { toDatabaseError } from "@/lib/db/errors";
 import { slugify } from "@/lib/validation/slug";
 import { generateNavigation } from "@/lib/site/navigation";
@@ -108,7 +106,6 @@ async function enableFeatureOnSite(
 
 export async function listEvents(siteId: string) {
   try {
-    await requireOwnedSite(siteId);
     return await prisma.event.findMany({
       where: { siteId },
       orderBy: { startAt: "asc" },
@@ -120,7 +117,6 @@ export async function listEvents(siteId: string) {
 
 export async function createEvent(siteId: string, input: unknown) {
   try {
-    await requireOwnedPaidSite(siteId);
     const data = eventSchema.parse(input);
     const existing = await prisma.event.findMany({
       where: { siteId },
@@ -154,7 +150,6 @@ export async function createEvent(siteId: string, input: unknown) {
 
 export async function deleteEvent(siteId: string, eventId: string) {
   try {
-    await requireOwnedPaidSite(siteId);
     await prisma.event.deleteMany({ where: { id: eventId, siteId } });
     await invalidateSite(siteId);
     return { success: true as const };
@@ -165,7 +160,6 @@ export async function deleteEvent(siteId: string, eventId: string) {
 
 export async function listSermons(siteId: string) {
   try {
-    await requireOwnedSite(siteId);
     return await prisma.sermon.findMany({
       where: { siteId },
       orderBy: { date: "desc" },
@@ -177,7 +171,6 @@ export async function listSermons(siteId: string) {
 
 export async function createSermon(siteId: string, input: unknown) {
   try {
-    await requireOwnedPaidSite(siteId);
     const data = sermonSchema.parse(input);
     const existing = await prisma.sermon.findMany({
       where: { siteId },
@@ -212,7 +205,6 @@ export async function createSermon(siteId: string, input: unknown) {
 
 export async function deleteSermon(siteId: string, sermonId: string) {
   try {
-    await requireOwnedPaidSite(siteId);
     await prisma.sermon.deleteMany({ where: { id: sermonId, siteId } });
     await invalidateSite(siteId);
     return { success: true as const };
@@ -223,7 +215,6 @@ export async function deleteSermon(siteId: string, sermonId: string) {
 
 export async function updateYoutubeChannel(siteId: string, input: unknown) {
   try {
-    await requireOwnedPaidSite(siteId);
     const data = youtubeSchema.parse(input);
     const site = await prisma.site.findUnique({ where: { id: siteId } });
     if (!site) throw new Error("Site not found");

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createSermon, deleteSermon } from "@/lib/site/content-actions";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,8 @@ export function SermonsManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const createSermon = trpc.content.createSermon.useMutation();
+  const deleteSermon = trpc.content.deleteSermon.useMutation();
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -53,13 +55,9 @@ export function SermonsManager({
     setError(null);
     startTransition(async () => {
       try {
-        await createSermon(siteId, {
-          title,
-          date,
-          speaker,
-          series,
-          videoUrl,
-          description,
+        await createSermon.mutateAsync({
+          siteId,
+          data: { title, date, speaker, series, videoUrl, description },
         });
         reset();
         router.refresh();
@@ -71,7 +69,7 @@ export function SermonsManager({
 
   function onDelete(id: string) {
     startTransition(async () => {
-      await deleteSermon(siteId, id);
+      await deleteSermon.mutateAsync({ siteId, sermonId: id });
       router.refresh();
     });
   }

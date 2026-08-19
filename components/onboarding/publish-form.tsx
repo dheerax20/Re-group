@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { Globe } from "lucide-react";
-import { checkSlugAvailable, publishSite } from "@/lib/site/actions";
+import { trpc } from "@/lib/trpc/client";
 import { wizardHref } from "@/lib/onboarding/steps";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,17 +33,23 @@ export function PublishForm({
   const [errors, setErrors] = useState<PublishError[]>(initialErrors);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const utils = trpc.useUtils();
+  const publish = trpc.site.publish.useMutation();
 
+  // Debounced so typing an address does not fire a query per keystroke.
   useEffect(() => {
     const handle = setTimeout(() => {
-      checkSlugAvailable(slug, siteId).then(setSlugStatus);
+      void utils.site.checkSlug
+        .fetch({ siteId, slug })
+        .then(setSlugStatus)
+        .catch(() => setSlugStatus(null));
     }, 350);
     return () => clearTimeout(handle);
-  }, [slug, siteId]);
+  }, [slug, siteId, utils]);
 
   function handlePublish() {
     startTransition(async () => {
-      const result = await publishSite(siteId, slug);
+      const result = await publish.mutateAsync({ siteId, slug });
       if (!result.success) {
         setErrors(result.errors ?? []);
         return;

@@ -1,3 +1,4 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -10,9 +11,6 @@ import {
   PanelsTopLeft,
   Video,
 } from "lucide-react";
-import { resolveActiveSite, getSite } from "@/lib/site/actions";
-import { getSiteContent } from "@/lib/site/get-site-content";
-import { getDomains } from "@/lib/domains/actions";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -32,13 +30,13 @@ function formatEventDate(value: string | Date): string {
 }
 
 export default async function DashboardPage() {
-  const active = await resolveActiveSite();
+  const active = await (await api()).site.mine();
   if (!active) redirect("/builder");
 
-  const [site, content, domains] = await Promise.all([
-    getSite(active.id),
-    getSiteContent(active.id),
-    getDomains(active.id),
+  const trpc = await api();
+  const [{ site, content }, domains] = await Promise.all([
+    trpc.site.get({ siteId: active.id }),
+    trpc.domains.list({ siteId: active.id }),
   ]);
 
   const published = active.status === "PUBLISHED";

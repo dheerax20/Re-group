@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createEvent, deleteEvent } from "@/lib/site/content-actions";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,8 @@ export function EventsManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const createEvent = trpc.content.createEvent.useMutation();
+  const deleteEvent = trpc.content.deleteEvent.useMutation();
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -49,11 +51,9 @@ export function EventsManager({
     setError(null);
     startTransition(async () => {
       try {
-        await createEvent(siteId, {
-          title,
-          startAt,
-          location,
-          description,
+        await createEvent.mutateAsync({
+          siteId,
+          data: { title, startAt, location, description },
         });
         reset();
         router.refresh();
@@ -65,7 +65,7 @@ export function EventsManager({
 
   function onDelete(id: string) {
     startTransition(async () => {
-      await deleteEvent(siteId, id);
+      await deleteEvent.mutateAsync({ siteId, eventId: id });
       router.refresh();
     });
   }

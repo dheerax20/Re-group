@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, Link2, Plus, Trash2 } from "lucide-react";
 import type { FeatureConfig } from "@/lib/features/types";
 import type { NavigationItem } from "@/lib/site/types";
 import { availableSitePages } from "@/lib/site/pages";
-import { updateNavigation } from "@/lib/site/actions";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,7 @@ export function PagesLinker({
   const [items, setItems] = useState<NavigationItem[]>(initialNavigation);
   const [addHref, setAddHref] = useState("");
   const [pending, startTransition] = useTransition();
+  const updateNav = trpc.site.updateNavigation.useMutation();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +52,7 @@ export function PagesLinker({
     setError(null);
     startTransition(async () => {
       try {
-        const result = await updateNavigation(siteId, next);
+        const result = await updateNav.mutateAsync({ siteId, data: next });
         const savedItems = result.navigation ?? next;
         setItems(savedItems);
         onChange?.(savedItems);

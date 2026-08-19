@@ -1,89 +1,130 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { AlertTriangle, Check, Loader2, Sparkles } from "lucide-react";
-import {
-  getAiWebsiteBuildStatus,
-  startAiWebsiteBuild,
-} from "@/lib/site/actions";
 import type { JobView } from "@/lib/ai/generation-job";
 import { CREW_STEPS } from "@/lib/ai/agents/crew";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-/** How often to ask the server where the build is. */
-const POLL_MS = 2500;
+import { AuroraField, CrewCircuit, ProgressRing } from "./wizard-art";
 
 /**
- * Watches a real build.
+ * Watches a real build, live.
  *
- * The previous version started the crew inside the request it was rendering in
- * and advanced this list on a 3.5-second timer, so the steps were theatre and a
- * closed tab lost the work. Now the server owns a job row: this component asks
- * it to start one, then polls, so the step shown is the specialist actually
- * running and a refresh rejoins the same build instead of paying for a new one.
+ * Three versions of this have existed. The first advanced the step list on a
+ * 3.5-second timer while the crew ran inside the request — the steps were
+ * theatre and a closed tab lost the work. The second moved the crew to a job
+ * row and polled it every 2.5s, which made the steps true but meant a request
+ * per tick and a step that could be up to a poll interval stale.
+ *
+ * This one subscribes to the Trigger.dev run. Progress arrives when it
+ * happens, there is no poll loop, and closing the tab is genuinely free: the
+ * run is durable, and reopening the page hands this component the active run
+ * id so it re-attaches to the same build rather than paying for a new one.
  */
-export function AiWebsiteStudio({ siteId }: { siteId: string }) {
+export function AiWebsiteStudio({
+  siteId,
+  initialJob,
+  initialToken,
+}: {
+  siteId: string;
+  initialJob: JobView | null;
+  initialToken: string | null;
+}) {
   const router = useRouter();
-  const [job, setJob] = useState<JobView | null>(null);
+  const utils = trpc.useUtils();
+
+  const [runId, setRunId] = useState<string | null>(initialJob?.triggerRunId ?? null);
+  const [token, setToken] = useState<string | null>(initialToken);
+  const [job, setJob] = useState<JobView | null>(initialJob);
   const [error, setError] = useState<string | null>(null);
-  const [starting, setStarting] = useState(true);
-  const started = useRef(false);
+  const autoStarted = useRef(false);
 
-  const start = useCallback(async () => {
-    setError(null);
-    setStarting(true);
-    try {
-      const result = await startAiWebsiteBuild(siteId);
+  const startBuild = trpc.ai.startBuild.useMutation({
+    onSuccess(result) {
+      setRunId(result.runId);
+      setToken(result.publicAccessToken);
       setJob(result.job ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start the build.");
-    } finally {
-      setStarting(false);
-    }
-  }, [siteId]);
+      setError(null);
+    },
+    onError(err) {
+      setError(err.message);
+    },
+  });
 
+  /**
+   * Start one automatically only when there is nothing to attach to.
+   *
+   * The ref guard matters more than it looks: React 19 runs effects twice in
+   * development, and without it the second pass fires a second mutation. The
+   * server would collapse them (an active job is returned rather than started
+   * again), but relying on that to avoid double-charging a church is the wrong
+   * place to put the safety net.
+   */
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    void start();
-  }, [start]);
+    if (autoStarted.current || runId) return;
+    const settled = job && job.status !== "QUEUED" && job.status !== "RUNNING";
+    if (job && !settled) return;
+    autoStarted.current = true;
+    startBuild.mutate({ siteId });
+  }, [runId, job, siteId, startBuild]);
 
-  // Poll while the build is in flight. Stops on its own once the job settles,
-  // so a finished build costs nothing.
+  const { run } = useRealtimeRun(runId ?? "", {
+    accessToken: token ?? undefined,
+    enabled: Boolean(runId && token),
+  });
+
+  // The run's metadata is the live copy; the job row is what a reloaded client
+  // resumes from. Prefer whichever is further along rather than assuming.
+  const liveStep = Number(run?.metadata?.stepIndex ?? -1);
+  const activeIndex = Math.max(liveStep, job?.stepIndex ?? 0, 0);
+
+  const runFailed = run?.status === "FAILED" || run?.status === "CRASHED" || run?.status === "SYSTEM_FAILURE";
+  const runDone = run?.status === "COMPLETED";
+  const failed = runFailed || job?.status === "FAILED";
+  const succeeded = runDone || job?.status === "SUCCEEDED";
+  const running = !failed && !succeeded && (Boolean(runId) || startBuild.isPending);
+
+  /**
+   * The run finishing is the signal to re-read the site — the block tree was
+   * committed by the task, not by anything this component called, so React
+   * Query has no idea it changed.
+   */
   useEffect(() => {
-    if (!job || (job.status !== "QUEUED" && job.status !== "RUNNING")) return;
+    if (!runDone) return;
+    void utils.site.invalidate();
+    void utils.ai.buildStatus.invalidate({ siteId });
+    router.refresh();
+  }, [runDone, utils, router, siteId]);
 
-    const timer = window.setInterval(async () => {
-      try {
-        const next = await getAiWebsiteBuildStatus(siteId);
-        if (!next) return;
-        setJob(next);
-        if (next.status === "SUCCEEDED") {
-          router.refresh();
-        }
-      } catch {
-        // A dropped poll is not a failed build — the next tick tries again.
-      }
-    }, POLL_MS);
+  // A failed run's message lives on the job row, which the task's `onFailure`
+  // writes — the realtime payload only says that it failed, not why.
+  useEffect(() => {
+    if (!runFailed) return;
+    void utils.ai.buildStatus.fetch({ siteId }).then((next) => {
+      if (next?.job) setJob(next.job);
+    });
+  }, [runFailed, utils, siteId]);
 
-    return () => window.clearInterval(timer);
-  }, [job, siteId, router]);
-
-  const activeIndex = job?.stepIndex ?? 0;
-  const failed = job?.status === "FAILED";
-  const running = job?.status === "QUEUED" || job?.status === "RUNNING";
-  const shownError = error ?? (failed ? job?.error : null);
+  const shownError = error ?? (failed ? (job?.error ?? "The build stopped unexpectedly.") : null);
+  const percent = succeeded
+    ? 100
+    : Math.round((Math.min(activeIndex, CREW_STEPS.length) / CREW_STEPS.length) * 100);
 
   return (
     <div className="space-y-8">
-      <div className="overflow-hidden rounded-3xl border border-editor-border bg-editor-panel p-6 text-editor-foreground shadow-[var(--shadow-lift)] sm:p-8">
-        <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-accent/20 text-accent">
-            <Sparkles className="size-5" />
-          </span>
-          <div>
+      <div className="relative isolate overflow-hidden rounded-3xl border border-editor-border bg-editor-panel p-6 text-editor-foreground shadow-[var(--shadow-lift)] sm:p-8">
+        <AuroraField className="opacity-40" />
+
+        <div className="relative flex items-start gap-4">
+          <ProgressRing value={percent} size={52} className="shrink-0 text-white/30">
+            <Sparkles className="size-5 text-accent" />
+          </ProgressRing>
+
+          <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
               AI design studio
             </p>
@@ -91,15 +132,23 @@ export function AiWebsiteStudio({ siteId }: { siteId: string }) {
               Designing your church homepage
             </h2>
             <p className="mt-2 max-w-xl text-sm text-editor-muted">
-              Specialists invent layout and copy. Photos stay empty — you&apos;ll add
-              your own church images next.
+              Six specialists invent layout and copy. Photos stay empty on purpose —
+              you&apos;ll add your own church images next.
             </p>
           </div>
         </div>
 
-        <ol className="mt-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="relative mt-7 px-1 text-white/25">
+          <CrewCircuit
+            total={CREW_STEPS.length}
+            activeIndex={activeIndex}
+            complete={succeeded}
+          />
+        </div>
+
+        <ol className="relative mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {CREW_STEPS.map((step, index) => {
-            const done = index < activeIndex || job?.status === "SUCCEEDED";
+            const done = succeeded || index < activeIndex;
             const active = running && index === activeIndex;
 
             return (
@@ -107,7 +156,7 @@ export function AiWebsiteStudio({ siteId }: { siteId: string }) {
                 key={step.id}
                 aria-current={active ? "step" : undefined}
                 className={cn(
-                  "rounded-2xl border px-4 py-3 transition-colors",
+                  "rounded-2xl border px-4 py-3 backdrop-blur-sm transition-colors",
                   active && "border-accent/50 bg-accent/15",
                   done && "border-white/10 bg-white/5",
                   !active && !done && "border-white/10 bg-black/20"
@@ -145,7 +194,16 @@ export function AiWebsiteStudio({ siteId }: { siteId: string }) {
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             {shownError}
           </p>
-          <Button type="button" onClick={() => void start()} disabled={starting}>
+          <Button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setJob(null);
+              setRunId(null);
+              startBuild.mutate({ siteId });
+            }}
+            disabled={startBuild.isPending}
+          >
             Try again
           </Button>
         </div>
@@ -153,9 +211,9 @@ export function AiWebsiteStudio({ siteId }: { siteId: string }) {
         <p className="text-center text-sm text-muted">
           {running
             ? "This takes about a minute. You can safely close this tab and come back — the build keeps going."
-            : starting
-              ? "Starting the crew…"
-              : "Finishing up…"}
+            : succeeded
+              ? "Done. Loading your homepage…"
+              : "Starting the crew…"}
         </p>
       )}
     </div>

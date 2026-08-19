@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { publishSite, unpublishSite } from "@/lib/site/actions";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { PublishError } from "@/lib/site/publish-validation";
@@ -25,10 +25,17 @@ export function PublishBar({
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
 }) {
   const [isPending, startTransition] = useTransition();
+  const utils = trpc.useUtils();
+  const publish = trpc.site.publish.useMutation({
+    onSuccess: () => utils.site.invalidate(),
+  });
+  const unpublish = trpc.site.unpublish.useMutation({
+    onSuccess: () => utils.site.invalidate(),
+  });
 
   function handlePublish() {
     startTransition(async () => {
-      const result = await publishSite(siteId, slug);
+      const result = await publish.mutateAsync({ siteId, slug });
       if (!result.success) {
         const errors = (result.errors ?? []) as PublishError[];
         alert(`Can't publish yet:\n${errors.map((e) => `• ${e.message}`).join("\n")}`);
@@ -38,7 +45,7 @@ export function PublishBar({
 
   function handleUnpublish() {
     startTransition(async () => {
-      await unpublishSite(siteId);
+      await unpublish.mutateAsync({ siteId });
     });
   }
 

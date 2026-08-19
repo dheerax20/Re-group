@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Bot, Send, Sparkles, User } from "lucide-react";
-import {
-  getChatBudget,
-  getChatHistory,
-  sendChatMessage,
-  type ChatMessageView,
-} from "@/lib/chat/actions";
+import type { ChatMessageView } from "@/lib/chat/service";
+import { trpc } from "@/lib/trpc/client";
 import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
 import type { SectionInstance } from "@/lib/site/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+/** The single in-flight optimistic bubble. */
+const OPTIMISTIC_ID = "pending-user-message";
 
 const PROMPT_EXAMPLES = [
   "Make the hero warmer for first-time visitors",
@@ -44,26 +43,34 @@ export function SiteChatPanel({
   siteId: string;
   onApplied: (result: AppliedResult) => void;
 }) {
-  const [messages, setMessages] = useState<ChatMessageView[] | null>(null);
-  const [budget, setBudget] = useState<{ remaining: number; limit: number } | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([getChatHistory(siteId), getChatBudget(siteId)]).then(
-      ([history, usage]) => {
-        if (cancelled) return;
-        setMessages(history);
-        setBudget({ remaining: usage.remaining, limit: usage.limit });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [siteId]);
+  const utils = trpc.useUtils();
+  const historyQuery = trpc.ai.chatHistory.useQuery({ siteId });
+  const budgetQuery = trpc.ai.chatBudget.useQuery({ siteId });
+  const sendMessage = trpc.ai.chatSend.useMutation();
+
+  /**
+   * The thread is the server's list plus whatever this session has optimistically
+   * added, rather than a copy of the server's list held in state.
+   *
+   * Mirroring a query into state with an effect means two sources of truth that
+   * drift the moment a refetch lands mid-send, and it is the cascading-render
+   * pattern React now warns about. Deriving instead means the optimistic bubble
+   * is the ONLY local state, and it disappears by itself the moment the real
+   * message arrives in the query data.
+   */
+  const [optimistic, setOptimistic] = useState<ChatMessageView[]>([]);
+  const messages = useMemo(
+    () => (historyQuery.data ? [...historyQuery.data, ...optimistic] : null),
+    [historyQuery.data, optimistic]
+  );
+  const budget = budgetQuery.data
+    ? { remaining: budgetQuery.data.remaining, limit: budgetQuery.data.limit }
+    : null;
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -74,30 +81,37 @@ export function SiteChatPanel({
     if (value.length < 2) return;
     setError(null);
     setDraft("");
+    const sentAt = new Date().toISOString();
 
     // Optimistic bubble so the thread never looks like the message vanished
     // during the round trip.
-    setMessages((current) => [
-      ...(current ?? []),
+    setOptimistic([
       {
-        id: `pending-${Date.now()}`,
+        // Fixed id, not a timestamp: only one message is ever in flight (the
+        // composer is disabled while pending), and a clock read during render
+        // is exactly the impurity the rules-of-React lint is pointing at.
+        id: OPTIMISTIC_ID,
         role: "user",
         content: value,
         appliedSummary: null,
-        createdAt: new Date().toISOString(),
+        createdAt: sentAt,
       },
     ]);
 
     startTransition(async () => {
       try {
-        const result = await sendChatMessage(siteId, value);
-        setMessages((current) => {
-          const withoutPending = (current ?? []).filter((m) => !m.id.startsWith("pending-"));
-          return [...withoutPending, result.userMessage, result.assistantMessage];
-        });
-        setBudget((prev) =>
-          prev ? { ...prev, remaining: Math.max(prev.remaining - 1, 0) } : prev
-        );
+        const result = await sendMessage.mutateAsync({ siteId, content: value });
+
+        // Write both real rows straight into the cache rather than refetching:
+        // the mutation already returned them, and a round trip here would make
+        // the reply visibly land late.
+        utils.ai.chatHistory.setData({ siteId }, (current) => [
+          ...(current ?? []),
+          result.userMessage,
+          result.assistantMessage,
+        ]);
+        setOptimistic([]);
+        void utils.ai.chatBudget.invalidate({ siteId });
         if (result.sections) {
           onApplied({
             sections: result.sections,
@@ -108,7 +122,7 @@ export function SiteChatPanel({
           });
         }
       } catch (err) {
-        setMessages((current) => (current ?? []).filter((m) => !m.id.startsWith("pending-")));
+        setOptimistic([]);
         setError(err instanceof Error ? err.message : "Could not send that message");
       }
     });

@@ -1,7 +1,6 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { ExternalLink, Globe } from "lucide-react";
-import { resolveActiveSite } from "@/lib/site/actions";
-import { getDomains } from "@/lib/domains/actions";
 import { DomainManager } from "@/components/domains/domain-manager";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 export const metadata = { title: "Domains — Regroup" };
 
 export default async function DomainsPage() {
-  const active = await resolveActiveSite();
+  const active = await (await api()).site.mine();
 
   if (!active) {
     return (
@@ -33,7 +32,7 @@ export default async function DomainsPage() {
     );
   }
 
-  const state = await getDomains(active.id);
+  const state = await (await api()).domains.list({ siteId: active.id });
 
   return (
     <div className="mx-auto max-w-3xl">

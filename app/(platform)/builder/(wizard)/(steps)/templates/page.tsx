@@ -1,13 +1,10 @@
+import { api } from "@/server/trpc/caller";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  getAiWebsiteBuildStatus,
-  getSite,
-  startAiWebsiteBuild,
-} from "@/lib/site/actions";
 import { wizardHref } from "@/lib/onboarding/steps";
 import { WizardStepHeader } from "@/components/onboarding/wizard-step-header";
 import { AiWebsiteStudio } from "@/components/onboarding/ai-website-studio";
+import { RebuildButton } from "@/components/onboarding/rebuild-button";
 import { GenerationPreview } from "@/components/onboarding/generation-preview";
 import { Button } from "@/components/ui/button";
 import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
@@ -36,18 +33,22 @@ export default async function TemplatesPage({
   const { siteId } = await searchParams;
   if (!siteId) redirect("/builder");
 
-  const site = await getSite(siteId);
+  const trpc = await api();
+  const site = await trpc.site.config({ siteId });
   if (!site) redirect("/builder");
 
   // A build in flight wins over an already-built site: after "Regenerate", the
-  // previous sections are still in the database, so checking only for sections
+  // previous design is still in the database, so checking only for content
   // would show the old website instead of the running build.
-  const job = await getAiWebsiteBuildStatus(siteId);
+  const status = await trpc.ai.buildStatus({ siteId });
+  const job = status?.job ?? null;
   const building = job?.status === "QUEUED" || job?.status === "RUNNING";
+  // The crew writes a block tree now; a site built before that still only has
+  // sections, so either one counts as "there is a design here".
   const ready =
     !building &&
     site.template.id === AI_GENERATED_TEMPLATE_ID &&
-    site.sections.length > 0;
+    (site.blocks.length > 0 || site.sections.length > 0);
   const improvements = site.improvements ?? [];
   const designFeedback = site.designFeedback ?? [];
   const mobileFeedback = site.mobileFeedback ?? [];
@@ -57,15 +58,6 @@ export default async function TemplatesPage({
   async function acceptWebsite() {
     "use server";
     redirect(wizardHref("publish", siteId!));
-  }
-
-  async function rebuildWebsite() {
-    "use server";
-    // Queues the crew and returns; the studio component polls the job. The
-    // redirect lands on this page with no finished site, which renders the
-    // studio and its live progress.
-    await startAiWebsiteBuild(siteId!);
-    redirect(wizardHref("templates", siteId!));
   }
 
   return (
@@ -84,7 +76,11 @@ export default async function TemplatesPage({
       />
 
       {!ready ? (
-        <AiWebsiteStudio siteId={siteId} />
+        <AiWebsiteStudio
+          siteId={siteId}
+          initialJob={job}
+          initialToken={status?.publicAccessToken ?? null}
+        />
       ) : (
         <div className="space-y-6">
           <div className="flex flex-wrap gap-2">
@@ -240,11 +236,7 @@ export default async function TemplatesPage({
                 Use this website
               </Button>
             </form>
-            <form action={rebuildWebsite}>
-              <Button type="submit" variant="outline" className="w-full sm:w-auto">
-                Regenerate with AI
-              </Button>
-            </form>
+            <RebuildButton siteId={siteId} />
           </div>
 
           <Link

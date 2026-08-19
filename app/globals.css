@@ -204,6 +204,39 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+  Wizard SVG motion (components/onboarding/wizard-art.tsx).
+
+  Three drift keyframes rather than one shared animation with delays: offset
+  delays on identical motion still repeat in lockstep, and the point of the
+  aurora is that it never quite lands in the same arrangement twice. The
+  periods are deliberately coprime-ish (19s/23s/29s) so the visible cycle is
+  minutes long rather than seconds.
+
+  All of these are killed by the reduced-motion block below.
+*/
+@keyframes drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(26px, 18px) scale(1.12); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  50%      { transform: translate(-30px, 22px) scale(0.92); }
+}
+@keyframes drift-c {
+  0%, 100% { transform: translate(0, 0) scale(0.96); }
+  50%      { transform: translate(18px, -26px) scale(1.1); }
+}
+@keyframes soft-pulse {
+  0%, 100% { opacity: 0.15; transform: scale(0.9); }
+  50%      { opacity: 0.4;  transform: scale(1.25); }
+}
+
+.motion-drift-a { animation: drift-a 19s ease-in-out infinite; transform-origin: center; }
+.motion-drift-b { animation: drift-b 23s ease-in-out infinite; transform-origin: center; }
+.motion-drift-c { animation: drift-c 29s ease-in-out infinite; transform-origin: center; }
+.motion-pulse   { animation: soft-pulse 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

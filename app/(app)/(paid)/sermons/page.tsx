@@ -1,7 +1,6 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { Mic2 } from "lucide-react";
-import { resolveActiveSite } from "@/lib/site/actions";
-import { listSermons } from "@/lib/site/content-actions";
 import { SermonsManager } from "@/components/builder/sermons-manager";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 export const metadata = { title: "Sermons — Regroup" };
 
 export default async function SermonsPage() {
-  const site = await resolveActiveSite();
+  const site = await (await api()).site.mine();
 
   if (!site) {
     return (
@@ -33,6 +32,6 @@ export default async function SermonsPage() {
     );
   }
 
-  const sermons = (await listSermons(site.id)) ?? [];
+  const sermons = (await (await api()).content.listSermons({ siteId: site.id })) ?? [];
   return <SermonsManager siteId={site.id} sermons={sermons} />;
 }

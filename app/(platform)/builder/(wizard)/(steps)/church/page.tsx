@@ -1,5 +1,5 @@
+import { api } from "@/server/trpc/caller";
 import { redirect } from "next/navigation";
-import { getSite } from "@/lib/site/actions";
 import { ChurchForm } from "@/components/onboarding/church-form";
 import { WizardStepHeader } from "@/components/onboarding/wizard-step-header";
 import { wizardHref } from "@/lib/onboarding/steps";
@@ -12,7 +12,7 @@ export default async function ChurchInfoPage({
   const { siteId } = await searchParams;
   if (!siteId) redirect("/builder");
 
-  const site = await getSite(siteId);
+  const site = await (await api()).site.config({ siteId: siteId });
   if (!site) redirect("/builder");
 
   return (

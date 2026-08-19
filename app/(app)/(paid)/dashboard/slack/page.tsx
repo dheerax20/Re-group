@@ -1,6 +1,6 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
-import { resolveActiveSite } from "@/lib/site/actions";
 import { getSlackConnectionState } from "@/lib/slack/actions";
 import { SlackConnectPanel } from "@/components/slack/slack-connect-panel";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -15,7 +15,7 @@ export default async function SlackPage({
   searchParams: Promise<{ slack?: string }>;
 }) {
   const { slack: notice } = await searchParams;
-  const active = await resolveActiveSite();
+  const active = await (await api()).site.mine();
 
   if (!active) {
     return (

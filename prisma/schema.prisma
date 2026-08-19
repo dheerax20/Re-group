@@ -22,11 +22,11 @@ enum MediaType {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  auth0Id   String   @unique
-  email     String?
-  name      String?
-  picture   String?
+  id      String  @id @default(cuid())
+  auth0Id String  @unique
+  email   String?
+  name    String?
+  picture String?
 
   // Set once the user has paid and dismissed /welcome. Distinct from
   // `site` — a user can have a plan before a site exists.
@@ -50,13 +50,11 @@ enum GhlProvisionStatus {
 
 /**
  * The user's matching GoHighLevel sub-account (see `ghl.md`).
- *
  * One per user, created when their subscription activates. `locationId` is
  * written the moment `POST /locations/` succeeds — BEFORE the user call — so a
  * retry after a half-failure reuses that Location instead of creating a second
  * one. Sub-accounts are billable on GHL's Agency Pro plan, so accidentally
  * creating two is a real cost, not just untidy data.
- *
  * No GHL password is stored. `POST /users/` requires one, so a random value is
  * generated per user and discarded — SSO is the login path, and an unused
  * credential sitting in a table is a liability rather than a feature.
@@ -122,13 +120,13 @@ model Site {
   updatedAt   DateTime  @updatedAt
   publishedAt DateTime?
 
-  socialLinks    SocialLink[]
-  media          Media[]
-  sermons        Sermon[]
-  events         Event[]
-  domains        SiteDomain[]
-  generationJobs SiteGenerationJob[]
-  chatMessages   ChatMessage[]
+  socialLinks     SocialLink[]
+  media           Media[]
+  sermons         Sermon[]
+  events          Event[]
+  domains         SiteDomain[]
+  generationJobs  SiteGenerationJob[]
+  chatMessages    ChatMessage[]
   slackConnection SlackConnection?
 
   @@index([status])
@@ -147,7 +145,6 @@ enum DomainStatus {
 /**
  * A custom hostname pointed at one site. Only ACTIVE rows are ever served —
  * `proxy.ts` resolves an incoming Host header to a site slug through here.
- *
  * `hostname` is globally unique because a hostname can only ever route to one
  * site, and that uniqueness is what makes the resolver cache safe.
  */
@@ -193,12 +190,10 @@ enum GenerationStatus {
 /**
  * One AI website build or editor prompt, tracked so the work survives the
  * request that started it.
- *
  * The crew is six sequential LLM calls; running it inside the request that the
  * browser is waiting on meant a closed tab discarded finished work and the
  * progress UI could only ever be a guess. The action enqueues a row, `after()`
  * advances it, and the client polls this.
- *
  * It doubles as the usage ledger: the monthly cap counts rows, so the limit
  * cannot be bypassed by clearing a cache.
  */
@@ -215,6 +210,13 @@ model SiteGenerationJob {
   step       String?
   stepIndex  Int     @default(0)
   totalSteps Int     @default(6)
+
+  /**
+   * The Trigger.dev run this job is executing as. Set immediately after
+   * `tasks.trigger()`, and what lets a client that reloaded mid-build
+   * re-subscribe to the live run instead of falling back to polling.
+   */
+  triggerRunId String?
 
   prompt    String?
   error     String?
@@ -261,13 +263,11 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
-
 /**
  * One Slack workspace connected to one site — both directions unique,
  * matching `Site.userId`'s "one of these per that" shape elsewhere in this
  * schema. A church that reinstalls into the same Slack workspace should
  * reconnect to the same row, not accumulate a second one.
- *
  * `botAccessToken` is encrypted before it ever reaches this table
  * (`lib/slack/crypto.ts`) — it is a live bearer credential for posting into
  * the church's Slack as the bot, the first third-party secret this app
@@ -439,9 +439,9 @@ model Subscription {
 }
 
 model SubscriptionItem {
-  id                       String @id @default(cuid())
+  id                       String  @id @default(cuid())
   subscriptionId           String
-  stripeSubscriptionItemId String @unique
+  stripeSubscriptionItemId String  @unique
   stripePriceId            String
   // The Stripe lookup_key AS OF THE LAST SYNC. Informational only — a
   // lookup key is mutable (transfer_lookup_key moves it to a new price),
@@ -451,7 +451,7 @@ model SubscriptionItem {
   // price metadata written at catalog bootstrap. THIS is what feature
   // gating and add-on matching read.
   planKey                  String?
-  quantity                 Int    @default(1)
+  quantity                 Int     @default(1)
 
   // Authoritative billing period — lives on the ITEM in Stripe, not the sub.
   currentPeriodStart DateTime?
@@ -487,10 +487,10 @@ model Entitlement {
 
 // Webhook idempotency. Stripe retries; handlers must be safe to re-run.
 model ProcessedStripeEvent {
-  id          String   @id // the Stripe event id, evt_...
+  id          String    @id // the Stripe event id, evt_...
   type        String
   // When the row was INSERTed, i.e. when a handler claimed the event.
-  processedAt DateTime @default(now())
+  processedAt DateTime  @default(now())
   // Set only once the handler has finished successfully. A row with a null
   // completedAt is a claim whose handler never reported back — a crash
   // between claim and completion. Such claims are reprocessable so the

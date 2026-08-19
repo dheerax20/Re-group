@@ -11,13 +11,9 @@ import {
   Trash2,
 } from "lucide-react";
 import {
-  addDomain,
-  refreshDomains,
-  removeDomain,
-  setPrimaryDomain,
-  verifyDomain,
   type DomainsState,
-} from "@/lib/domains/actions";
+} from "@/lib/domains/service";
+import { trpc } from "@/lib/trpc/client";
 import type { DomainGroup } from "@/lib/domains/actions-support";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -100,6 +96,10 @@ function DomainCard({
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const refreshDomains = trpc.domains.refresh.useMutation();
+  const setPrimary = trpc.domains.setPrimary.useMutation();
+  const removeDomain = trpc.domains.remove.useMutation();
+  const verifyDomain = trpc.domains.verify.useMutation();
   const status = presentStatus(group);
   const isWorking = group.status === "ACTIVE";
 
@@ -108,7 +108,7 @@ function DomainCard({
     startTransition(async () => {
       const error = await work();
       setMessage(error);
-      onChanged(await refreshDomains(siteId));
+      onChanged(await refreshDomains.mutateAsync({ siteId }));
     });
   }
 
@@ -148,7 +148,7 @@ function DomainCard({
               disabled={pending}
               onClick={() =>
                 run(async () => {
-                  const result = await setPrimaryDomain(siteId, group.root);
+                  const result = await setPrimary.mutateAsync({ siteId, root: group.root });
                   return result.success ? null : result.error;
                 })
               }
@@ -165,7 +165,7 @@ function DomainCard({
             disabled={pending}
             onClick={() =>
               run(async () => {
-                const result = await removeDomain(siteId, group.root);
+                const result = await removeDomain.mutateAsync({ siteId, root: group.root });
                 return result.success ? null : result.error;
               })
             }
@@ -236,7 +236,7 @@ function DomainCard({
               disabled={pending}
               onClick={() =>
                 run(async () => {
-                  const result = await verifyDomain(siteId, group.root);
+                  const result = await verifyDomain.mutateAsync({ siteId, root: group.root });
                   return result.success ? null : result.error;
                 })
               }
@@ -268,6 +268,8 @@ export function DomainManager({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const addDomain = trpc.domains.add.useMutation();
+  const refreshDomains = trpc.domains.refresh.useMutation();
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -275,7 +277,7 @@ export function DomainManager({
     setNotice(null);
 
     startTransition(async () => {
-      const result = await addDomain(siteId, hostname);
+      const result = await addDomain.mutateAsync({ siteId, hostname });
       if (!result.success) {
         setError(result.error);
         return;
@@ -284,7 +286,7 @@ export function DomainManager({
       setNotice(
         `${result.root} is connected. Add the DNS records below to finish.`
       );
-      setState(await refreshDomains(siteId));
+      setState(await refreshDomains.mutateAsync({ siteId }));
     });
   }
 
@@ -384,7 +386,7 @@ export function DomainManager({
               disabled={pending}
               onClick={() => {
                 setError(null);
-                startTransition(async () => setState(await refreshDomains(siteId)));
+                startTransition(async () => setState(await refreshDomains.mutateAsync({ siteId })));
               }}
             >
               <RefreshCw className={cn("size-3.5", pending && "animate-spin")} />

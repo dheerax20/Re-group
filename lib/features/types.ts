@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export interface FeatureConfig {
   sermons: boolean;
   sermonSearch: boolean;
@@ -45,3 +47,22 @@ export const alwaysEnabledSectionTypes = new Set([
   "cta",
   "footer",
 ]);
+
+/**
+ * The wire shape of `FeatureConfig`.
+ *
+ * Lives here rather than in a router so the single definition of what a
+ * feature flag set IS also defines what may be sent. Cross-field rules
+ * ("sermon search requires sermons") stay in `validateFeatureDependencies` —
+ * they are a write-site concern, not a parse concern.
+ */
+export const featureConfigSchema = z.object({
+  sermons: z.boolean(),
+  sermonSearch: z.boolean(),
+  events: z.boolean(),
+  youtube: z.boolean(),
+  podcast: z.boolean(),
+  giving: z.boolean(),
+  ministries: z.boolean(),
+  contact: z.boolean(),
+});

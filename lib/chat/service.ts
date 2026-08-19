@@ -1,8 +1,6 @@
-"use server";
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireOwnedPaidSite, requireOwnedSite } from "@/lib/auth/session";
 import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
 import { runChatTurn } from "@/lib/ai/chat/graph";
 import type { ChatTurn } from "@/lib/ai/editor-prompt";
@@ -54,7 +52,6 @@ function toView(row: {
 }
 
 export async function getChatHistory(siteId: string): Promise<ChatMessageView[]> {
-  await requireOwnedSite(siteId);
   const rows = await prisma.chatMessage.findMany({
     where: { siteId },
     orderBy: { createdAt: "asc" },
@@ -63,7 +60,6 @@ export async function getChatHistory(siteId: string): Promise<ChatMessageView[]>
 }
 
 export async function getChatBudget(siteId: string) {
-  await requireOwnedSite(siteId);
   const budget = await getAiBudget(siteId, "chat_message");
   return {
     used: budget.used,
@@ -85,9 +81,10 @@ export type SendChatMessageResult = {
 
 export async function sendChatMessage(
   siteId: string,
+  userId: string,
   content: string
 ): Promise<SendChatMessageResult> {
-  const user = await requireOwnedPaidSite(siteId);
+  // Authorized by `paidSiteProcedure`; `userId` is the caller it verified.
 
   const trimmed = content.trim();
   if (trimmed.length < 2) {
@@ -99,7 +96,7 @@ export async function sendChatMessage(
 
   // Checked before anything is written: a rejected message should leave no
   // trace in the thread, not a user bubble with no reply.
-  await assertAiBudget(siteId, user.id, "chat_message");
+  await assertAiBudget(siteId, userId, "chat_message");
 
   const site = await prisma.site.findUnique({ where: { id: siteId } });
   if (!site) throw new Error("Site not found");

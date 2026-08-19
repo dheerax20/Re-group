@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { socialLinksSchema, socialPlatforms } from "@/lib/validation/social";
-import { updateSocialLinks } from "@/lib/site/actions";
+import { trpc } from "@/lib/trpc/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export function SocialForm({
   submitLabel?: string;
 }) {
   const router = useRouter();
+  const updateSocial = trpc.content.updateSocial.useMutation();
   const [saved, setSaved] = useState(false);
   const existing = Object.fromEntries(defaultValues.map((l) => [l.platform, l.url]));
 
@@ -60,7 +61,7 @@ export function SocialForm({
   });
 
   const onSubmit = handleSubmit(async (data) => {
-    await updateSocialLinks(siteId, data);
+    await updateSocial.mutateAsync({ siteId, data });
     if (nextHref) {
       router.push(nextHref);
     } else {
@@ -73,6 +74,7 @@ export function SocialForm({
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-5">
       <FieldGroup
+        index={1}
         title="Social profiles"
         description="Leave blank if you don’t use a platform. Only valid URLs are saved."
       >

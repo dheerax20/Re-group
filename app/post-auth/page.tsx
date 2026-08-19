@@ -1,7 +1,7 @@
+import { api } from "@/server/trpc/caller";
 import { redirect } from "next/navigation";
 import { syncCurrentUser } from "@/lib/auth/session";
 import { requireActivePlan } from "@/lib/billing/guard";
-import { resumeHref } from "@/lib/site/actions";
 
 /**
  * The single fork every authenticated session passes through.
@@ -17,7 +17,7 @@ export default async function PostAuthPage() {
   await requireActivePlan(user.id);
 
   if (user.site) {
-    redirect(await resumeHref(user.site.id));
+    redirect(await (await api()).site.resumeHref({ siteId: user.site.id }));
   }
   redirect("/builder");
 }

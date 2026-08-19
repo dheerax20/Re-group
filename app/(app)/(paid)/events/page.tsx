@@ -1,7 +1,6 @@
+import { api } from "@/server/trpc/caller";
 import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
-import { resolveActiveSite } from "@/lib/site/actions";
-import { listEvents } from "@/lib/site/content-actions";
 import { EventsManager } from "@/components/builder/events-manager";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 export const metadata = { title: "Events — Regroup" };
 
 export default async function EventsPage() {
-  const site = await resolveActiveSite();
+  const site = await (await api()).site.mine();
 
   if (!site) {
     return (
@@ -33,6 +32,6 @@ export default async function EventsPage() {
     );
   }
 
-  const events = (await listEvents(site.id)) ?? [];
+  const events = (await (await api()).content.listEvents({ siteId: site.id })) ?? [];
   return <EventsManager siteId={site.id} events={events} />;
 }

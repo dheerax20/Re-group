@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { brandConfigSchema, BrandConfigInput } from "@/lib/validation/brand";
-import { updateBrand } from "@/lib/site/actions";
+import { trpc } from "@/lib/trpc/client";
 import { fontRegistry } from "@/lib/theme/fonts";
 import { generateThemeStyle } from "@/lib/theme/generate-theme";
 import type { BrandConfig } from "@/lib/theme/types";
@@ -18,6 +18,7 @@ import {
   FieldGroup,
   FormActions,
 } from "@/components/onboarding/form-primitives";
+import { BrandPreview } from "@/components/onboarding/brand-preview";
 
 async function uploadImage(siteId: string, type: "LOGO" | "FAVICON", file: File) {
   const formData = new FormData();
@@ -48,6 +49,7 @@ export function BrandForm({
   submitLabel?: string;
 }) {
   const router = useRouter();
+  const updateBrand = trpc.site.updateBrand.useMutation();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<"logo" | "favicon" | null>(null);
@@ -94,7 +96,7 @@ export function BrandForm({
   }
 
   const onSubmit = handleSubmit(async (data) => {
-    await updateBrand(siteId, data);
+    await updateBrand.mutateAsync({ siteId, data });
     if (nextHref) router.push(nextHref);
     else {
       onSaved?.();
@@ -105,7 +107,23 @@ export function BrandForm({
 
   return (
     <form onSubmit={onSubmit} className="mt-8 space-y-5">
-      <FieldGroup title="Colors" description="These become CSS tokens across every template.">
+      {/*
+        Sits above the inputs, not beside them: on a phone a side-by-side
+        preview collapses under the form and is never seen while the colours
+        are actually being chosen.
+      */}
+      <BrandPreview
+        colors={values?.colors ?? {}}
+        primaryFont={values?.typography?.primaryFont}
+        secondaryFont={values?.typography?.secondaryFont}
+        churchName={churchName}
+      />
+
+      <FieldGroup
+        index={1}
+        title="Colors"
+        description="These become CSS tokens across every template."
+      >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <Label htmlFor="colors.primary">Primary</Label>
@@ -158,7 +176,7 @@ export function BrandForm({
         </div>
       </FieldGroup>
 
-      <FieldGroup title="Typography" description="Approved font registry only.">
+      <FieldGroup index={2} title="Typography" description="Approved font registry only.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <Label htmlFor="primaryFont">Heading / body primary</Label>
@@ -183,7 +201,7 @@ export function BrandForm({
         </div>
       </FieldGroup>
 
-      <FieldGroup title="Assets" description="Optional now — templates still look polished without them.">
+      <FieldGroup index={3} title="Assets" description="Optional now — templates still look polished without them.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <Label>Logo</Label>

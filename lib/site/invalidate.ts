@@ -33,6 +33,24 @@ const APP_PATHS = [
   "/youtube",
 ];
 
+/**
+ * `revalidatePath` throws when there is no request scope to attach the
+ * revalidation to — which is exactly the case inside a Trigger.dev task, since
+ * that runs in its own process rather than in a Next.js request. The Redis
+ * invalidation below is the part that actually matters there (it is what the
+ * public read path consults), and the ISR entries age out on their own
+ * `revalidate = 300`. So a failure here is logged and stepped over rather than
+ * being allowed to fail a build that has already succeeded.
+ */
+function safeRevalidate(path: string, type?: "page" | "layout") {
+  try {
+    if (type) revalidatePath(path, type);
+    else revalidatePath(path);
+  } catch {
+    // Outside a request scope (Trigger.dev task, script). Redis still cleared.
+  }
+}
+
 export type InvalidateOptions = {
   /** Pass when the caller already knows it, to skip a slug lookup. */
   slug?: string;
@@ -55,17 +73,17 @@ export async function invalidateSite(
 
   if (resolvedSlug) {
     for (const path of publicPaths(resolvedSlug)) {
-      revalidatePath(path);
+      safeRevalidate(path);
     }
     // Detail pages are dynamic segments; revalidating the layout covers them.
-    revalidatePath(`/sites/${resolvedSlug}/sermons/[slug]`, "page");
-    revalidatePath(`/sites/${resolvedSlug}/events/[slug]`, "page");
+    safeRevalidate(`/sites/${resolvedSlug}/sermons/[slug]`, "page");
+    safeRevalidate(`/sites/${resolvedSlug}/events/[slug]`, "page");
     await invalidateSiteCache(resolvedSlug);
   }
 
   if (!publicOnly) {
     for (const path of APP_PATHS) {
-      revalidatePath(path);
+      safeRevalidate(path);
     }
   }
 }

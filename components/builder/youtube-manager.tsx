@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { updateYoutubeChannel } from "@/lib/site/content-actions";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ export function YoutubeManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const updateYoutube = trpc.content.updateYoutube.useMutation();
   const [url, setUrl] = useState(channelUrl);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function YoutubeManager({
     setMessage(null);
     startTransition(async () => {
       try {
-        await updateYoutubeChannel(siteId, { channelUrl: url });
+        await updateYoutube.mutateAsync({ siteId, data: { channelUrl: url } });
         setMessage(url ? "YouTube section updated on your website." : "YouTube section disabled.");
         router.refresh();
       } catch (err) {

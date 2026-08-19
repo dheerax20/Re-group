@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RegroupLogo } from "@/components/layout/regroup-logo";
 import { fadeUp, staggerContainer } from "@/lib/motion/variants";
+import { AuroraField, BlueprintGrid } from "@/components/onboarding/wizard-art";
 
 export function OnboardingWelcome({
   startAction,
@@ -14,8 +15,18 @@ export function OnboardingWelcome({
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="min-h-screen bg-background regroup-noise">
-      <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-8">
+    <div className="relative min-h-screen overflow-hidden bg-background regroup-noise">
+      {/*
+        Two layers, not one. The aurora carries the colour and the motion; the
+        grid gives it something to sit against so the drift is legible as
+        movement rather than a vague glow. Both are clipped by the wrapper's
+        `overflow-hidden` — the aurora's blur radius extends well past the
+        viewport and would otherwise add a horizontal scrollbar.
+      */}
+      <AuroraField className="opacity-[0.18]" />
+      <BlueprintGrid className="text-border opacity-40" />
+
+      <div className="relative mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-8">
         <RegroupLogo href="/" />
 
         <div className="flex flex-1 flex-col justify-center py-16">

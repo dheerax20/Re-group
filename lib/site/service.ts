@@ -1,40 +1,35 @@
-"use server";
-
-import { after } from "next/server";
-import { revalidatePath } from "next/cache";
-import { prisma, withDbRetry } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { churchInfoSchema } from "@/lib/validation/church";
 import { brandConfigSchema, defaultBrandConfig } from "@/lib/validation/brand";
 import { socialLinksSchema, toSocialLinkRecords } from "@/lib/validation/social";
-import { sectionConfigSchema, coerceSections } from "@/lib/validation/section";
+import { sectionConfigSchema } from "@/lib/validation/section";
 import { slugSchema, slugify } from "@/lib/validation/slug";
 import { wizardHref } from "@/lib/onboarding/steps";
-import { defaultFeatures, FeatureConfig } from "@/lib/features/types";
+import { defaultFeatures, type FeatureConfig } from "@/lib/features/types";
 import { validateFeatureDependencies } from "@/lib/features/validate";
 import { generateNavigation } from "@/lib/site/navigation";
 import { mergeNavigation, allowedHrefs } from "@/lib/site/pages";
 import { navigationConfigSchema } from "@/lib/validation/navigation";
-import { assertAiBudget } from "@/lib/ai/usage";
-import {
-  createJob,
-  findActiveJob,
-  getLatestJob,
-  runFullBuildJob,
-  type JobView,
-} from "@/lib/ai/generation-job";
 import { validateSiteForPublish } from "@/lib/site/publish-validation";
 import { toSiteConfig } from "@/lib/site/to-site-config";
-import { parseChurchStory } from "@/lib/site/story";
 import { invalidateSite } from "@/lib/site/invalidate";
 import { syncPrimaryDomain } from "@/lib/domains/actions-support";
-import {
-  requireOwnedPaidSite,
-  requireOwnedSite,
-  syncCurrentUser,
-} from "@/lib/auth/session";
-import { z } from "zod";
 import { toDatabaseError, isDatabaseUnavailableError } from "@/lib/db/errors";
 import type { Prisma } from "@prisma/client";
+
+/**
+ * Site mutations, as plain functions.
+ *
+ * These were `"use server"` actions whose first line was always an ownership
+ * and billing check. That check now lives in `paidSiteProcedure`
+ * (`server/trpc/trpc.ts`), where it is a middleware every site-scoped
+ * procedure inherits rather than a line each new action had to remember.
+ *
+ * Nothing else about them changed: same validation order, same transactions,
+ * same invalidation. These functions assume authorization has already
+ * happened, so they must only ever be reached through a tRPC procedure or a
+ * Trigger.dev task acting on a job that was authorized when it was queued.
+ */
 
 /** Prisma's Json columns want InputJsonValue; our domain types are plain
  * serializable objects/arrays, so this cast is safe at every call site. */
@@ -42,16 +37,15 @@ function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
-export async function createDraftSite() {
+export async function createDraftSite(userId: string, existingSiteId?: string) {
   try {
-    const user = await syncCurrentUser();
-    if (user.site) {
-      return { siteId: user.site.id, existing: true as const };
+    if (existingSiteId) {
+      return { siteId: existingSiteId, existing: true as const };
     }
 
     const site = await prisma.site.create({
       data: {
-        userId: user.id,
+        userId,
         name: "Untitled Church",
         slug: `untitled-${Math.random().toString(36).slice(2, 8)}`,
         brandConfig: toJson(defaultBrandConfig),
@@ -86,24 +80,22 @@ export async function createDraftSite() {
  * step; published → the dashboard.
  */
 export async function resumeHref(siteId: string): Promise<string> {
-  await requireOwnedSite(siteId);
-
   const site = await prisma.site.findUnique({
     where: { id: siteId },
-    select: { status: true, sectionConfig: true },
+    select: { status: true, sectionConfig: true, blockConfig: true },
   });
   if (!site) return "/builder";
 
   if (site.status === "PUBLISHED") return "/dashboard";
 
   const sections = Array.isArray(site.sectionConfig) ? site.sectionConfig : [];
-  return sections.length === 0
+  const blocks = Array.isArray(site.blockConfig) ? site.blockConfig : [];
+  return sections.length === 0 && blocks.length === 0
     ? wizardHref("templates", siteId)
     : wizardHref("publish", siteId);
 }
 
 export async function getSite(siteId: string) {
-  await requireOwnedSite(siteId);
   const site = await prisma.site.findUnique({
     where: { id: siteId },
     include: { socialLinks: true },
@@ -113,12 +105,11 @@ export async function getSite(siteId: string) {
 }
 
 /** The signed-in user's site only — one website per Auth0 account. */
-export async function resolveActiveSite() {
+export async function resolveActiveSite(user: {
+  site: { id: string; name: string; slug: string; status: string } | null;
+}) {
   try {
-    return await withDbRetry(async () => {
-      const user = await syncCurrentUser();
-      return user.site;
-    });
+    return user.site;
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       console.error("[resolveActiveSite] Database unavailable.", error);
@@ -129,7 +120,6 @@ export async function resolveActiveSite() {
 }
 
 export async function updateChurchInfo(siteId: string, input: unknown) {
-  await requireOwnedPaidSite(siteId);
   const data = churchInfoSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -156,7 +146,6 @@ export async function updateChurchInfo(siteId: string, input: unknown) {
 }
 
 export async function updateSocialLinks(siteId: string, input: unknown) {
-  await requireOwnedPaidSite(siteId);
   const data = socialLinksSchema.parse(input);
   const records = toSocialLinkRecords(data);
 
@@ -172,7 +161,6 @@ export async function updateSocialLinks(siteId: string, input: unknown) {
 }
 
 export async function updateBrand(siteId: string, input: unknown) {
-  await requireOwnedPaidSite(siteId);
   const data = brandConfigSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -182,21 +170,8 @@ export async function updateBrand(siteId: string, input: unknown) {
   return { success: true };
 }
 
-const featureConfigSchema = z.object({
-  sermons: z.boolean(),
-  sermonSearch: z.boolean(),
-  events: z.boolean(),
-  youtube: z.boolean(),
-  podcast: z.boolean(),
-  giving: z.boolean(),
-  ministries: z.boolean(),
-  contact: z.boolean(),
-});
-
-export async function updateFeatures(siteId: string, input: unknown) {
-  await requireOwnedPaidSite(siteId);
-  const data = featureConfigSchema.parse(input) as FeatureConfig;
-  const errors = validateFeatureDependencies(data);
+export async function updateFeatures(siteId: string, input: FeatureConfig) {
+  const errors = validateFeatureDependencies(input);
   if (errors.length > 0) {
     throw new Error(errors.map((e) => e.message).join("; "));
   }
@@ -204,47 +179,15 @@ export async function updateFeatures(siteId: string, input: unknown) {
   await prisma.site.update({
     where: { id: siteId },
     data: {
-      featureConfig: toJson(data),
-      navigationConfig: toJson(generateNavigation(data)),
+      featureConfig: toJson(input),
+      navigationConfig: toJson(generateNavigation(input)),
     },
   });
   await invalidateSite(siteId);
   return { success: true };
 }
 
-/**
- * Queues an AI website build and returns immediately.
- *
- * The work itself runs in `after()`, against a row the client can poll. That is
- * what makes the six-agent run survive a closed tab, and what lets the progress
- * display report the specialist that is actually working rather than a timer.
- */
-export async function startAiWebsiteBuild(siteId: string) {
-  const user = await requireOwnedPaidSite(siteId);
-
-  const existing = await findActiveJob(siteId, "full_build");
-  if (existing) {
-    // Already running. Returning it rather than starting a second one is what
-    // makes a double-click or a refresh cost nothing.
-    return { job: await getLatestJob(siteId, "full_build") };
-  }
-
-  await assertAiBudget(siteId, user.id, "full_build");
-
-  const job = await createJob(siteId, "full_build");
-  after(() => runFullBuildJob(job.id));
-
-  return { job };
-}
-
-/** Poll target for the generation UI. */
-export async function getAiWebsiteBuildStatus(siteId: string): Promise<JobView | null> {
-  await requireOwnedSite(siteId);
-  return getLatestJob(siteId, "full_build");
-}
-
 export async function updateSections(siteId: string, input: unknown) {
-  await requireOwnedPaidSite(siteId);
   const data = sectionConfigSchema.parse(input);
   await prisma.site.update({
     where: { id: siteId },
@@ -255,7 +198,6 @@ export async function updateSections(siteId: string, input: unknown) {
 }
 
 export async function updateNavigation(siteId: string, input: unknown) {
-  await requireOwnedPaidSite(siteId);
   const parsed = navigationConfigSchema.parse(input);
   const site = await prisma.site.findUnique({
     where: { id: siteId },
@@ -296,7 +238,6 @@ export async function suggestSlug(name: string) {
 }
 
 export async function publishSite(siteId: string, slug: string) {
-  await requireOwnedPaidSite(siteId);
   const parsedSlug = slugSchema.parse(slug);
 
   const before = await prisma.site.findUnique({
@@ -337,13 +278,11 @@ export async function publishSite(siteId: string, slug: string) {
   }
   await invalidateSite(siteId, { slug: parsedSlug });
   await syncPrimaryDomain(siteId);
-  revalidatePath("/dashboard/domains");
 
   return { success: true as const, slug: parsedSlug };
 }
 
 export async function unpublishSite(siteId: string) {
-  await requireOwnedPaidSite(siteId);
   const site = await prisma.site.update({
     where: { id: siteId },
     data: { status: "DRAFT" },

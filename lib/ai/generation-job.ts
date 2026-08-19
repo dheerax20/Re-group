@@ -6,25 +6,27 @@ import { coerceSections } from "@/lib/validation/section";
 import { coerceBlocks } from "@/lib/site/blocks/schema";
 import { getChurchWebsiteCrew } from "./multi-agent-site-builder";
 import { CREW_STEPS } from "./agents/crew";
+import type { ChurchWebsiteBuild } from "./agents/crew";
 import {
   AI_GENERATED_TEMPLATE_ID,
   AI_GENERATED_TEMPLATE_VERSION,
 } from "./agents/schemas";
 
 /**
- * Runs the agent crew outside the request that asked for it.
+ * The generation job — the ledger and audit trail for one AI build.
  *
- * The crew is six sequential LLM calls — routinely a minute or more. Running it
- * inside the server action the browser was awaiting meant a closed tab or a
- * platform timeout threw away work that had already been paid for, and the
- * progress list could only ever be a `setInterval` guessing. Now the action
- * creates a row and returns; `after()` runs this; the client polls the row.
+ * The crew itself no longer runs here. It runs as a Trigger.dev task
+ * (`trigger/full-build.ts`), which owns run liveness: a killed invocation is
+ * Trigger.dev's problem to report, not something this app infers from a
+ * timestamp. What is left in this file is everything that is genuinely about
+ * the job row rather than about executing it — creating it, reading it,
+ * writing progress, and committing a finished build.
  *
- * A job is also the usage ledger — see `lib/ai/usage.ts`.
+ * The row survives that move on purpose. It is the budget ledger — counting
+ * rows rather than keeping a separate counter means the ledger and the audit
+ * trail are the same record, and a failed job still counts because the
+ * provider was still called.
  */
-
-/** Anything older than this with no result is a runner that died mid-flight. */
-const STALE_JOB_MS = 5 * 60 * 1000;
 
 export type JobView = {
   id: string;
@@ -35,11 +37,12 @@ export type JobView = {
   error: string | null;
   styleName: string | null;
   summary: string | null;
+  triggerRunId: string | null;
   createdAt: string;
   finishedAt: string | null;
 };
 
-function toView(job: {
+type JobRow = {
   id: string;
   status: GenerationStatus;
   step: string | null;
@@ -48,9 +51,12 @@ function toView(job: {
   error: string | null;
   styleName: string | null;
   summary: string | null;
+  triggerRunId: string | null;
   createdAt: Date;
   finishedAt: Date | null;
-}): JobView {
+};
+
+function toView(job: JobRow): JobView {
   return {
     id: job.id,
     status: job.status,
@@ -60,6 +66,7 @@ function toView(job: {
     error: job.error,
     styleName: job.styleName,
     summary: job.summary,
+    triggerRunId: job.triggerRunId,
     createdAt: job.createdAt.toISOString(),
     finishedAt: job.finishedAt ? job.finishedAt.toISOString() : null,
   };
@@ -72,37 +79,21 @@ function toJson(value: unknown): Prisma.InputJsonValue {
 /**
  * A job already in flight for this site, if any.
  *
- * A QUEUED or RUNNING row older than `STALE_JOB_MS` is treated as dead and
- * marked failed rather than blocking the site forever — the alternative is a
- * church whose Rebuild button never works again because one invocation was
- * killed between claiming the job and finishing it.
+ * There is no staleness sweep any more. The five-minute `STALE_JOB_MS`
+ * heuristic existed because `after()` gave no way to tell a slow build from a
+ * dead one, so a run killed between claiming a job and finishing it would
+ * block that church's Rebuild button forever. A Trigger.dev run has a real,
+ * observable status, and `onFailure` marks the row terminal — so a QUEUED or
+ * RUNNING row now means the run is genuinely alive.
  */
 export async function findActiveJob(siteId: string, kind: string) {
-  const active = await prisma.siteGenerationJob.findFirst({
+  return prisma.siteGenerationJob.findFirst({
     where: { siteId, kind, status: { in: ["QUEUED", "RUNNING"] } },
     orderBy: { createdAt: "desc" },
   });
-  if (!active) return null;
-
-  if (Date.now() - active.createdAt.getTime() > STALE_JOB_MS) {
-    await prisma.siteGenerationJob.update({
-      where: { id: active.id },
-      data: {
-        status: "FAILED",
-        error: "The build stopped unexpectedly. Start it again.",
-        finishedAt: new Date(),
-      },
-    });
-    return null;
-  }
-
-  return active;
 }
 
 export async function getLatestJob(siteId: string, kind: string): Promise<JobView | null> {
-  const active = await findActiveJob(siteId, kind);
-  if (active) return toView(active);
-
   const latest = await prisma.siteGenerationJob.findFirst({
     where: { siteId, kind },
     orderBy: { createdAt: "desc" },
@@ -127,102 +118,150 @@ export async function createJob(
   return toView(job);
 }
 
-/**
- * Executes a queued full build. Safe to call once per job id; a job not in
- * QUEUED is ignored, so a duplicate `after()` cannot double-charge.
- */
-export async function runFullBuildJob(jobId: string): Promise<void> {
-  const claimed = await prisma.siteGenerationJob.updateMany({
-    where: { id: jobId, status: "QUEUED" },
+/** Records which Trigger.dev run is executing this job, for resume-on-reload. */
+export async function attachRunId(jobId: string, triggerRunId: string): Promise<void> {
+  await prisma.siteGenerationJob.update({
+    where: { id: jobId },
+    data: { triggerRunId },
+  });
+}
+
+export async function markJobRunning(jobId: string): Promise<void> {
+  await prisma.siteGenerationJob.update({
+    where: { id: jobId },
     data: { status: "RUNNING", startedAt: new Date() },
   });
-  if (claimed.count === 0) return;
+}
 
-  const job = await prisma.siteGenerationJob.findUnique({
+export async function writeJobProgress(
+  jobId: string,
+  step: string,
+  stepIndex: number
+): Promise<void> {
+  await prisma.siteGenerationJob.update({
     where: { id: jobId },
-    include: { site: true },
+    data: { step, stepIndex },
   });
-  if (!job) return;
+}
 
-  const site = job.site;
+/** Terminal failure. The message is the one the church reads. */
+export async function markJobFailed(jobId: string, message: string): Promise<void> {
+  await prisma.siteGenerationJob.update({
+    where: { id: jobId },
+    data: { status: "FAILED", error: message, finishedAt: new Date() },
+  });
+}
 
-  try {
-    const built = await getChurchWebsiteCrew().build(
-      {
-        churchName: site.name,
-        tagline: site.tagline ?? undefined,
-        denomination: site.denomination ?? undefined,
-        congregationSize: site.congregationSize ?? undefined,
-        brand: site.brandConfig as never,
-        features: site.featureConfig as never,
+/**
+ * Turns whatever the crew threw into copy a church can act on.
+ *
+ * A raw "Invalid schema" is the model having produced something unusable, and
+ * saying so is more useful than surfacing a zod dump onto a progress screen.
+ */
+export function describeBuildFailure(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "AI website generation failed";
+  return raw.includes("Invalid schema")
+    ? "The AI returned an unusable layout. Try again."
+    : raw.slice(0, 280);
+}
+
+export type CrewProgressCallback = (step: string, stepIndex: number) => Promise<void> | void;
+
+/**
+ * Runs the six-agent crew for a site and returns the result WITHOUT writing it.
+ *
+ * Split from the commit so the Trigger.dev task can report progress between
+ * the two and so a build that produced nothing usable never gets half-written.
+ * The crew itself is untouched — same art direction picking, same concurrent
+ * media director, same structured-output handling.
+ */
+export async function runCrewBuild(
+  siteId: string,
+  onProgress?: CrewProgressCallback
+): Promise<{ built: ChurchWebsiteBuild; site: { id: string; slug: string } }> {
+  const site = await prisma.site.findUnique({ where: { id: siteId } });
+  if (!site) throw new Error("Site not found");
+
+  const built = await getChurchWebsiteCrew().build(
+    {
+      churchName: site.name,
+      tagline: site.tagline ?? undefined,
+      denomination: site.denomination ?? undefined,
+      congregationSize: site.congregationSize ?? undefined,
+      brand: site.brandConfig as never,
+      features: site.featureConfig as never,
+      templateId: AI_GENERATED_TEMPLATE_ID,
+      story: parseChurchStory(site.storyConfig),
+    },
+    async (step) => {
+      await onProgress?.(step.id, step.index);
+    },
+    parseStyleName(site.storyConfig)
+  );
+
+  return { built, site: { id: site.id, slug: site.slug } };
+}
+
+/**
+ * Persists a finished build.
+ *
+ * The crew's output is model output: it runs through the same repair the read
+ * path uses so an invented block or URL cannot be persisted.
+ *
+ * The composed page goes to `blockConfig`, NOT `sectionConfig`. Those are two
+ * different shapes, and `sectionConfig` still has other writers (the AI chat
+ * editor, `enableFeatureOnSite`) that would overwrite a block tree with legacy
+ * sections and destroy the build. It also still holds the giving/YouTube/
+ * podcast URLs the read path derives.
+ */
+export async function commitBuild(
+  siteId: string,
+  jobId: string,
+  built: ChurchWebsiteBuild,
+  slug?: string
+): Promise<void> {
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: { slug: true, storyConfig: true },
+  });
+  if (!site) throw new Error("Site not found");
+
+  const blocks = built.blocks ? coerceBlocks(built.blocks) : [];
+  const legacySections = built.blocks ? null : coerceSections(built.sections);
+
+  await prisma.$transaction([
+    prisma.site.update({
+      where: { id: siteId },
+      data: {
         templateId: AI_GENERATED_TEMPLATE_ID,
-        story: parseChurchStory(site.storyConfig),
-      },
-      async (step) => {
-        await prisma.siteGenerationJob.update({
-          where: { id: jobId },
-          data: { step: step.id, stepIndex: step.index },
-        });
-      },
-      parseStyleName(site.storyConfig)
-    );
-
-    // The crew's output is model output: run it through the same repair the
-    // read path uses so an invented block/URL cannot be persisted.
-    //
-    // The composed page goes to `blockConfig`, NOT `sectionConfig`. Those are
-    // two different shapes, and `sectionConfig` still has other writers (the
-    // visual editor, the AI chat editor, `enableFeatureOnSite`) that would
-    // overwrite a block tree with legacy sections and destroy the build. It
-    // also still holds the giving/YouTube/podcast URLs the read path derives.
-    const blocks = built.blocks ? coerceBlocks(built.blocks) : [];
-    const legacySections = built.blocks ? null : coerceSections(built.sections);
-
-    await prisma.$transaction([
-      prisma.site.update({
-        where: { id: site.id },
-        data: {
-          templateId: AI_GENERATED_TEMPLATE_ID,
-          templateVersion: AI_GENERATED_TEMPLATE_VERSION,
-          ...(legacySections ? { sectionConfig: toJson(legacySections) } : {}),
-          blockConfig: blocks.length > 0 ? toJson(blocks) : undefined,
-          navigationConfig: toJson(built.navigation),
-          seoConfig: toJson(built.seo),
-          storyConfig: toJson({
-            ...parseChurchStory(site.storyConfig),
-            improvements: built.improvements,
-            designFeedback: built.designFeedback,
-            mobileFeedback: built.mobileFeedback,
-            agentLog: built.log,
-            styleName: built.styleName,
-          }),
-        },
-      }),
-      prisma.siteGenerationJob.update({
-        where: { id: jobId },
-        data: {
-          status: "SUCCEEDED",
-          step: null,
-          stepIndex: CREW_STEPS.length,
+        templateVersion: AI_GENERATED_TEMPLATE_VERSION,
+        ...(legacySections ? { sectionConfig: toJson(legacySections) } : {}),
+        blockConfig: blocks.length > 0 ? toJson(blocks) : undefined,
+        navigationConfig: toJson(built.navigation),
+        seoConfig: toJson(built.seo),
+        storyConfig: toJson({
+          ...parseChurchStory(site.storyConfig),
+          improvements: built.improvements,
+          designFeedback: built.designFeedback,
+          mobileFeedback: built.mobileFeedback,
+          agentLog: built.log,
           styleName: built.styleName,
-          summary: `Built a ${built.styleName} homepage.`,
-          log: toJson(built.log),
-          finishedAt: new Date(),
-        },
-      }),
-    ]);
-
-    await invalidateSite(site.id, { slug: site.slug });
-  } catch (error) {
-    console.error(`[generation-job] ${jobId} failed`, error);
-    const raw = error instanceof Error ? error.message : "AI website generation failed";
-    const message = raw.includes("Invalid schema")
-      ? "The AI returned an unusable layout. Try again."
-      : raw.slice(0, 280);
-
-    await prisma.siteGenerationJob.update({
+        }),
+      },
+    }),
+    prisma.siteGenerationJob.update({
       where: { id: jobId },
-      data: { status: "FAILED", error: message, finishedAt: new Date() },
-    });
-  }
+      data: {
+        status: "SUCCEEDED",
+        step: null,
+        stepIndex: CREW_STEPS.length,
+        styleName: built.styleName,
+        summary: `Built a ${built.styleName} homepage.`,
+        log: toJson(built.log),
+        finishedAt: new Date(),
+      },
+    }),
+  ]);
+
+  await invalidateSite(siteId, { slug: slug ?? site.slug });
 }

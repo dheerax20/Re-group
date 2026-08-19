@@ -1,8 +1,6 @@
-"use server";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireOwnedPaidSite, requireOwnedSite } from "@/lib/auth/session";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { invalidateSiteHostnames } from "./resolve";
 import {
@@ -51,7 +49,6 @@ export type DomainsState = {
 };
 
 export async function getDomains(siteId: string): Promise<DomainsState> {
-  await requireOwnedSite(siteId);
 
   const [site, domains] = await Promise.all([
     prisma.site.findUnique({
@@ -92,9 +89,10 @@ export type AddDomainResult =
  */
 export async function addDomain(
   siteId: string,
+  userId: string,
   input: string
 ): Promise<AddDomainResult> {
-  const user = await requireOwnedPaidSite(siteId);
+  // Authorized by `paidSiteProcedure`; `userId` is the caller it verified.
 
   if (!isCustomDomainsEnabled()) {
     return {
@@ -103,7 +101,7 @@ export async function addDomain(
     };
   }
 
-  await enforceRateLimit(`domain:add:${user.id}`, 10, 3600, "domain attempts");
+  await enforceRateLimit(`domain:add:${userId}`, 10, 3600, "domain attempts");
 
   const validated = validateHostname(input);
   if (!validated.ok) {
@@ -187,9 +185,9 @@ export async function addDomain(
 }
 
 /** Re-checks every domain on the site against Vercel. */
-export async function refreshDomains(siteId: string): Promise<DomainsState> {
-  const user = await requireOwnedPaidSite(siteId);
-  await enforceRateLimit(`domain:refresh:${user.id}`, 20, 300, "domain checks");
+export async function refreshDomains(siteId: string, userId: string): Promise<DomainsState> {
+  // Authorized by `paidSiteProcedure`; `userId` is the caller it verified.
+  await enforceRateLimit(`domain:refresh:${userId}`, 20, 300, "domain checks");
 
   const domains = await prisma.siteDomain.findMany({ where: { siteId } });
   for (const domain of domains) {
@@ -217,10 +215,11 @@ export type VerifyDomainResult =
  */
 export async function verifyDomain(
   siteId: string,
+  userId: string,
   root: string
 ): Promise<VerifyDomainResult> {
-  const user = await requireOwnedPaidSite(siteId);
-  await enforceRateLimit(`domain:verify:${user.id}`, 20, 300, "verification attempts");
+  // Authorized by `paidSiteProcedure`; `userId` is the caller it verified.
+  await enforceRateLimit(`domain:verify:${userId}`, 20, 300, "verification attempts");
 
   const rows = await hostnamesInGroup(siteId, root);
   if (rows.length === 0) {
@@ -259,7 +258,6 @@ export async function verifyDomain(
 }
 
 export async function setPrimaryDomain(siteId: string, root: string) {
-  await requireOwnedPaidSite(siteId);
 
   const rows = await hostnamesInGroup(siteId, root);
   const live = rows.filter((row) => row.status === "ACTIVE");
@@ -298,7 +296,6 @@ export async function setPrimaryDomain(siteId: string, root: string) {
  * here is the one thing that would stop a church reconnecting their domain.
  */
 export async function removeDomain(siteId: string, root: string) {
-  await requireOwnedPaidSite(siteId);
 
   const rows = await hostnamesInGroup(siteId, root);
   if (rows.length === 0) {
