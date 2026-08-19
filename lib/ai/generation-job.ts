@@ -79,12 +79,16 @@ function toJson(value: unknown): Prisma.InputJsonValue {
 /**
  * A job already in flight for this site, if any.
  *
- * There is no staleness sweep any more. The five-minute `STALE_JOB_MS`
- * heuristic existed because `after()` gave no way to tell a slow build from a
- * dead one, so a run killed between claiming a job and finishing it would
- * block that church's Rebuild button forever. A Trigger.dev run has a real,
- * observable status, and `onFailure` marks the row terminal — so a QUEUED or
- * RUNNING row now means the run is genuinely alive.
+ * The old five-minute `STALE_JOB_MS` sweep is gone, but NOT because a
+ * QUEUED row can be trusted to mean "alive" — that assumption was wrong and
+ * cost a jammed Rebuild button in practice. `onFailure` covers a run that
+ * starts and dies; it does not cover a run nothing ever accepts, which stays
+ * queued indefinitely and fails nothing.
+ *
+ * What replaced the timeout is `reconcileJobWithRun` (`./reconcile-run.ts`),
+ * which asks Trigger.dev what actually became of the run instead of guessing
+ * from elapsed time. Callers that surface an in-flight job to a user should
+ * go through it rather than reading this directly.
  */
 export async function findActiveJob(siteId: string, kind: string) {
   return prisma.siteGenerationJob.findFirst({
@@ -101,21 +105,49 @@ export async function getLatestJob(siteId: string, kind: string): Promise<JobVie
   return latest ? toView(latest) : null;
 }
 
-export async function createJob(
+/**
+ * Claims the one active job slot for this (site, kind), or reports that
+ * somebody already holds it.
+ *
+ * A `findActiveJob` check followed by a create is not safe: two clicks 200ms
+ * apart both passed the check before either row existed, and both charged the
+ * budget. The partial unique index added in
+ * `20260819140000_one_active_job_per_site` makes the second insert fail with
+ * P2002, which is the only account of "already running" that cannot race.
+ *
+ * Callers must treat `claimed: false` as "do not charge, do not trigger".
+ */
+export async function claimJob(
   siteId: string,
   kind: "full_build" | "editor_prompt",
   prompt?: string
-): Promise<JobView> {
-  const job = await prisma.siteGenerationJob.create({
-    data: {
-      siteId,
-      kind,
-      status: "QUEUED",
-      totalSteps: kind === "full_build" ? CREW_STEPS.length : 1,
-      prompt: prompt ?? null,
-    },
-  });
-  return toView(job);
+): Promise<{ claimed: true; job: JobView } | { claimed: false; job: JobView | null }> {
+  try {
+    const job = await prisma.siteGenerationJob.create({
+      data: {
+        siteId,
+        kind,
+        status: "QUEUED",
+        totalSteps: kind === "full_build" ? CREW_STEPS.length : 1,
+        prompt: prompt ?? null,
+      },
+    });
+    return { claimed: true, job: toView(job) };
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const existing = await findActiveJob(siteId, kind);
+      return { claimed: false, job: existing ? toView(existing) : null };
+    }
+    throw error;
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "P2002"
+  );
 }
 
 /** Records which Trigger.dev run is executing this job, for resume-on-reload. */
@@ -144,12 +176,40 @@ export async function writeJobProgress(
   });
 }
 
+/**
+ * Terminal success for a job the caller ran inline (the editor prompt).
+ *
+ * The full build does not use this — it commits the site and the job in one
+ * transaction, so that path cannot leave one written without the other.
+ *
+ * Marking inline jobs terminal is not optional bookkeeping: only one active
+ * job per (site, kind) may exist, so a row left QUEUED would make the NEXT
+ * editor prompt fail to claim a slot.
+ */
+export async function markJobSucceeded(jobId: string, summary: string): Promise<void> {
+  await prisma.siteGenerationJob.update({
+    where: { id: jobId },
+    data: { status: "SUCCEEDED", summary, stepIndex: 1, finishedAt: new Date() },
+  });
+}
+
 /** Terminal failure. The message is the one the church reads. */
 export async function markJobFailed(jobId: string, message: string): Promise<void> {
   await prisma.siteGenerationJob.update({
     where: { id: jobId },
     data: { status: "FAILED", error: message, finishedAt: new Date() },
   });
+}
+
+/**
+ * Whether a job row is still claiming to be in flight.
+ *
+ * `finishedAt` is not consulted on purpose — the status column is what
+ * `findActiveJob` and the unique index both key on, so it is the only
+ * definition of "active" that all three agree about.
+ */
+export function isActiveStatus(status: GenerationStatus): boolean {
+  return status === "QUEUED" || status === "RUNNING";
 }
 
 /**

@@ -4,11 +4,14 @@ import { auth, tasks } from "@trigger.dev/sdk";
 import { router, ownedSiteProcedure, paidSiteProcedure } from "../trpc";
 import {
   attachRunId,
-  createJob,
+  claimJob,
   findActiveJob,
   getLatestJob,
+  markJobFailed,
+  markJobSucceeded,
   type JobView,
 } from "@/lib/ai/generation-job";
+import { reconcileJobWithRun } from "@/lib/ai/reconcile-run";
 import type { fullBuildTask } from "@/trigger/full-build";
 import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
 import { runEditorPrompt } from "@/lib/ai/editor-prompt-service";
@@ -46,6 +49,11 @@ export const aiRouter = router({
   startBuild: paidSiteProcedure
     .input(siteInput)
     .mutation(async ({ ctx, input }) => {
+      // Reconcile first. An active row whose run is dead would otherwise send
+      // the church straight back to a build that is never going to finish.
+      const existing = await getLatestJob(input.siteId, "full_build");
+      if (existing) await reconcileJobWithRun(existing);
+
       const active = await findActiveJob(input.siteId, "full_build");
       if (active?.triggerRunId) {
         return {
@@ -55,15 +63,53 @@ export const aiRouter = router({
         };
       }
 
-      await assertAiBudget(input.siteId, ctx.user.id, "full_build");
+      /**
+       * Claim the slot BEFORE charging. The database decides who wins, so two
+       * concurrent clicks produce one job and one charge; the loser gets the
+       * winner's run to watch. Doing this after `assertAiBudget` would charge
+       * the loser for a build it never got to start.
+       */
+      const claim = await claimJob(input.siteId, "full_build");
+      if (!claim.claimed) {
+        const job = claim.job;
+        return {
+          runId: job?.triggerRunId ?? null,
+          publicAccessToken: job?.triggerRunId ? await runToken(job.triggerRunId) : null,
+          job,
+        };
+      }
 
-      const job = await createJob(input.siteId, "full_build");
+      const job = claim.job;
 
-      const handle = await tasks.trigger<typeof fullBuildTask>(
-        "full-build",
-        { siteId: input.siteId, jobId: job.id },
-        { idempotencyKey: `build-${job.id}` }
-      );
+      try {
+        await assertAiBudget(input.siteId, ctx.user.id, "full_build");
+      } catch (error) {
+        // Release the slot: a refused build must not leave a QUEUED row
+        // jamming every future attempt. The row stays as the audit trail.
+        await markJobFailed(job.id, "This build was not started.");
+        throw error;
+      }
+
+      let handle;
+      try {
+        handle = await tasks.trigger<typeof fullBuildTask>(
+          "full-build",
+          { siteId: input.siteId, jobId: job.id },
+          { idempotencyKey: `build-${job.id}` }
+        );
+      } catch (error) {
+        // Same reasoning: if the run could not be enqueued at all, the row
+        // must not stay active or nothing will ever start again.
+        await markJobFailed(
+          job.id,
+          "Could not reach the task runner. Check TRIGGER_SECRET_KEY, then try again."
+        );
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not start the build. Try again in a moment.",
+          cause: error,
+        });
+      }
 
       await attachRunId(job.id, handle.id);
 
@@ -84,8 +130,12 @@ export const aiRouter = router({
   buildStatus: ownedSiteProcedure
     .input(siteInput)
     .query(async ({ input }) => {
-      const job = await getLatestJob(input.siteId, "full_build");
-      if (!job) return null;
+      const latest = await getLatestJob(input.siteId, "full_build");
+      if (!latest) return null;
+
+      // The row alone cannot tell a slow build from an abandoned one; this
+      // asks the task runner and fails the row when the run is provably gone.
+      const job = await reconcileJobWithRun(latest);
 
       const live = job.status === "QUEUED" || job.status === "RUNNING";
       const publicAccessToken =
@@ -106,20 +156,39 @@ export const aiRouter = router({
   editorPrompt: paidSiteProcedure
     .input(siteInput.extend({ prompt: z.string().trim().min(4).max(600) }))
     .mutation(async ({ ctx, input }) => {
-      await assertAiBudget(input.siteId, ctx.user.id, "editor_prompt");
+      // Claim the slot first, for the same reason the build does: the ledger
+      // row is written whether or not the call succeeds (the provider was
+      // still going to be called, and the monthly cap counts rows), so two
+      // concurrent prompts must not produce two rows and two charges.
+      const claim = await claimJob(input.siteId, "editor_prompt", input.prompt);
+      if (!claim.claimed) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "An AI edit is already running. Wait for it to finish.",
+        });
+      }
+      const job = claim.job;
 
-      // The ledger row is written whether or not the call succeeds — the
-      // provider was still going to be called, and the monthly cap counts rows.
-      const job = await createJob(input.siteId, "editor_prompt", input.prompt);
+      try {
+        await assertAiBudget(input.siteId, ctx.user.id, "editor_prompt");
+      } catch (error) {
+        await markJobFailed(job.id, "This edit was not started.");
+        throw error;
+      }
 
       try {
         const result = await runEditorPrompt(input.siteId, input.prompt);
+        // Inline jobs must be closed out explicitly — an active row would
+        // block the next edit from claiming the slot.
+        await markJobSucceeded(job.id, result.summary);
         return { job, result };
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "The AI edit failed. Try again.";
+        await markJobFailed(job.id, message.slice(0, 280));
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message:
-            error instanceof Error ? error.message : "The AI edit failed. Try again.",
+          message,
           cause: error,
         });
       }

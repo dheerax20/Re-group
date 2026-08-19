@@ -4,19 +4,16 @@ import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
 /**
  * Trigger.dev project configuration.
  *
- * The project ref is the literal default with an env override, not the other
- * way round. The CLI reads this file directly and does NOT load `.env`, so a
- * bare `process.env.TRIGGER_PROJECT_REF` resolved to an empty string on every
- * `trigger.dev dev` invocation and the CLI could not tell which project it was
- * talking to. The override still exists for anyone pointing the same checkout
- * at their own project.
+ * `TRIGGER_PROJECT_REF` rather than a literal: the project reference is
+ * created when someone runs `npx trigger.dev@latest init` against their own
+ * account, and hard-coding one developer's would break everyone else's deploy.
  *
  * The Prisma extension is required because the task imports the generated
  * client — without it the deployed bundle ships the schema but not the engine,
  * and every run fails at the first query rather than at build time.
  */
 export default defineConfig({
-  project: process.env.TRIGGER_PROJECT_REF ?? "proj_urxklgmdxnxqslhgqhij",
+  project: process.env.TRIGGER_PROJECT_REF ?? "",
   dirs: ["./trigger"],
   maxDuration: 600,
   build: {

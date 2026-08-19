@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { AlertTriangle, Check, Loader2, Sparkles } from "lucide-react";
@@ -10,6 +10,15 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AuroraField, CrewCircuit, ProgressRing } from "./wizard-art";
+
+/**
+ * Sites this page session has already auto-started a build for.
+ *
+ * Module scope on purpose — see the effect that reads it. Cleared on a real
+ * page load, which is the correct lifetime: a fresh load re-reads the job from
+ * the server and re-attaches rather than starting anything new.
+ */
+const autoStartedSites = new Set<string>();
 
 /**
  * Watches a real build, live.
@@ -41,7 +50,6 @@ export function AiWebsiteStudio({
   const [token, setToken] = useState<string | null>(initialToken);
   const [job, setJob] = useState<JobView | null>(initialJob);
   const [error, setError] = useState<string | null>(null);
-  const autoStarted = useRef(false);
 
   const startBuild = trpc.ai.startBuild.useMutation({
     onSuccess(result) {
@@ -58,17 +66,21 @@ export function AiWebsiteStudio({
   /**
    * Start one automatically only when there is nothing to attach to.
    *
-   * The ref guard matters more than it looks: React 19 runs effects twice in
-   * development, and without it the second pass fires a second mutation. The
-   * server would collapse them (an active job is returned rather than started
-   * again), but relying on that to avoid double-charging a church is the wrong
-   * place to put the safety net.
+   * The guard is module-scoped (`autoStartedSites`), NOT a ref, and that
+   * distinction is load-bearing. React StrictMode mounts this component twice
+   * in development, which creates two component instances — each with its own
+   * ref, each seeing an empty guard, each firing a mutation. tRPC's batch link
+   * then packs both into a single `ai.startBuild,ai.startBuild` request. The
+   * database rejects the second (one active job per site), so no church was
+   * ever double-charged, but a guard that reliably fires twice is not a guard.
+   *
+   * Keyed by siteId so a genuine remount for a different site still starts.
    */
   useEffect(() => {
-    if (autoStarted.current || runId) return;
+    if (runId || autoStartedSites.has(siteId)) return;
     const settled = job && job.status !== "QUEUED" && job.status !== "RUNNING";
     if (job && !settled) return;
-    autoStarted.current = true;
+    autoStartedSites.add(siteId);
     startBuild.mutate({ siteId });
   }, [runId, job, siteId, startBuild]);
 
@@ -200,6 +212,9 @@ export function AiWebsiteStudio({
               setError(null);
               setJob(null);
               setRunId(null);
+              // An explicit retry is a deliberate act, so it clears the
+              // auto-start guard rather than being suppressed by it.
+              autoStartedSites.delete(siteId);
               startBuild.mutate({ siteId });
             }}
             disabled={startBuild.isPending}

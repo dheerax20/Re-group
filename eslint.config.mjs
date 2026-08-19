@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Trigger.dev's bundler scratch space. Generated, gitignored, and not
+    // ours to lint — it was contributing 112 errors from vendored code.
+    ".trigger/**",
   ]),
 ]);
 
