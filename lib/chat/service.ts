@@ -3,10 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
 import { runChatTurn } from "@/lib/ai/chat/graph";
-import type { ChatTurn } from "@/lib/ai/editor-prompt";
-import { coerceSections } from "@/lib/validation/section";
+import type { ChatTurn } from "@/lib/ai/block-prompt";
 import { invalidateSite } from "@/lib/site/invalidate";
-import type { SectionInstance } from "@/lib/site/types";
+import { getPageBlocks, HOME_PATH } from "@/lib/site/blocks/resolve-page";
+import { isEditablePath } from "@/lib/site/pages";
+import { loadSiteConfig, writePageBlocks } from "@/lib/ai/page-edit";
+import type { PageBlocks } from "@/lib/site/blocks/types";
 import { parseChurchStory, type DesignFeedback, type SiteImprovement } from "@/lib/site/story";
 
 /**
@@ -72,8 +74,10 @@ export async function getChatBudget(siteId: string) {
 export type SendChatMessageResult = {
   userMessage: ChatMessageView;
   assistantMessage: ChatMessageView;
-  /** Present only when the turn actually changed the site's sections. */
-  sections?: SectionInstance[];
+  /** Present only when the turn actually changed the site's page. */
+  blocks?: PageBlocks;
+  /** Which page changed — not always the one the editor was showing. */
+  path?: string;
   improvements?: SiteImprovement[];
   designFeedback?: DesignFeedback[];
   mobileFeedback?: DesignFeedback[];
@@ -82,7 +86,9 @@ export type SendChatMessageResult = {
 export async function sendChatMessage(
   siteId: string,
   userId: string,
-  content: string
+  content: string,
+  /** The page the editor is showing; the model may retarget from here. */
+  path: string = HOME_PATH
 ): Promise<SendChatMessageResult> {
   // Authorized by `paidSiteProcedure`; `userId` is the caller it verified.
 
@@ -114,27 +120,39 @@ export async function sendChatMessage(
     data: { siteId, role: "USER", content: trimmed },
   });
 
-  const currentSections = coerceSections(site.sectionConfig) as SectionInstance[];
+  // The tree the selected page actually renders. `runPageEdit` re-resolves it
+  // anyway; this copy is what the read-only `answerQuestion` branch describes.
+  const { siteConfig } = await loadSiteConfig(siteId);
+  const currentPath = isEditablePath(path, siteConfig.features) ? path : HOME_PATH;
+  const currentBlocks = getPageBlocks(siteConfig, currentPath);
 
   try {
     const result = await runChatTurn({
+      siteId,
       churchName: site.name,
       features: (site.featureConfig as Record<string, unknown>) ?? {},
-      sections: currentSections,
+      path: currentPath,
+      blocks: currentBlocks,
       history,
       message: trimmed,
+      // A retarget costs a second provider call, and the budget is asserted
+      // per call, not per request.
+      assertBudget: () => assertAiBudget(siteId, userId, "chat_message").then(() => undefined),
     });
 
-    let updatedSections: SectionInstance[] | undefined;
+    let updatedBlocks: PageBlocks | undefined;
+    const updatedPath = result.updatedPath ?? currentPath;
 
-    if (result.updatedSections) {
-      // Model output, repaired rather than trusted — same rule as every
-      // other AI write path in this app.
-      updatedSections = coerceSections(result.updatedSections) as SectionInstance[];
+    if (result.updatedBlocks) {
+      // Already repaired by `applyBlockEdits` (coerceBlocks + the legibility
+      // pass) — model output is never written unrepaired, on either path.
+      updatedBlocks = result.updatedBlocks;
+      // Home lands on `Site.blockConfig`; every other page on its `SitePage`
+      // row. `writePageBlocks` owns that split.
+      await writePageBlocks(siteId, updatedPath, updatedBlocks);
       await prisma.site.update({
         where: { id: siteId },
         data: {
-          sectionConfig: toJson(updatedSections),
           // Persisted, not just returned to the client: the "Needs" checklist
           // in the editor reads this back from the site record, so a chat
           // edit's improvements/feedback have to survive a page reload the
@@ -162,7 +180,8 @@ export async function sendChatMessage(
     return {
       userMessage: toView(userMessage),
       assistantMessage: toView(assistantRow),
-      sections: updatedSections,
+      blocks: updatedBlocks,
+      path: updatedPath,
       improvements: result.improvements,
       designFeedback: result.designFeedback,
       mobileFeedback: result.mobileFeedback,

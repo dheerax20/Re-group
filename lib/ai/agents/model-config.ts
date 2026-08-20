@@ -28,7 +28,7 @@ const ROLE_ENV_VAR: Record<AgentRole, string> = {
   composer: "AI_MODEL_COMPOSER",
   responsiveQa: "AI_MODEL_RESPONSIVE_QA",
   mediaDirector: "AI_MODEL_MEDIA_DIRECTOR",
-  // The in-editor one-shot prompt (lib/ai/editor-prompt.ts).
+  // The in-editor one-shot prompt (lib/ai/block-prompt.ts).
   editor: "AI_MODEL_EDITOR",
   // The site chatbot (lib/ai/chat) — two roles because "is this a question or
   // an edit request" is a much smaller job than answering or editing, and is

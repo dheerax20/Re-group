@@ -148,7 +148,7 @@ project belongs to one).
     [LangGraph](https://langchain-ai.github.io/langgraphjs/) in the
     codebase rather than a hand-written chain. A message is classified as
     an edit request or a question (`classify`), then routed to either
-    `applyChange` — which calls the exact same `applyEditorAiPrompt`
+    `applyChange` — which calls the exact same `runPageEdit`
     function the in-editor "AI prompt" box always used, so the chatbot is
     not a second, less-validated way to touch a site — or `answerQuestion`,
     which is read-only and cannot mutate anything. `lib/chat/actions.ts` is

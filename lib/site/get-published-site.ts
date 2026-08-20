@@ -16,7 +16,7 @@ export const getPublishedSiteBySlug = cache(
     return cached(`site:${slug}:published`, 3600, async () => {
       const site = await prisma.site.findFirst({
         where: { slug, status: "PUBLISHED" },
-        include: { socialLinks: true },
+        include: { socialLinks: true, pages: true },
       });
       if (!site) return null;
 

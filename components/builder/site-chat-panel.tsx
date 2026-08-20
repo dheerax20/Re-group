@@ -5,7 +5,7 @@ import { Bot, Send, Sparkles, User } from "lucide-react";
 import type { ChatMessageView } from "@/lib/chat/service";
 import { trpc } from "@/lib/trpc/client";
 import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
-import type { SectionInstance } from "@/lib/site/types";
+import type { PageBlocks } from "@/lib/site/blocks/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,9 @@ const PROMPT_EXAMPLES = [
 ];
 
 type AppliedResult = {
-  sections: SectionInstance[];
+  blocks: PageBlocks;
+  /** The page the edit landed on — not always the one on screen. */
+  path?: string;
   improvements: SiteImprovement[];
   designFeedback: DesignFeedback[];
   mobileFeedback: DesignFeedback[];
@@ -38,9 +40,12 @@ type AppliedResult = {
  */
 export function SiteChatPanel({
   siteId,
+  path = "/",
   onApplied,
 }: {
   siteId: string;
+  /** The page the editor is showing; sent with every message. */
+  path?: string;
   onApplied: (result: AppliedResult) => void;
 }) {
   const [draft, setDraft] = useState("");
@@ -100,7 +105,7 @@ export function SiteChatPanel({
 
     startTransition(async () => {
       try {
-        const result = await sendMessage.mutateAsync({ siteId, content: value });
+        const result = await sendMessage.mutateAsync({ siteId, content: value, path });
 
         // Write both real rows straight into the cache rather than refetching:
         // the mutation already returned them, and a round trip here would make
@@ -112,9 +117,10 @@ export function SiteChatPanel({
         ]);
         setOptimistic([]);
         void utils.ai.chatBudget.invalidate({ siteId });
-        if (result.sections) {
+        if (result.blocks) {
           onApplied({
-            sections: result.sections,
+            blocks: result.blocks,
+            path: result.path,
             improvements: result.improvements ?? [],
             designFeedback: result.designFeedback ?? [],
             mobileFeedback: result.mobileFeedback ?? [],

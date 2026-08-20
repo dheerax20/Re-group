@@ -119,6 +119,8 @@
   --color-foreground: #1c1917;
   --color-accent: #c4a574;
   --color-muted: #6b7280;
+  --color-primary-foreground: #ffffff;
+  --color-accent-foreground: #1c1917;
   --font-primary: var(--font-inter);
   --font-secondary: var(--font-inter);
 
@@ -184,6 +186,8 @@
   --color-site-background: var(--color-background);
   --color-site-foreground: var(--color-foreground);
   --color-site-accent: var(--color-accent);
+  --color-site-primary-foreground: var(--color-primary-foreground);
+  --color-site-accent-foreground: var(--color-accent-foreground);
   --color-site-muted: var(--color-muted);
   --font-site-primary: var(--font-primary);
   --font-site-secondary: var(--font-secondary);

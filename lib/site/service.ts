@@ -98,7 +98,7 @@ export async function resumeHref(siteId: string): Promise<string> {
 export async function getSite(siteId: string) {
   const site = await prisma.site.findUnique({
     where: { id: siteId },
-    include: { socialLinks: true },
+    include: { socialLinks: true, pages: true },
   });
   if (!site) return null;
   return toSiteConfig(site);
@@ -250,7 +250,7 @@ export async function publishSite(siteId: string, slug: string) {
   // published — and the previous slug's caches never cleared.
   const candidate = await prisma.site.findUnique({
     where: { id: siteId },
-    include: { socialLinks: true },
+    include: { socialLinks: true, pages: true },
   });
   if (!candidate) throw new Error("Site not found");
 

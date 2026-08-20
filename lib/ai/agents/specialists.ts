@@ -198,6 +198,13 @@ export function createChurchAgents(gateway: Gateway) {
       "textTone (default/muted/inverted/accent). Vary these deliberately band to band — the whole point is " +
       "that this page should NOT read as one fixed template; alternate alignment, density, background, and " +
       "eyebrow accent across bands the way the mood description calls for. " +
+      "BACKGROUNDS: never fill a band with the church's primary or secondary colour at full strength. A " +
+      "saturated brand colour behind a whole section looks cheap and makes the text inside it a contrast " +
+      "problem. Prefer the plain page background (`transparent`); where you want a band to stand apart use " +
+      "`surface` or `accent`, which render as a wash of the brand at 5-10% opacity over that same page " +
+      "background. Never set padding below `lg` on a top-level band, and never set `gap` to `none` or `xs` " +
+      "on a band or a stack — a hero whose eyebrow, headline, subhead and button touch each other is the " +
+      "most common way this page comes out wrong. " +
       "Structure REQUIRED: the FIRST top-level block MUST be a section block whose id is exactly \"nav\", " +
       "containing a row with a brandLogo and a navLinks block. The LAST top-level block MUST be a section " +
       "block whose id is exactly \"footer\", containing a row with a copyrightLine and a navLinks block. " +
@@ -205,6 +212,9 @@ export function createChurchAgents(gateway: Gateway) {
       "button, optionally stats and an image), a welcome/about band, then ONE band per feature that is ON in " +
       "the profile (sermonCollection if sermons, eventCollection if events, ministryCollection if ministries, " +
       "givingCta if giving, contactInfo+socialLinks if contact), then a closing cta band (heading, text, button). " +
+      "The feature bands are NOT optional: the site's navigation links to every one of those pages, so a " +
+      "homepage that omits a band for an enabled feature is broken — the visitor is told the church has " +
+      "sermons and then shown a page that never mentions them. Include every one whose flag is true. " +
       "8-14 top-level blocks total, including nav and footer.",
     "Direction:\n{direction}\n\nProducer brief:\n{brief}\n\nTheme:\n{theme}\n\nChurch profile:\n{profile}\n\n" +
       "Copy voice: {copyVoice}\n\nCompose the homepage.",

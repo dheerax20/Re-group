@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { BlockNode, BlockStyle } from "@/lib/site/blocks/types";
+import { NAV_BLOCK_ID, FOOTER_BLOCK_ID } from "@/lib/site/blocks/types";
+import type { BlockNode, BlockStyle, SpacingToken } from "@/lib/site/blocks/types";
 import type { SiteConfig, SiteContent, EventSummary, SermonSummary } from "@/lib/site/types";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,9 +70,22 @@ export function BlockTree({ nodes, site, content }: { nodes: BlockNode[] } & Ctx
   );
 }
 
-function containerStyle(style: BlockStyle | undefined, extra?: string) {
+function containerStyle(
+  style: BlockStyle | undefined,
+  extra?: string,
+  fallbackPadding: SpacingToken = "lg"
+) {
   return cn(
-    style?.padding ? paddingClass[style.padding] : "",
+    /**
+     * Padding is the one token with no sane implicit zero. Every other
+     * property here already falls back (`width ?? "wide"`, `align ?? "left"`,
+     * `gap -> "gap-6"`), but an absent `padding` used to emit no class at all,
+     * so any band the model didn't style rendered flush against its
+     * neighbours — the single biggest cause of a generated page reading as one
+     * undifferentiated blob. `padding: "none"` is still honoured: that is an
+     * explicit choice, where absent is just an omission.
+     */
+    paddingClass[style?.padding ?? fallbackPadding],
     style?.background ? backgroundClass[style.background] : "",
     style?.textTone ? textToneClass[style.textTone] : "",
     extra
@@ -82,8 +96,15 @@ function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
   switch (node.type) {
     case "section": {
       const width = node.style?.width ?? "wide";
+      /**
+       * The `lg` padding default below is right for a content band and wrong
+       * for the pinned nav/footer bands, which the design pass deliberately
+       * skips — an unstyled nav would otherwise render with a band's worth of
+       * vertical padding.
+       */
+      const pinned = node.id === NAV_BLOCK_ID || node.id === FOOTER_BLOCK_ID;
       return (
-        <section className={containerStyle(node.style)}>
+        <section className={containerStyle(node.style, undefined, pinned ? "sm" : "lg")}>
           <div className={cn(widthClass[width], alignItemsClass[node.style?.align ?? "left"], "flex flex-col", node.style?.gap ? gapClass[node.style.gap] : "gap-6")}>
             <BlockTree nodes={node.children} site={site} content={content} />
           </div>
@@ -152,8 +173,12 @@ function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
             <div
               className="absolute inset-0"
               style={{
+                // A waiting photo slot, not a decorative slab. This was a
+                // near-black saturated gradient at full-bleed size, which read
+                // as a deliberate design element rather than "your photo goes
+                // here" — and broke the same rule as a solid brand band.
                 background:
-                  "linear-gradient(145deg, color-mix(in oklab, var(--color-primary) 88%, black), color-mix(in oklab, var(--color-secondary) 60%, var(--color-accent)))",
+                  "linear-gradient(145deg, color-mix(in oklab, var(--color-primary) 8%, var(--color-background)), color-mix(in oklab, var(--color-accent) 12%, var(--color-background)))",
               }}
             />
           )}

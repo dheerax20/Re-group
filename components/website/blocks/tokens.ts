@@ -77,18 +77,36 @@ export const widthClass: Record<WidthToken, string> = {
   full: "mx-auto w-full px-4 sm:px-6 lg:px-8",
 };
 
+/**
+ * Band backgrounds.
+ *
+ * A church's primary/secondary is NEVER painted as a solid full-bleed band.
+ * A saturated brand colour behind a whole section is the single fastest way a
+ * generated site looks like a template — and with a strong blue or red it
+ * makes every heading inside it a contrast problem. The brand appears as a
+ * wash of at most 10% instead, over the church's own background.
+ *
+ * `transparent` and `surface` used to be the same pixel: `.theme-root` already
+ * paints `--color-background`, so `bg-site-background` on a band inside it
+ * changed nothing, and alternating between the two produced no visible rhythm
+ * at all. `surface` is now the whisper tint that makes the alternation real.
+ *
+ * `inverted` (the church's own ink) is kept because a dark band is a genuine
+ * editorial device, but nothing assigns it automatically — see
+ * `lib/site/blocks/design-pass.ts`.
+ */
 export const backgroundClass: Record<SurfaceToken, string> = {
   transparent: "bg-transparent",
-  surface: "bg-site-background",
-  primary: "bg-site-primary text-white",
-  accent: "bg-site-accent text-white",
+  surface: "bg-site-primary/5 text-site-foreground",
+  primary: "bg-site-primary/10 text-site-foreground",
+  accent: "bg-site-accent/10 text-site-foreground",
   inverted: "bg-site-foreground text-site-background",
 };
 
 export const textToneClass: Record<TextToneToken, string> = {
   default: "text-site-foreground",
   muted: "text-site-muted",
-  inverted: "text-white",
+  inverted: "text-site-background",
   accent: "text-site-accent",
 };
 

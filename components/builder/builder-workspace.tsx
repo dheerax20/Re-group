@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, Monitor, Smartphone, Sparkles } from "lucide-react";
 import type { SiteConfig, SiteContent, NavigationItem } from "@/lib/site/types";
 import { NAV_BLOCK_ID, FOOTER_BLOCK_ID } from "@/lib/site/blocks/types";
+import { getPageBlocks, HOME_PATH } from "@/lib/site/blocks/resolve-page";
+import { editableSitePages } from "@/lib/site/pages";
 import { BlockTree } from "@/components/website/blocks/block-renderer";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { PagesLinker } from "@/components/builder/pages-linker";
@@ -35,17 +38,41 @@ export function BuilderWorkspace({
   site: SiteConfig;
   content: SiteContent;
 }) {
+  /**
+   * `site` is a server prop, so the preview only reflects an applied AI edit
+   * once the server component re-runs. `onApplied` used to be a no-op, which
+   * meant that even on the turns where an edit DID land, the church watched
+   * their own change not appear.
+   */
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("assistant");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [navigation, setNavigation] = useState<NavigationItem[]>(site.navigation);
 
+  /**
+   * Which page the editor is showing. Secondary pages used to be uneditable
+   * because their content was hardcoded in their route files; they are stored
+   * now, so the assistant needs to know which one it is looking at.
+   */
+  const pages = editableSitePages(site.features);
+  const [path, setPath] = useState<string>(HOME_PATH);
+  const activePath = pages.some((p) => p.href === path) ? path : HOME_PATH;
+
+  const blocks = getPageBlocks(site, activePath);
+
   // nav and footer are pinned bands; the preview renders the tree exactly as
-  // the public page does, so what the church sees here is what ships.
-  const pageBlocks = site.blocks.filter(
+  // the public page does, so what the church sees here is what ships. Only the
+  // homepage carries them in its own tree — secondary pages get them from the
+  // site layout, so the preview supplies them here for every page.
+  const pageBlocks = blocks.filter(
     (block) => block.id !== NAV_BLOCK_ID && block.id !== FOOTER_BLOCK_ID
   );
-  const navBlock = site.blocks.find((block) => block.id === NAV_BLOCK_ID);
-  const footerBlock = site.blocks.find((block) => block.id === FOOTER_BLOCK_ID);
+  const navBlock =
+    blocks.find((block) => block.id === NAV_BLOCK_ID) ??
+    site.blocks.find((block) => block.id === NAV_BLOCK_ID);
+  const footerBlock =
+    blocks.find((block) => block.id === FOOTER_BLOCK_ID) ??
+    site.blocks.find((block) => block.id === FOOTER_BLOCK_ID);
 
   const previewSite = { ...site, navigation };
 
@@ -85,7 +112,28 @@ export function BuilderWorkspace({
             </button>
           </div>
 
-          <Link href={`/sites/${site.site.slug}`} target="_blank" rel="noreferrer">
+          {pages.length > 1 ? (
+            <label className="hidden items-center gap-2 sm:flex">
+              <span className="sr-only">Page to edit</span>
+              <select
+                value={activePath}
+                onChange={(event) => setPath(event.target.value)}
+                className="h-8 rounded-full border border-editor-border bg-white/5 px-3 text-xs text-editor-foreground"
+              >
+                {pages.map((page) => (
+                  <option key={page.href} value={page.href} className="text-foreground">
+                    {page.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <Link
+            href={`/sites/${site.site.slug}${activePath === HOME_PATH ? "" : activePath}`}
+            target="_blank"
+            rel="noreferrer"
+          >
             <Button variant="outline" size="sm">
               <ExternalLink className="size-4" />
               View site
@@ -122,7 +170,16 @@ export function BuilderWorkspace({
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {tab === "assistant" ? (
-              <SiteChatPanel siteId={site.site.id} onApplied={() => {}} />
+              <SiteChatPanel
+                siteId={site.site.id}
+                path={activePath}
+                onApplied={(result) => {
+                  // A retarget edits a page other than the one on screen;
+                  // follow it so the church sees what changed.
+                  if (result.path && result.path !== activePath) setPath(result.path);
+                  router.refresh();
+                }}
+              />
             ) : (
               <div className="p-3 [&_input]:border-white/15 [&_input]:bg-white/5 [&_input]:text-white [&_label]:text-white/70 [&_p]:text-white/50 [&_select]:border-white/15 [&_select]:bg-white/5 [&_select]:text-white">
                 <PagesLinker

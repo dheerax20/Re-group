@@ -7,12 +7,25 @@ export type SitePageLink = {
   description: string;
   feature?: keyof FeatureConfig;
   required?: boolean;
+  /**
+   * Whether this page's content is a block tree the AI editor can change.
+   *
+   * Sermons and Events are deliberately false: they are functional listing
+   * pages with search, filtering and `/[slug]` detail routes rendered as
+   * hand-written JSX, not editorial block compositions. Making them "editable"
+   * would mean rebuilding that behaviour out of blocks first.
+   */
+  editable?: boolean;
 };
 
 /** Canonical public pages the website builder can link in navigation. */
 export const SITE_PAGE_LINKS: SitePageLink[] = [
-  { label: "Home", href: "/", description: "Homepage", required: true },
-  { label: "About", href: "/about", description: "Church story" },
+  { label: "Home", href: "/", description: "Homepage", required: true,
+    editable: true,
+  },
+  { label: "About", href: "/about", description: "Church story",
+    editable: true,
+  },
   {
     label: "Sermons",
     href: "/sermons",
@@ -30,18 +43,21 @@ export const SITE_PAGE_LINKS: SitePageLink[] = [
     href: "/ministries",
     description: "Groups & teams",
     feature: "ministries",
+    editable: true,
   },
   {
     label: "Give",
     href: "/giving",
     description: "Giving page",
     feature: "giving",
+    editable: true,
   },
   {
     label: "Contact",
     href: "/contact",
     description: "Visit & contact",
     feature: "contact",
+    editable: true,
   },
 ];
 
@@ -50,6 +66,16 @@ export function availableSitePages(features: FeatureConfig): SitePageLink[] {
     if (!page.feature) return true;
     return Boolean(features[page.feature]);
   });
+}
+
+/** The pages whose content the builder and the AI editor may change. */
+export function editableSitePages(features: FeatureConfig): SitePageLink[] {
+  return availableSitePages(features).filter((page) => page.editable);
+}
+
+/** Guard for anything that accepts a page path from a client or a model. */
+export function isEditablePath(path: string, features: FeatureConfig): boolean {
+  return editableSitePages(features).some((page) => page.href === path);
 }
 
 export function allowedHrefs(features: FeatureConfig): Set<string> {

@@ -28,6 +28,36 @@ const blockStyleSchema = z
 
 const idSchema = z.string().trim().min(1).max(60);
 
+const STYLE_FIELD_SCHEMAS = {
+  padding: spacingSchema,
+  gap: spacingSchema,
+  align: alignSchema,
+  width: widthSchema,
+  background: surfaceSchema,
+  textTone: textToneSchema,
+} as const;
+
+/**
+ * Keeps the style keys that parse and drops only the ones that don't.
+ *
+ * `repairBlocks` used to delete the whole `style` object when any single field
+ * failed, so one hallucinated enum value (`padding: "huge"`) cost that band its
+ * padding, background AND alignment at once — a silent quality cliff that read
+ * as the model producing a bad layout. This is the same per-field salvage
+ * `coerceSections` does in `lib/validation/section.ts`, applied here.
+ */
+function salvageStyle(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, schema] of Object.entries(STYLE_FIELD_SCHEMAS)) {
+    if (raw[key] === undefined) continue;
+    const parsed = schema.safeParse(raw[key]);
+    if (parsed.success) out[key] = parsed.data;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Node count is capped at parse time per-array below; this is a hard ceiling on recursion depth. */
 const MAX_DEPTH = 6;
 
@@ -235,8 +265,10 @@ export function repairBlocks(value: unknown): PageBlocks {
         .map(prune)
         .filter((child): child is BlockNode => child !== null);
     }
-    if (candidate.style !== undefined && !blockStyleSchema.safeParse(candidate.style).success) {
-      delete candidate.style;
+    if (candidate.style !== undefined) {
+      const salvaged = salvageStyle(candidate.style);
+      if (salvaged) candidate.style = salvaged;
+      else delete candidate.style;
     }
 
     const parsed = blockNodeSchema.safeParse(candidate);

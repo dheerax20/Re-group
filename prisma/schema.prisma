@@ -120,6 +120,7 @@ model Site {
   updatedAt   DateTime  @updatedAt
   publishedAt DateTime?
 
+  pages           SitePage[]
   socialLinks     SocialLink[]
   media           Media[]
   sermons         Sermon[]
@@ -148,6 +149,42 @@ enum DomainStatus {
  * `hostname` is globally unique because a hostname can only ever route to one
  * site, and that uniqueness is what makes the resolver cache safe.
  */
+/**
+ * One editable public page of a church's site.
+ * Secondary pages used to be hardcoded block trees written inline in their
+ * route files (`app/sites/[siteSlug]/about/page.tsx` built its `BlockNode[]`
+ * on every render), so there was nothing for the AI editor — or anything else
+ * — to change. A row here is what makes a page editable.
+ * The HOMEPAGE deliberately stays on `Site.blockConfig` rather than moving
+ * here. That column has one writer, several readers, and the whole
+ * `blockConfig ?? sectionConfig` legacy bridge hanging off it; relocating the
+ * one path that already works, for symmetry, is not worth the regression risk.
+ * `lib/site/blocks/resolve-page.ts` is the single place that asymmetry lives.
+ * A missing row is not an error: the read path falls back to
+ * `defaultPageBlocks()`, which is the same composition these pages have always
+ * rendered. That is what lets every existing site keep working with no
+ * backfill — a page only gains a row once something actually edits it.
+ */
+model SitePage {
+  id     String @id @default(cuid())
+  siteId String
+  /// Matches an `href` in `SITE_PAGE_LINKS` (lib/site/pages.ts).
+  path   String
+
+  blockConfig Json
+  /// Reserved for per-page title/description. Nothing writes it yet.
+  seoConfig   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, path])
+  @@index([siteId])
+  @@map("site_pages")
+}
+
 model SiteDomain {
   id       String @id @default(cuid())
   siteId   String
