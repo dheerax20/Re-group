@@ -91,7 +91,7 @@ export default async function BillingSettingsPage() {
       {needsPayment ? (
         <section
           role="alert"
-          className="mb-6 rounded-2xl border border-warning/40 bg-warning-soft p-5"
+          className="mb-6 rounded-panel border border-warning/40 bg-warning-soft p-5"
         >
           <h2 className="font-medium text-warning">
             {subscription.status === "past_due"

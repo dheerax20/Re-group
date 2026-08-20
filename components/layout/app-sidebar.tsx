@@ -94,7 +94,7 @@ function navButtonClass(active: boolean) {
     "hover:bg-sidebar-accent hover:text-sidebar-foreground",
     "group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center",
     active &&
-      "bg-brand-soft text-brand hover:bg-brand-soft hover:text-brand data-[active=true]:bg-brand-soft data-[active=true]:text-brand"
+      "bg-brand-soft text-brand-strong hover:bg-brand-soft hover:text-brand-strong data-[active=true]:bg-brand-soft data-[active=true]:text-brand-strong"
   );
 }
 
@@ -178,7 +178,7 @@ export function AppSidebar({
                 collapsed && "justify-center border-0 bg-transparent p-0"
               )}
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-[11px] font-semibold text-brand">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-[11px] font-semibold text-brand-strong">
                 {churchInitial}
               </span>
               <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
@@ -286,7 +286,7 @@ export function AppSidebar({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={userPicture} alt="" className="size-8 shrink-0 rounded-full object-cover" />
             ) : (
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand-strong">
                 {(userName?.trim()?.[0] ?? userEmail?.trim()?.[0] ?? "U").toUpperCase()}
               </span>
             )}

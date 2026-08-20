@@ -84,7 +84,7 @@ export function UpgradeForm({
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
-      className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-soft)]"
+      className="rounded-panel border border-border bg-surface p-6 shadow-[var(--shadow-soft)]"
     >
       <motion.div
         variants={fadeUp}

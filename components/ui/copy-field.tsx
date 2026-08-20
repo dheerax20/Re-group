@@ -41,7 +41,7 @@ export function CopyField({
           {label}
         </p>
       ) : null}
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-background pl-2.5">
+      <div className="flex items-center gap-1 rounded-full border border-border bg-background pl-2.5">
         <code className="min-w-0 flex-1 truncate py-2 font-mono text-xs text-foreground">
           {value}
         </code>
@@ -49,7 +49,7 @@ export function CopyField({
           type="button"
           onClick={copy}
           aria-label={copied ? `Copied ${label ?? "value"}` : `Copy ${label ?? "value"}`}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
         >
           {copied ? (
             <Check className="size-3.5 text-success" />

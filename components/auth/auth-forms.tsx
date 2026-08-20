@@ -25,7 +25,7 @@ function AuthShell({
       </div>
       <div className="flex flex-1 items-center justify-center px-6 pb-16">
         <motion.div
-          className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 shadow-[var(--shadow-soft)]"
+          className="w-full max-w-md rounded-panel border border-border bg-surface p-8 shadow-[var(--shadow-soft)]"
           initial={reduceMotion ? false : "hidden"}
           animate="visible"
           variants={staggerContainer}

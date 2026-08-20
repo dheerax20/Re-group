@@ -46,9 +46,9 @@ export function AuroraField({ className }: { className?: string }) {
       </defs>
 
       <g filter={`url(#${blur})`} opacity="0.55">
-        <circle cx="90" cy="90" r="80" fill="var(--color-brand, #6366f1)" className="motion-drift-a" />
-        <circle cx="300" cy="70" r="70" fill="var(--color-accent, #d4af37)" className="motion-drift-b" />
-        <circle cx="210" cy="230" r="90" fill="var(--color-brand, #6366f1)" opacity="0.7" className="motion-drift-c" />
+        <circle cx="90" cy="90" r="80" fill="var(--brand)" className="motion-drift-a" />
+        <circle cx="300" cy="70" r="70" fill="var(--accent)" className="motion-drift-b" />
+        <circle cx="210" cy="230" r="90" fill="var(--brand)" opacity="0.7" className="motion-drift-c" />
       </g>
     </svg>
   );
@@ -135,8 +135,8 @@ export function ProgressRing({
       >
         <defs>
           <linearGradient id={`${id}-stroke`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="var(--color-brand, #6366f1)" />
-            <stop offset="100%" stopColor="var(--color-accent, #d4af37)" />
+            <stop offset="0%" stopColor="var(--brand)" />
+            <stop offset="100%" stopColor="var(--accent)" />
           </linearGradient>
         </defs>
         <circle
@@ -199,8 +199,8 @@ export function CrewCircuit({
     >
       <defs>
         <linearGradient id={`${id}-live`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--color-brand, #6366f1)" />
-          <stop offset="100%" stopColor="var(--color-accent, #d4af37)" />
+          <stop offset="0%" stopColor="var(--brand)" />
+          <stop offset="100%" stopColor="var(--accent)" />
         </linearGradient>
         <filter id={`${id}-glow`} x="-100%" y="-100%" width="300%" height="300%">
           <feGaussianBlur stdDeviation="3" result="b" />
@@ -243,7 +243,7 @@ export function CrewCircuit({
                 cx={cx}
                 cy="24"
                 r="9"
-                fill="var(--color-accent, #d4af37)"
+                fill="var(--accent)"
                 opacity="0.25"
                 className="motion-pulse"
               />
@@ -254,9 +254,9 @@ export function CrewCircuit({
               r={active ? 6 : 4.5}
               fill={
                 done
-                  ? "var(--color-brand, #6366f1)"
+                  ? "var(--brand)"
                   : active
-                    ? "var(--color-accent, #d4af37)"
+                    ? "var(--accent)"
                     : "currentColor"
               }
               opacity={done || active ? 1 : 0.25}
@@ -289,8 +289,8 @@ export function ArcFlourish({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient id={`${id}-arc`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--color-accent, #d4af37)" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="var(--color-brand, #6366f1)" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
         </linearGradient>
       </defs>
       {[34, 52, 70, 88].map((r, index) => (

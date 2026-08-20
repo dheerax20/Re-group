@@ -63,7 +63,7 @@ export function PublishForm({
     const url = liveUrl(publishedSlug);
     return (
       <div className="mt-8 space-y-4">
-        <div className="rounded-2xl border border-accent/30 bg-accent-soft p-6 text-center">
+        <div className="rounded-panel border border-accent/30 bg-accent-soft p-6 text-center">
           <h2 className="font-serif text-2xl font-semibold text-foreground">
             Your site is live
           </h2>
@@ -90,8 +90,8 @@ export function PublishForm({
 
         {/* The moment a church most wants their own address is right after
             seeing the platform one, so the offer belongs here. */}
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+        <div className="flex flex-wrap items-center gap-3 rounded-panel border border-border bg-surface p-5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-strong">
             <Globe className="size-4" />
           </span>
           <div className="min-w-0 flex-1">

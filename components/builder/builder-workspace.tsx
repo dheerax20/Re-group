@@ -148,7 +148,7 @@ export function BuilderWorkspace({
           </p>
         </aside>
 
-        <div className="min-h-0 overflow-y-auto bg-neutral-200 p-4 dark:bg-neutral-900">
+        <div className="min-h-0 overflow-y-auto bg-editor-canvas p-4">
           <div
             className={cn(
               "mx-auto overflow-hidden rounded-xl bg-white shadow-lg",

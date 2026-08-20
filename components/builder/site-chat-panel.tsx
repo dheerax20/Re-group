@@ -185,7 +185,7 @@ export function SiteChatPanel({
               </span>
               <div
                 className={cn(
-                  "max-w-[80%] rounded-2xl px-3 py-2 text-[13px] leading-snug",
+                  "max-w-[80%] rounded-panel px-3 py-2 text-[13px] leading-snug",
                   message.role === "user"
                     ? "bg-accent text-editor-shell"
                     : "border border-white/10 bg-white/5 text-white/85"

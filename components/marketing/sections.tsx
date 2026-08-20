@@ -89,9 +89,9 @@ export function MarketingSections() {
             {demoEvents.slice(0, 3).map((event) => (
               <div
                 key={event.id}
-                className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)]"
+                className="flex items-start gap-3 rounded-panel border border-border bg-background p-4 shadow-[var(--shadow-soft)]"
               >
-                <div className="rounded-xl bg-brand-soft p-2.5 text-brand">
+                <div className="rounded-xl bg-brand-soft p-2.5 text-brand-strong">
                   <Calendar className="h-4 w-4" />
                 </div>
                 <div>
@@ -108,12 +108,12 @@ export function MarketingSections() {
 
       <SectionReveal className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
-          <motion.div variants={fadeUp} className="order-2 overflow-hidden rounded-2xl border border-border bg-surface lg:order-1">
+          <motion.div variants={fadeUp} className="order-2 overflow-hidden rounded-panel border border-border bg-surface lg:order-1">
             <div className="border-b border-border px-4 py-3 text-sm font-medium">Members</div>
             <div className="divide-y divide-border">
               {demoMembers.slice(0, 4).map((member) => (
                 <div key={member.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-strong">
                     {member.initials}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -161,7 +161,7 @@ export function MarketingSections() {
             {demoCourses.map((course) => (
               <div
                 key={course.id}
-                className="rounded-2xl border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+                className="rounded-panel border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
               >
                 <GraduationCap className="h-5 w-5 text-brand" />
                 <p className="mt-4 font-semibold">{course.title}</p>
@@ -195,7 +195,7 @@ export function MarketingSections() {
             { icon: GraduationCap, label: "Courses" },
           ].map((item, index) => (
             <div key={item.label} className="flex w-full flex-col items-center">
-              <div className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
+              <div className="flex w-full items-center gap-3 rounded-panel border border-border bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
                 <item.icon className="h-5 w-5 text-brand" />
                 <span className="font-medium">{item.label}</span>
               </div>
@@ -208,17 +208,17 @@ export function MarketingSections() {
       <SectionReveal className="px-6 pb-24">
         <motion.div
           variants={fadeUp}
-          className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-border bg-brand px-8 py-14 text-center text-brand-foreground sm:px-16"
+          className="mx-auto max-w-6xl overflow-hidden rounded-panel border border-foreground bg-foreground px-8 py-14 text-center text-background sm:px-16"
         >
           <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
             Give your church a digital home.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-brand-foreground/80">
+          <p className="mx-auto mt-4 max-w-xl text-background/80">
             Start with the builder. Grow into events, members, and courses — without
             leaving Regroup.
           </p>
           <Link href="/builder" className="mt-8 inline-flex">
-            <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90">
               Start building
               <ArrowRight className="h-4 w-4" />
             </Button>

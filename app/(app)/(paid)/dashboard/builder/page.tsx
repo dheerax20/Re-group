@@ -19,7 +19,7 @@ function EditorNotice({
   return (
     <div className="flex h-full items-center justify-center p-8 text-center">
       <div className="max-w-sm">
-        <span className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-white/10 text-editor-foreground">
+        <span className="mx-auto flex size-11 items-center justify-center rounded-panel bg-white/10 text-editor-foreground">
           <PanelsTopLeft className="size-5" />
         </span>
         <h1 className="mt-4 text-xl font-semibold text-editor-foreground">{title}</h1>

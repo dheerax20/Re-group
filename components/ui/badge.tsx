@@ -24,7 +24,7 @@ const badgeVariants = cva(
         warning: "bg-warning-soft text-warning",
         info: "bg-info-soft text-info",
         destructive: "bg-destructive-soft text-destructive",
-        accent: "bg-accent-soft text-accent-foreground",
+        accent: "bg-accent-soft text-accent-strong",
       },
     },
     defaultVariants: { variant: "default" },

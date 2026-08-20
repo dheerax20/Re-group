@@ -66,7 +66,7 @@ export function ErrorState({
       <p className="mt-3 text-sm text-muted">{description}</p>
 
       {isDev ? (
-        <pre className="mt-6 max-h-64 overflow-auto rounded-2xl border border-border bg-surface p-4 text-left font-mono text-xs whitespace-pre-wrap text-muted">
+        <pre className="mt-6 max-h-64 overflow-auto rounded-panel border border-border bg-surface p-4 text-left font-mono text-xs whitespace-pre-wrap text-muted">
           {error.message}
           {error.digest ? `\n\ndigest: ${error.digest}` : ""}
         </pre>

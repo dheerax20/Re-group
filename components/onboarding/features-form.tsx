@@ -106,7 +106,7 @@ export function FeaturesForm({
               <div
                 key={key}
                 className={cn(
-                  "group/feat relative overflow-hidden rounded-2xl border p-4 transition-all duration-300",
+                  "group/feat relative overflow-hidden rounded-panel border p-4 transition-all duration-300",
                   on
                     ? "border-brand/45 bg-brand-soft/40 shadow-[var(--shadow-soft)]"
                     : "border-border bg-surface hover:border-border-strong"
@@ -122,8 +122,8 @@ export function FeaturesForm({
                   >
                     <defs>
                       <radialGradient id={`glow-${key}`}>
-                        <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.45" />
-                        <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
+                        <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
+                        <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
                       </radialGradient>
                     </defs>
                     <circle cx="50" cy="50" r="50" fill={`url(#glow-${key})`} />

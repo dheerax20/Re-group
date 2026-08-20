@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
  * This used to hardcode Tailwind's raw `neutral-200` border and a plain white
  * fill, so every card in the app ignored the design tokens — white-on-warm in
  * light mode, white-on-black in dark. Everything here is token-driven, and the
- * `rounded-2xl border border-border bg-surface shadow-[var(--shadow-soft)]`
+ * `rounded-panel border border-border bg-surface shadow-[var(--shadow-soft)]`
  * incantation that was pasted across a dozen pages now lives in one place.
  */
-const cardVariants = cva("rounded-2xl border transition-colors", {
+const cardVariants = cva("rounded-panel border transition-colors", {
   variants: {
     variant: {
       /** Default: sits on the page background. */

@@ -20,7 +20,7 @@ export function GenerationPreview({ site }: { site: SiteConfig }) {
   const width = VIEWPORTS[viewport].width;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-editor-panel shadow-[var(--shadow-lift)]">
+    <div className="overflow-hidden rounded-panel border border-border bg-editor-panel shadow-[var(--shadow-lift)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
         <p className="text-xs text-white/55">Live AI preview</p>
         <div className="flex items-center rounded-xl border border-white/10 bg-white/5 p-0.5">
@@ -50,7 +50,7 @@ export function GenerationPreview({ site }: { site: SiteConfig }) {
             viewport === "mobile"
               ? "rounded-[1.5rem] border-[8px] border-editor-border"
               : viewport === "tablet"
-                ? "rounded-2xl border-[6px] border-editor-border"
+                ? "rounded-panel border-[6px] border-editor-border"
                 : "w-full max-w-[1100px] rounded-xl"
           )}
           style={{ width: "100%", maxWidth: width }}

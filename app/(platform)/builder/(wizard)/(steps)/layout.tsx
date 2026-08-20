@@ -21,7 +21,7 @@ export default async function WizardLayout({
         <div className="relative">
           <StepProgress />
           <main className="mx-auto max-w-5xl px-6 py-10">
-            <div className="relative overflow-hidden rounded-3xl border border-border bg-surface/95 p-6 shadow-[var(--shadow-lift)] backdrop-blur-sm sm:p-8">
+            <div className="relative overflow-hidden rounded-panel border border-border bg-surface/95 p-6 shadow-[var(--shadow-lift)] backdrop-blur-sm sm:p-8">
               {children}
             </div>
           </main>
