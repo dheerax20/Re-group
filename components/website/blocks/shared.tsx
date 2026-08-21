@@ -14,7 +14,11 @@ import { cn } from "@/lib/utils";
 /** Placeholder for a data-bound block whose collection is empty. */
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-dashed border-site-muted/25">
+    /* `w-full` for the same reason `row` and `stack` carry it: the collection
+       views early-return this, bypassing their own `grid w-full` wrapper, so
+       without it a church with no sermons yet gets a dashed card only as wide
+       as the sentence inside it. */
+    <div className="w-full overflow-hidden rounded-2xl border border-dashed border-site-muted/25">
       <div
         className="h-28"
         style={{
@@ -22,7 +26,7 @@ export function EmptyState({ message }: { message: string }) {
             "linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 18%, white), color-mix(in oklab, var(--color-accent) 25%, white))",
         }}
       />
-      <div className="p-8 text-center text-site-muted">{message}</div>
+      <div className="p-8 text-center text-base text-site-muted sm:text-lg">{message}</div>
     </div>
   );
 }
@@ -41,8 +45,8 @@ export function TraitEyebrow({
   accent?: "none" | "line" | "bordered" | "numbered";
   tone?: "default" | "light";
 }) {
-  const base = "text-sm font-semibold uppercase tracking-wider";
-  const color = tone === "light" ? "text-white" : "text-site-accent";
+  const base = "text-sm font-semibold uppercase tracking-wider sm:text-base";
+  const color = tone === "light" ? "text-current" : "text-site-accent";
 
   if (accent === "bordered") {
     return (
@@ -51,7 +55,7 @@ export function TraitEyebrow({
           "inline-flex items-center rounded-full border px-3 py-1",
           base,
           color,
-          tone === "light" ? "border-white/30" : "border-site-accent/30"
+          tone === "light" ? "border-current/30" : "border-site-accent/30"
         )}
       >
         {children}
@@ -65,7 +69,7 @@ export function TraitEyebrow({
         <span
           className={cn(
             "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px]",
-            tone === "light" ? "bg-white/15" : "bg-site-accent/15"
+            tone === "light" ? "bg-current/15" : "bg-site-accent/15"
           )}
         >
           •
@@ -82,7 +86,7 @@ export function TraitEyebrow({
         <span
           className={cn(
             "mt-2 block h-0.5 w-10 rounded-full",
-            tone === "light" ? "bg-white/60" : "bg-site-accent/60"
+            tone === "light" ? "bg-current/60" : "bg-site-accent/60"
           )}
         />
       ) : null}
@@ -90,12 +94,20 @@ export function TraitEyebrow({
   );
 }
 
-/** A single label/value chip from a `stats` block. */
+/**
+ * A single label/value chip from a `stats` block.
+ *
+ * Everything here is `currentColor`, not white. A stats block lands inside
+ * whatever band the composer put it in, and that band's background token
+ * already resolved a readable foreground (`text-site-primary-foreground` and
+ * friends) — inheriting it means the chip is legible on a dark hero AND on a
+ * pale brand colour, which a hardcoded white never was.
+ */
 export function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-      <p className="text-xs uppercase tracking-wider text-white/70">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+    <div className="rounded-2xl border border-current/15 bg-current/10 px-4 py-3 backdrop-blur-sm">
+      <p className="text-sm uppercase tracking-wider text-current/70">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-current">{value}</p>
     </div>
   );
 }

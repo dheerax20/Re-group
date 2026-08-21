@@ -117,6 +117,15 @@ export interface SiteConfig {
    * synthesized from old `sections` data via `legacySectionsToBlocks`.
    */
   blocks: BlockNode[];
+  /**
+   * Every OTHER editable page's block tree, keyed by path (`"/about"`, ...).
+   *
+   * The homepage is `blocks` above, not an entry here — read both through
+   * `getPageBlocks` (`lib/site/blocks/resolve-page.ts`) rather than reaching
+   * into either directly. A path missing from this map has simply never been
+   * edited and falls back to `defaultPageBlocks`.
+   */
+  pages: Record<string, BlockNode[]>;
   seo: SeoConfig;
   socialLinks: Array<{ platform: string; url: string }>;
   youtube?: YoutubeConfig;

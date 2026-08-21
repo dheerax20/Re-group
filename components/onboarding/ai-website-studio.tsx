@@ -128,7 +128,7 @@ export function AiWebsiteStudio({
 
   return (
     <div className="space-y-8">
-      <div className="relative isolate overflow-hidden rounded-3xl border border-editor-border bg-editor-panel p-6 text-editor-foreground shadow-[var(--shadow-lift)] sm:p-8">
+      <div className="relative isolate overflow-hidden rounded-panel border border-editor-border bg-editor-panel p-6 text-editor-foreground shadow-[var(--shadow-lift)] sm:p-8">
         <AuroraField className="opacity-40" />
 
         <div className="relative flex items-start gap-4">
@@ -168,7 +168,7 @@ export function AiWebsiteStudio({
                 key={step.id}
                 aria-current={active ? "step" : undefined}
                 className={cn(
-                  "rounded-2xl border px-4 py-3 backdrop-blur-sm transition-colors",
+                  "rounded-panel border px-4 py-3 backdrop-blur-sm transition-colors",
                   active && "border-accent/50 bg-accent/15",
                   done && "border-white/10 bg-white/5",
                   !active && !done && "border-white/10 bg-black/20"

@@ -20,7 +20,7 @@ export function BrandLogoBlockView({ site }: { site: SiteConfig }) {
           className="h-8 w-auto object-contain"
         />
       ) : (
-        <span className="text-lg">{site.site.name}</span>
+        <span className="text-xl">{site.site.name}</span>
       )}
     </Link>
   );
@@ -32,7 +32,7 @@ export function NavLinksBlockView({ site, tone = "default" }: { site: SiteConfig
 
   return (
     <div className="relative">
-      <ul className="hidden items-center gap-6 text-sm font-medium md:flex">
+      <ul className="hidden items-center gap-6 text-base font-medium md:flex">
         {site.navigation.map((item) => (
           <li key={item.href}>
             <Link href={item.href} className="hover:text-site-accent">
@@ -56,7 +56,7 @@ export function NavLinksBlockView({ site, tone = "default" }: { site: SiteConfig
       {open ? (
         <ul
           className={cn(
-            "absolute right-0 top-full z-20 mt-2 grid w-48 gap-1 rounded-2xl p-2 text-sm font-medium shadow-lg md:hidden",
+            "absolute right-0 top-full z-20 mt-2 grid w-48 gap-1 rounded-2xl p-2 text-base font-medium shadow-lg md:hidden",
             dark ? "bg-site-primary text-white" : "bg-site-background text-site-foreground"
           )}
         >

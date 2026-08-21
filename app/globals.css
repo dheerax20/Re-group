@@ -3,7 +3,18 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Modern Sanctuary — warm linen surfaces, sanctuary navy + stained-glass gold.
+  Parish — parchment ground, terracotta accent, sage secondary, ink-brown text.
+  Ported from parish-design-system/DESIGN_SYSTEM.md ("St Aldhelm Parish —
+  Illuminated"). Three ramps share one OKLCH lightness scale, so neutral-500,
+  terracotta-500 and sage-500 all read at the same perceived lightness; keep any
+  addition on the same steps.
+
+    neutral     100 #f9f4ed  200 #eee7db  300 #dcd3c4  400 #c0b6a5  500 #a19786
+                600 #82796a  700 #645c50  800 #474238  900 #2e2b25
+    terracotta  100 #fff2eb  200 #ffe1d0  300 #ffc6a5  400 #f6a06b  500 #d67f48
+                600 #b2622d  700 #8c491a  800 #643312  900 #402310
+    sage        100 #f0fae1  200 #e1eecc  300 #ccdbb2  400 #aebf92  500 #8fa073
+                600 #728157  700 #56633f  800 #3d472b  900 #272e1b
 
   Two token families live here and must not be confused:
 
@@ -16,81 +27,111 @@
     prefixed utilities (`bg-site-primary`, `text-site-accent`).
 
   Never style product chrome with a site- utility, or a church's colours will
-  leak into the dashboard.
+  leak into the dashboard. Equally, never write `var(--color-brand)` in JSX:
+  tokens declared in `@theme inline` are inlined into the utility and are NOT
+  emitted as custom properties, so only the raw `var(--brand)` form resolves.
 */
 
 :root {
   color-scheme: light;
 
-  --background: #faf8f5;
-  --foreground: #2d2926;
-  --surface: #ffffff;
-  --surface-muted: #f3efea;
-  --surface-raised: #ffffff;
-  --muted: #6b655f;
-  --muted-foreground: #6b655f;
-  --border: #e8e1d6;
-  --border-strong: #d8cfc0;
-  --input: #e8e1d6;
-  --ring: #d4a359;
+  /*
+    Container radius (28px). Controls — buttons, inputs, selects, badges — are
+    fully pill instead and say so directly with `rounded-full`; the radius scale
+    is not stretched to cover them. Exposed as `rounded-panel` rather than by
+    redefining --radius-2xl, because the church renderer
+    (components/website/blocks/tokens.ts) reads the stock scale and must keep
+    its own shapes.
+  */
+  --radius: 1.75rem;
 
-  --primary: #1e293b;
-  --primary-foreground: #faf8f5;
-  --secondary: #f3efea;
-  --secondary-foreground: #2d2926;
-  --destructive: #b3432e;
+  --background: #f5ead8;
+  --foreground: #201e1d;
+  /* Cards sit one step *darker* than the page here — the parchment treatment,
+     not an inversion mistake. */
+  --surface: #ebddc5;
+  --surface-muted: #eee7db;
+  --surface-raised: #f9f4ed;
+  --muted: #82796a;
+  --muted-foreground: #82796a;
+  --border: #dcd3c4;
+  --border-strong: #c0b6a5;
+  --input: #dcd3c4;
+  --ring: #c67139;
+
+  --primary: #c67139;
+  --primary-foreground: #f5ead8;
+  --secondary: #eee7db;
+  --secondary-foreground: #201e1d;
+  --destructive: #b3402c;
   --destructive-foreground: #ffffff;
-  --destructive-soft: #f9e7e2;
+  --destructive-soft: #f7e3de;
 
-  --brand: #1e293b;
-  --brand-foreground: #faf8f5;
-  --brand-soft: #e8eaef;
-  --accent: #d4a359;
-  --accent-foreground: #2d2926;
-  --accent-soft: #f6ecd9;
+  --brand: #c67139;
+  --brand-foreground: #f5ead8;
+  --brand-soft: #fff2eb;
+  --accent: #7a8a5e;
+  --accent-foreground: #f5ead8;
+  --accent-soft: #e1eecc;
+
+  /*
+    Ink for text and icons sitting ON a -soft tint. The -foreground tokens are
+    what goes on the *solid* fill (parchment on terracotta, parchment on sage);
+    at 12px on a pale tint neither the solid-fill foreground nor the mid-tone
+    --brand / --accent itself clears 4.5:1, so the ramp's 700 step does that job.
+  */
+  --brand-strong: #8c491a;
+  --accent-strong: #56633f;
 
   /*
     Status colours. Separate from --accent on purpose: the accent is decoration
-    and can be brand-led, while these carry meaning and must stay legible.
+    and can be brand-led, while these carry meaning and must stay legible. The
+    -soft fills are pulled toward parchment so they don't read as grey patches
+    on a warm ground.
   */
-  --success: #2f6a4f;
-  --success-soft: #e4efe7;
-  --warning: #8a5a11;
-  --warning-soft: #fbeed7;
-  --info: #2f5d80;
-  --info-soft: #e4edf4;
+  --success: #4a6b45;
+  --success-soft: #e6ecdc;
+  --warning: #8c6218;
+  --warning-soft: #f7e8cd;
+  --info: #4a6072;
+  --info-soft: #e5e9ec;
 
   /*
     The website editor is a deliberately dark workspace so the church's own
     site reads as the bright object on the canvas. Tokenised rather than
     hardcoded so the editor stays consistent and themeable.
   */
-  --editor-shell: #141211;
-  --editor-panel: #1c1917;
-  --editor-panel-raised: #24201d;
-  --editor-border: #322c27;
-  --editor-foreground: #f4efe8;
-  --editor-muted: #a29a90;
-  --editor-canvas: #f3efea;
+  --editor-shell: #201e1d;
+  --editor-panel: #2e2b25;
+  --editor-panel-raised: #3a352d;
+  --editor-border: #474238;
+  --editor-foreground: #f9f4ed;
+  --editor-muted: #a19786;
+  --editor-canvas: #eee7db;
 
-  /* Default site theme tokens — replaced per tenant by ThemeProvider. */
+  /*
+    Default site theme tokens — replaced per tenant by ThemeProvider. The fonts
+    point at the tenant registry (lib/theme/fonts.ts), never at a chrome font.
+  */
   --color-primary: #134e4a;
   --color-secondary: #2a6f6a;
   --color-background: #ffffff;
   --color-foreground: #1c1917;
   --color-accent: #c4a574;
   --color-muted: #6b7280;
-  --font-primary: var(--font-jakarta);
-  --font-secondary: var(--font-jakarta);
+  --color-primary-foreground: #ffffff;
+  --color-accent-foreground: #1c1917;
+  --font-primary: var(--font-inter);
+  --font-secondary: var(--font-inter);
 
-  --sidebar: #f3efea;
-  --sidebar-foreground: #2d2926;
-  --sidebar-primary: #1e293b;
-  --sidebar-primary-foreground: #faf8f5;
-  --sidebar-accent: #eae3d7;
-  --sidebar-accent-foreground: #2d2926;
-  --sidebar-border: #e8e1d6;
-  --sidebar-ring: #d4a359;
+  --sidebar: #eee7db;
+  --sidebar-foreground: #201e1d;
+  --sidebar-primary: #c67139;
+  --sidebar-primary-foreground: #f5ead8;
+  --sidebar-accent: #dcd3c4;
+  --sidebar-accent-foreground: #201e1d;
+  --sidebar-border: #dcd3c4;
+  --sidebar-ring: #c67139;
 }
 
 @theme inline {
@@ -115,9 +156,11 @@
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
+  --color-brand-strong: var(--brand-strong);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-strong: var(--accent-strong);
 
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
@@ -134,8 +177,8 @@
   --color-editor-muted: var(--editor-muted);
   --color-editor-canvas: var(--editor-canvas);
 
-  --font-sans: var(--font-jakarta);
-  --font-serif: var(--font-cormorant);
+  --font-sans: var(--font-figtree);
+  --font-serif: var(--font-eb-garamond);
   --font-mono: var(--font-geist-mono);
 
   --color-site-primary: var(--color-primary);
@@ -143,12 +186,16 @@
   --color-site-background: var(--color-background);
   --color-site-foreground: var(--color-foreground);
   --color-site-accent: var(--color-accent);
+  --color-site-primary-foreground: var(--color-primary-foreground);
+  --color-site-accent-foreground: var(--color-accent-foreground);
   --color-site-muted: var(--color-muted);
   --font-site-primary: var(--font-primary);
   --font-site-secondary: var(--font-secondary);
 
   --radius-xl: 1rem;
   --radius-2xl: 1.25rem;
+  /* Chrome's container radius. Additive on purpose — see --radius above. */
+  --radius-panel: var(--radius);
   --shadow-soft: 0 10px 30px -10px rgba(45, 41, 38, 0.08);
   --shadow-lift: 0 20px 40px -15px rgba(45, 41, 38, 0.18);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -164,7 +211,45 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-jakarta), system-ui, sans-serif;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+@layer base {
+  /*
+    Headings are serif, regular weight, tight, and deliberately unspaced —
+    dropping the base template's -0.015em tracking is what turns a generic
+    organic palette into this one (DESIGN_SYSTEM.md §1).
+
+    This lives in @layer base, never unlayered: unlayered rules outrank
+    Tailwind's layered utilities, so a bare `h1 { font-weight: 400 }` would
+    silently beat every `font-bold` in the app *and* in the church renderer's
+    headingScaleClass.
+  */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-eb-garamond), Georgia, serif;
+    font-weight: 400;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  /*
+    A church's headings follow that church's brand font. An element-level
+    font-family on h1 beats the family inherited from .theme-root, so the
+    tenant side has to opt back out explicitly.
+  */
+  .theme-root :is(h1, h2, h3, h4, h5, h6) {
+    font-family: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+  }
 }
 
 /*
@@ -251,57 +336,65 @@ body {
 /*
   Dark theme. Declared once and applied two ways: the `.dark` class for an
   explicit choice, and `prefers-color-scheme` so the product follows the
-  operating system with no JavaScript. Previously only the class existed and
-  nothing ever set it, so these values never rendered — and the sidebar block
-  still held shadcn's default blues, which clash with the linen palette.
+  operating system with no JavaScript. The two blocks below are duplicates on
+  purpose and must be edited in lockstep.
+
+  This is not a second palette — it is the parchment system's own dark band
+  (the source page's hero scrim, verse band and footer) extended across the
+  whole product: neutral-900 ground, neutral-100 text, terracotta-400 for
+  emphasis because terracotta-500 goes muddy on a dark ground.
 */
 .dark {
   color-scheme: dark;
 
-  --background: #1a1817;
-  --foreground: #f3efea;
-  --surface: #24211f;
-  --surface-muted: #2c2825;
-  --surface-raised: #2c2825;
-  --muted: #a9a199;
-  --muted-foreground: #a9a199;
-  --border: #34302c;
-  --border-strong: #443e38;
-  --input: #34302c;
-  --ring: #d4a359;
+  --background: #2e2b25;
+  --foreground: #f9f4ed;
+  --surface: #3a352d;
+  --surface-muted: #474238;
+  --surface-raised: #474238;
+  --muted: #c0b6a5;
+  --muted-foreground: #c0b6a5;
+  --border: #4f4a3f;
+  --border-strong: #645c50;
+  --input: #4f4a3f;
+  --ring: #f6a06b;
 
-  --primary: #d4a359;
-  --primary-foreground: #1a1817;
-  --secondary: #2c2825;
-  --secondary-foreground: #f3efea;
-  --destructive: #e0705a;
-  --destructive-foreground: #1a1817;
-  --destructive-soft: #3a2620;
+  --primary: #f6a06b;
+  --primary-foreground: #2e2b25;
+  --secondary: #474238;
+  --secondary-foreground: #f9f4ed;
+  --destructive: #e2624c;
+  --destructive-foreground: #2e2b25;
+  --destructive-soft: #4a2a22;
 
-  --brand: #d4a359;
-  --brand-foreground: #1a1817;
-  --brand-soft: #3a3128;
-  --accent: #d4a359;
-  --accent-foreground: #1a1817;
-  --accent-soft: #3a3128;
+  --brand: #f6a06b;
+  --brand-foreground: #2e2b25;
+  --brand-soft: #643312;
+  --accent: #aebf92;
+  --accent-foreground: #272e1b;
+  --accent-soft: #3d472b;
 
-  --success: #7cc39b;
-  --success-soft: #22302a;
+  /* On a dark ground the tint is the deep step, so the ink flips to the 300s. */
+  --brand-strong: #ffc6a5;
+  --accent-strong: #ccdbb2;
+
+  --success: #9fbf8f;
+  --success-soft: #2b3626;
   --warning: #e0b264;
-  --warning-soft: #33291a;
-  --info: #8ab4d8;
-  --info-soft: #1f2a33;
+  --warning-soft: #3a2f1a;
+  --info: #a3b6c4;
+  --info-soft: #2a3138;
 
-  --editor-canvas: #201d1b;
+  --editor-canvas: #35312a;
 
-  --sidebar: #211e1c;
-  --sidebar-foreground: #f3efea;
-  --sidebar-primary: #d4a359;
-  --sidebar-primary-foreground: #1a1817;
-  --sidebar-accent: #2f2a26;
-  --sidebar-accent-foreground: #f3efea;
-  --sidebar-border: #34302c;
-  --sidebar-ring: #d4a359;
+  --sidebar: #3a352d;
+  --sidebar-foreground: #f9f4ed;
+  --sidebar-primary: #f6a06b;
+  --sidebar-primary-foreground: #2e2b25;
+  --sidebar-accent: #474238;
+  --sidebar-accent-foreground: #f9f4ed;
+  --sidebar-border: #4f4a3f;
+  --sidebar-ring: #f6a06b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -311,50 +404,54 @@ body {
   :root:not(.light) {
     color-scheme: dark;
 
-    --background: #1a1817;
-    --foreground: #f3efea;
-    --surface: #24211f;
-    --surface-muted: #2c2825;
-    --surface-raised: #2c2825;
-    --muted: #a9a199;
-    --muted-foreground: #a9a199;
-    --border: #34302c;
-    --border-strong: #443e38;
-    --input: #34302c;
-    --ring: #d4a359;
+    --background: #2e2b25;
+    --foreground: #f9f4ed;
+    --surface: #3a352d;
+    --surface-muted: #474238;
+    --surface-raised: #474238;
+    --muted: #c0b6a5;
+    --muted-foreground: #c0b6a5;
+    --border: #4f4a3f;
+    --border-strong: #645c50;
+    --input: #4f4a3f;
+    --ring: #f6a06b;
 
-    --primary: #d4a359;
-    --primary-foreground: #1a1817;
-    --secondary: #2c2825;
-    --secondary-foreground: #f3efea;
-    --destructive: #e0705a;
-    --destructive-foreground: #1a1817;
-    --destructive-soft: #3a2620;
+    --primary: #f6a06b;
+    --primary-foreground: #2e2b25;
+    --secondary: #474238;
+    --secondary-foreground: #f9f4ed;
+    --destructive: #e2624c;
+    --destructive-foreground: #2e2b25;
+    --destructive-soft: #4a2a22;
 
-    --brand: #d4a359;
-    --brand-foreground: #1a1817;
-    --brand-soft: #3a3128;
-    --accent: #d4a359;
-    --accent-foreground: #1a1817;
-    --accent-soft: #3a3128;
+    --brand: #f6a06b;
+    --brand-foreground: #2e2b25;
+    --brand-soft: #643312;
+    --accent: #aebf92;
+    --accent-foreground: #272e1b;
+    --accent-soft: #3d472b;
 
-    --success: #7cc39b;
-    --success-soft: #22302a;
+    /* On a dark ground the tint is the deep step, so the ink flips to the 300s. */
+    --brand-strong: #ffc6a5;
+    --accent-strong: #ccdbb2;
+
+    --success: #9fbf8f;
+    --success-soft: #2b3626;
     --warning: #e0b264;
-    --warning-soft: #33291a;
-    --info: #8ab4d8;
-    --info-soft: #1f2a33;
+    --warning-soft: #3a2f1a;
+    --info: #a3b6c4;
+    --info-soft: #2a3138;
 
-    --editor-canvas: #201d1b;
+    --editor-canvas: #35312a;
 
-    --sidebar: #211e1c;
-    --sidebar-foreground: #f3efea;
-    --sidebar-primary: #d4a359;
-    --sidebar-primary-foreground: #1a1817;
-    --sidebar-accent: #2f2a26;
-    --sidebar-accent-foreground: #f3efea;
-    --sidebar-border: #34302c;
-    --sidebar-ring: #d4a359;
+    --sidebar: #3a352d;
+    --sidebar-foreground: #f9f4ed;
+    --sidebar-primary: #f6a06b;
+    --sidebar-primary-foreground: #2e2b25;
+    --sidebar-accent: #474238;
+    --sidebar-accent-foreground: #f9f4ed;
+    --sidebar-border: #4f4a3f;
+    --sidebar-ring: #f6a06b;
   }
 
   /*

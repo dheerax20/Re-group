@@ -28,7 +28,7 @@ export default async function ProfilePage() {
         }
       />
 
-      <div className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-soft)]">
+      <div className="rounded-panel border border-border bg-surface p-6 shadow-[var(--shadow-soft)]">
         <div className="flex items-center gap-4">
           {user.picture ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -38,7 +38,7 @@ export default async function ProfilePage() {
               className="size-14 rounded-full object-cover"
             />
           ) : (
-            <span className="flex size-14 items-center justify-center rounded-full bg-brand-soft text-lg font-semibold text-brand">
+            <span className="flex size-14 items-center justify-center rounded-full bg-brand-soft text-lg font-semibold text-brand-strong">
               {initial}
             </span>
           )}

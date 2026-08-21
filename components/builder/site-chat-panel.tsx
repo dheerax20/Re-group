@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type Ref,
+} from "react";
 import { Bot, Send, Sparkles, User } from "lucide-react";
 import type { ChatMessageView } from "@/lib/chat/service";
 import { trpc } from "@/lib/trpc/client";
 import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
-import type { SectionInstance } from "@/lib/site/types";
+import type { PageBlocks } from "@/lib/site/blocks/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+/** What the outline panel calls to put a block id in the composer. */
+export type ComposerHandle = { insert: (token: string) => void };
 
 /** The single in-flight optimistic bubble. */
 const OPTIMISTIC_ID = "pending-user-message";
@@ -20,7 +31,9 @@ const PROMPT_EXAMPLES = [
 ];
 
 type AppliedResult = {
-  sections: SectionInstance[];
+  blocks: PageBlocks;
+  /** The page the edit landed on — not always the one on screen. */
+  path?: string;
   improvements: SiteImprovement[];
   designFeedback: DesignFeedback[];
   mobileFeedback: DesignFeedback[];
@@ -38,15 +51,30 @@ type AppliedResult = {
  */
 export function SiteChatPanel({
   siteId,
+  path = "/",
+  ref,
   onApplied,
 }: {
   siteId: string;
+  /** The page the editor is showing; sent with every message. */
+  path?: string;
+  /**
+   * How the outline panel drops a block id into this composer, so a church can
+   * name a block without having to memorise its id.
+   *
+   * Imperative rather than a `value` prop: the draft has to stay local to this
+   * component — lifting it to the workspace would re-render the whole preview
+   * on every keystroke — and a prop would mean writing state from an effect,
+   * the cascading-render pattern the thread list above already avoids.
+   */
+  ref?: Ref<ComposerHandle>;
   onApplied: (result: AppliedResult) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const utils = trpc.useUtils();
   const historyQuery = trpc.ai.chatHistory.useQuery({ siteId });
@@ -76,6 +104,19 @@ export function SiteChatPanel({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, pending]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      insert: (token: string) => {
+        setDraft((current) =>
+          current.trim() ? `${current.trimEnd()} ${token} ` : `${token} `
+        );
+        textareaRef.current?.focus();
+      },
+    }),
+    []
+  );
+
   function send(text?: string) {
     const value = (text ?? draft).trim();
     if (value.length < 2) return;
@@ -100,7 +141,7 @@ export function SiteChatPanel({
 
     startTransition(async () => {
       try {
-        const result = await sendMessage.mutateAsync({ siteId, content: value });
+        const result = await sendMessage.mutateAsync({ siteId, content: value, path });
 
         // Write both real rows straight into the cache rather than refetching:
         // the mutation already returned them, and a round trip here would make
@@ -112,9 +153,10 @@ export function SiteChatPanel({
         ]);
         setOptimistic([]);
         void utils.ai.chatBudget.invalidate({ siteId });
-        if (result.sections) {
+        if (result.blocks) {
           onApplied({
-            sections: result.sections,
+            blocks: result.blocks,
+            path: result.path,
             improvements: result.improvements ?? [],
             designFeedback: result.designFeedback ?? [],
             mobileFeedback: result.mobileFeedback ?? [],
@@ -185,7 +227,14 @@ export function SiteChatPanel({
               </span>
               <div
                 className={cn(
-                  "max-w-[80%] rounded-2xl px-3 py-2 text-[13px] leading-snug",
+                  /**
+                   * `break-words` alone does not break a single unbroken token,
+                   * and a pasted image URL — now the documented way to add a
+                   * photo — is exactly that. `overflow-wrap: anywhere` does.
+                   * `whitespace-pre-wrap` keeps the line breaks a church typed.
+                   */
+                  "max-w-[80%] min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+                  "rounded-panel px-3 py-2 text-[13px] leading-snug",
                   message.role === "user"
                     ? "bg-accent text-editor-shell"
                     : "border border-white/10 bg-white/5 text-white/85"
@@ -223,6 +272,7 @@ export function SiteChatPanel({
         ) : null}
         <div className="flex items-end gap-2">
           <Textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

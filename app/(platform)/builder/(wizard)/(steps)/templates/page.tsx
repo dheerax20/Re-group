@@ -99,7 +99,7 @@ export default async function TemplatesPage({
               ))}
           </div>
 
-          <div className="rounded-2xl border border-brand/30 bg-brand-soft/40 p-5 shadow-[var(--shadow-soft)]">
+          <div className="rounded-panel border border-brand/30 bg-brand-soft/40 p-5 shadow-[var(--shadow-soft)]">
             <div className="flex items-start gap-3">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
                 <Camera className="size-4" />
@@ -126,7 +126,7 @@ export default async function TemplatesPage({
           {(mobileFeedback.length > 0 || designFeedback.length > 0) && (
             <div className="grid gap-4 lg:grid-cols-2">
               {mobileFeedback.length > 0 ? (
-                <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+                <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
                   <div className="flex items-center gap-2">
                     <Smartphone className="size-4 text-brand" />
                     <h2 className="font-semibold">Mobile improvements</h2>
@@ -145,7 +145,7 @@ export default async function TemplatesPage({
                 </div>
               ) : null}
               {designFeedback.length > 0 ? (
-                <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+                <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
                   <div className="flex items-center gap-2">
                     <Sparkles className="size-4 text-accent" />
                     <h2 className="font-semibold">Design feedback</h2>
@@ -170,9 +170,9 @@ export default async function TemplatesPage({
           )}
 
           {improvements.length > 0 ? (
-            <div className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+            <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
               <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-strong">
                   <ImagePlus className="size-4" />
                 </span>
                 <div>
@@ -216,7 +216,7 @@ export default async function TemplatesPage({
           ) : null}
 
           {agentLog.length > 0 ? (
-            <details className="rounded-2xl border border-border bg-background px-4 py-3">
+            <details className="rounded-panel border border-border bg-background px-4 py-3">
               <summary className="cursor-pointer text-sm font-medium">Agent run log</summary>
               <ul className="mt-3 space-y-2 border-t border-border pt-3">
                 {agentLog.map((entry) => (

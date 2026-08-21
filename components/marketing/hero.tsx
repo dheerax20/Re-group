@@ -113,7 +113,7 @@ function FloatingChip({
 export function BuilderPreviewMock({ compact = false }: { compact?: boolean }) {
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-lift)] ${
+      className={`overflow-hidden rounded-panel border border-border bg-surface shadow-[var(--shadow-lift)] ${
         compact ? "" : "rotate-[-1deg]"
       }`}
     >
@@ -124,7 +124,7 @@ export function BuilderPreviewMock({ compact = false }: { compact?: boolean }) {
           <div className="h-2.5 w-2.5 rounded-full bg-accent-soft" />
           <span className="ml-2 text-xs font-medium text-muted">Website Builder</span>
         </div>
-        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
+        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent-strong">
           Live preview
         </span>
       </div>
@@ -154,7 +154,7 @@ export function BuilderPreviewMock({ compact = false }: { compact?: boolean }) {
             </div>
             <div className="grid gap-3 p-3 sm:grid-cols-2">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-foreground">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-strong">
                   Sundays 10 AM
                 </p>
                 <p className="mt-1 font-serif text-sm font-semibold leading-snug">
@@ -164,7 +164,7 @@ export function BuilderPreviewMock({ compact = false }: { compact?: boolean }) {
                   Plan a Visit
                 </div>
               </div>
-              <div className="min-h-[88px] rounded-xl bg-gradient-to-br from-brand via-[#334155] to-accent" />
+              <div className="min-h-[88px] rounded-xl bg-gradient-to-br from-brand via-brand/70 to-accent" />
             </div>
             <div className="grid grid-cols-3 gap-2 border-t border-border bg-surface-muted p-3">
               {["Sunday Worship", "Youth Night", "Bible Study"].map((title) => (

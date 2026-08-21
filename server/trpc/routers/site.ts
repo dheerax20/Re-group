@@ -22,6 +22,7 @@ import {
   updateSections,
 } from "@/lib/site/service";
 import { getSiteContent } from "@/lib/site/get-site-content";
+import { updatePageBlocks, UneditablePageError } from "@/lib/site/blocks/manual-edit";
 
 const siteInput = z.object({ siteId: z.string().min(1) });
 
@@ -89,6 +90,59 @@ export const siteRouter = router({
   updateSections: paidSiteProcedure
     .input(siteInput.extend({ data: sectionConfigSchema }))
     .mutation(async ({ input }) => updateSections(input.siteId, input.data)),
+
+  /**
+   * Direct block edits from the editor's outline panel — reordering bands and
+   * setting a block's font size.
+   *
+   * Deliberately NOT part of the AI router: these cost no chat budget and make
+   * no provider call. They still land on the same validated write path, and
+   * `updatePageBlocks` rejects a path the church may not edit rather than
+   * trusting the client's `path`.
+   */
+  updateBlocks: paidSiteProcedure
+    .input(
+      siteInput.extend({
+        path: z.string().min(1).max(120),
+        order: z.array(z.string().min(1).max(60)).max(60).optional(),
+        /**
+         * Only font size. Accepting the full `blockPatchSchema` here would put
+         * `remove`, `href` and `src` on a route with no UI behind it, and an
+         * image set this way would skip the `Media` bookkeeping the AI path
+         * does.
+         */
+        scales: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(60),
+              scale: z.enum(["display", "h1", "h2", "h3", "body", "small"]),
+            })
+          )
+          .max(24)
+          .optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await updatePageBlocks(input.siteId, {
+          path: input.path,
+          order: input.order,
+          scales: input.scales,
+        });
+      } catch (error) {
+        /**
+         * Only the one error this route defines is a client error. Wrapping
+         * everything meant a dropped database connection arrived as a
+         * BAD_REQUEST that nothing retries, and put raw Prisma text — host,
+         * query fragments — straight into the editor's error line. Anything
+         * else goes to `errorTranslation` in ../trpc.ts untouched.
+         */
+        if (error instanceof UneditablePageError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message, cause: error });
+        }
+        throw error;
+      }
+    }),
 
   /** Keeps the `allowedHrefs(features)` rejection — nav cannot point at a disabled page. */
   updateNavigation: paidSiteProcedure

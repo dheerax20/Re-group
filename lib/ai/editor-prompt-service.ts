@@ -1,40 +1,48 @@
-import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-import { coerceSections } from "@/lib/validation/section";
+import { prisma } from "@/lib/db";
 import { invalidateSite } from "@/lib/site/invalidate";
 import { parseChurchStory } from "@/lib/site/story";
-import type { SectionInstance } from "@/lib/site/types";
-import { applyEditorAiPrompt } from "./editor-prompt";
+import { HOME_PATH } from "@/lib/site/blocks/resolve-page";
+import { runPageEdit, writePageBlocks } from "./page-edit";
 
 /**
  * The one-shot editor prompt, persisted.
  *
- * `applyEditorAiPrompt` only produces a result; this is the write side, and it
- * is deliberately the same shape as the chatbot's edit node — load, call,
- * repair with `coerceSections`, persist, invalidate. Model output is never
- * written unrepaired, on either path.
+ * The page-resolution, retargeting and write rules all live in
+ * `./page-edit.ts`, shared with the chatbot, so there is still one validated
+ * way for a prompt to change a site.
+ *
+ * Note the write goes to `blockConfig` (home) or a `SitePage` row (everything
+ * else) — never `sectionConfig`. That column is still read for the giving /
+ * YouTube / podcast URLs and by legacy sites, but it stopped being the edit
+ * target when this path was found to be writing to a column nothing rendered.
  */
 function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
-export async function runEditorPrompt(siteId: string, prompt: string) {
-  const site = await prisma.site.findUnique({ where: { id: siteId } });
+export async function runEditorPrompt(
+  siteId: string,
+  prompt: string,
+  path: string = HOME_PATH,
+  /** Re-run before a retarget's second provider call. */
+  assertBudget?: () => Promise<void>
+) {
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: { id: true, slug: true, storyConfig: true },
+  });
   if (!site) throw new Error("Site not found");
 
-  const result = await applyEditorAiPrompt({
-    churchName: site.name,
-    prompt,
-    sections: coerceSections(site.sectionConfig) as SectionInstance[],
-    features: (site.featureConfig as Record<string, unknown>) ?? {},
-  });
+  const result = await runPageEdit({ siteId, path, prompt, assertBudget });
 
-  const sections = coerceSections(result.sections) as SectionInstance[];
+  if (result.changed) {
+    await writePageBlocks(siteId, result.path, result.blocks);
+  }
 
   await prisma.site.update({
     where: { id: siteId },
     data: {
-      sectionConfig: toJson(sections),
       // Persisted rather than only returned: the editor's "Needs" checklist
       // reads these back off the site record, so they have to survive a reload.
       storyConfig: toJson({
@@ -50,7 +58,9 @@ export async function runEditorPrompt(siteId: string, prompt: string) {
 
   return {
     summary: result.summary,
-    sections,
+    path: result.path,
+    blocks: result.blocks,
+    applied: result.changed,
     improvements: result.improvements,
     designFeedback: result.designFeedback,
     mobileFeedback: result.mobileFeedback,

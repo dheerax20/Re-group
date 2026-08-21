@@ -278,7 +278,7 @@ export function AddonManager({ addons }: { addons: ManagedAddon[] }) {
   const removingOnly = changes.length > 0 && changes.every((c) => !c.enabled);
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-soft)]">
+    <section className="rounded-panel border border-border bg-surface p-6 shadow-[var(--shadow-soft)]">
       <h2 className="font-medium text-foreground">Add-ons</h2>
       <p className="mt-1 text-sm text-muted">Turn these on or off at any time.</p>
 

@@ -1,14 +1,17 @@
 import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
+import { getPageBlocks } from "@/lib/site/blocks/resolve-page";
 import { BlockTree } from "@/components/website/blocks/block-renderer";
-import type { BlockNode } from "@/lib/site/blocks/types";
 
 export const revalidate = 300;
 
 /**
- * A secondary page: a small deterministic block composition (not its own AI
- * agent — see the plan's cost/scope tradeoff) built from real site fields,
- * still rendered through the same generic `BlockTree` as the homepage.
+ * Renders whatever this page's stored block tree says.
+ *
+ * The composition used to be written inline here and rebuilt on every render,
+ * which is why nothing could edit it: there was no stored content to change.
+ * The default now lives in `lib/site/blocks/default-pages.ts`, and
+ * `getPageBlocks` prefers the church's own `SitePage` row once one exists.
  */
 export default async function AboutPage({
   params,
@@ -21,36 +24,7 @@ export default async function AboutPage({
 
   const { site, content } = data;
 
-  const blocks: BlockNode[] = [
-    {
-      id: "about-page",
-      type: "section",
-      style: { padding: "lg", align: "center" },
-      children: [
-        { id: "about-eyebrow", type: "eyebrow", text: "About Us" },
-        { id: "about-heading", type: "heading", text: `Who We Are`, scale: "h1" },
-        {
-          id: "about-text",
-          type: "text",
-          text:
-            site.brand.tagline ||
-            `${site.site.name} exists to help people know God and grow in community. We gather to worship, learn, and serve together.`,
-        },
-      ],
-    },
-  ];
-
-  if (site.features.ministries) {
-    blocks.push({
-      id: "about-ministries",
-      type: "section",
-      style: { padding: "lg" },
-      children: [
-        { id: "ministries-heading", type: "heading", text: "Ministries", scale: "h2" },
-        { id: "ministries-collection", type: "ministryCollection" },
-      ],
-    });
-  }
-
-  return <BlockTree nodes={blocks} site={site} content={content} />;
+  return (
+    <BlockTree nodes={getPageBlocks(site, "/about")} site={site} content={content} />
+  );
 }

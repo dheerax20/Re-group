@@ -31,8 +31,8 @@ export default function GlobalError({
           alignItems: "center",
           justifyContent: "center",
           padding: "2rem",
-          background: "#faf8f5",
-          color: "#2d2926",
+          background: "#f5ead8",
+          color: "#201e1d",
           fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
           textAlign: "center",
         }}
@@ -41,7 +41,7 @@ export default function GlobalError({
           <h1 style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
             Regroup is temporarily unavailable
           </h1>
-          <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "#6b655f" }}>
+          <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", color: "#82796a" }}>
             We&rsquo;re having trouble loading the app. Please try again in a
             moment.
           </p>
@@ -50,7 +50,7 @@ export default function GlobalError({
               style={{
                 marginTop: "1rem",
                 fontSize: "0.6875rem",
-                color: "#6b655f",
+                color: "#82796a",
                 fontFamily: "ui-monospace, monospace",
               }}
             >
@@ -65,8 +65,8 @@ export default function GlobalError({
               padding: "0.625rem 1.25rem",
               borderRadius: "0.75rem",
               border: "none",
-              background: "#1e293b",
-              color: "#faf8f5",
+              background: "#c67139",
+              color: "#f5ead8",
               fontSize: "0.875rem",
               fontWeight: 500,
               cursor: "pointer",

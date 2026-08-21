@@ -154,7 +154,13 @@ export const aiRouter = router({
    * latency to something the church is watching happen.
    */
   editorPrompt: paidSiteProcedure
-    .input(siteInput.extend({ prompt: z.string().trim().min(4).max(600) }))
+    .input(
+      siteInput.extend({
+        prompt: z.string().trim().min(4).max(600),
+        /** Which page to edit. Validated against the site's editable pages. */
+        path: z.string().trim().max(60).default("/"),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       // Claim the slot first, for the same reason the build does: the ledger
       // row is written whether or not the call succeeds (the provider was
@@ -177,7 +183,14 @@ export const aiRouter = router({
       }
 
       try {
-        const result = await runEditorPrompt(input.siteId, input.prompt);
+        const result = await runEditorPrompt(
+          input.siteId,
+          input.prompt,
+          input.path,
+          // Charged again if the model retargets to another page, since that
+          // is a second provider call.
+          () => assertAiBudget(input.siteId, ctx.user.id, "editor_prompt").then(() => undefined)
+        );
         // Inline jobs must be closed out explicitly — an active row would
         // block the next edit from claiming the slot.
         await markJobSucceeded(job.id, result.summary);
@@ -207,8 +220,13 @@ export const aiRouter = router({
    * generation call, and the church is waiting on the reply.
    */
   chatSend: paidSiteProcedure
-    .input(siteInput.extend({ content: z.string().trim().min(2).max(1000) }))
+    .input(
+      siteInput.extend({
+        content: z.string().trim().min(2).max(1000),
+        path: z.string().trim().max(60).default("/"),
+      })
+    )
     .mutation(async ({ ctx, input }) =>
-      sendChatMessage(input.siteId, ctx.user.id, input.content)
+      sendChatMessage(input.siteId, ctx.user.id, input.content, input.path)
     ),
 });

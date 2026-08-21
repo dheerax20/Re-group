@@ -34,10 +34,10 @@ function EdgeLight({ className }: { className?: string }) {
     >
       <defs>
         <linearGradient id={`${id}-edge`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--color-brand, #6366f1)" stopOpacity="0" />
-          <stop offset="35%" stopColor="var(--color-accent, #d4af37)" stopOpacity="0.9" />
-          <stop offset="70%" stopColor="var(--color-brand, #6366f1)" stopOpacity="0.7" />
-          <stop offset="100%" stopColor="var(--color-brand, #6366f1)" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--brand)" stopOpacity="0" />
+          <stop offset="35%" stopColor="var(--accent)" stopOpacity="0.9" />
+          <stop offset="70%" stopColor="var(--brand)" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
         </linearGradient>
       </defs>
       <rect width="100" height="1" fill={`url(#${id}-edge)`} />
@@ -65,8 +65,8 @@ function GroupGlyph({ index }: { index?: number }) {
     >
       <defs>
         <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--color-brand, #6366f1)" />
-          <stop offset="100%" stopColor="var(--color-accent, #d4af37)" />
+          <stop offset="0%" stopColor="var(--brand)" />
+          <stop offset="100%" stopColor="var(--accent)" />
         </linearGradient>
       </defs>
       <rect
@@ -123,7 +123,7 @@ export function FieldGroup({
   return (
     <section
       className={cn(
-        "group/field relative overflow-hidden rounded-2xl border border-border bg-surface-muted/50 p-5",
+        "group/field relative overflow-hidden rounded-panel border border-border bg-surface-muted/50 p-5",
         "transition-colors duration-300 focus-within:border-brand/40 hover:border-border-strong",
         className
       )}

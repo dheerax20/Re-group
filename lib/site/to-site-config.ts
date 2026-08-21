@@ -4,7 +4,8 @@ import { isValidFontKey } from "@/lib/theme/fonts";
 import { FeatureConfig, defaultFeatures } from "@/lib/features/types";
 import { defaultBrandConfig } from "@/lib/validation/brand";
 import { coerceSections } from "@/lib/validation/section";
-import { toPageBlocks } from "@/lib/site/blocks/schema";
+import { coerceBlocks, toPageBlocks } from "@/lib/site/blocks/schema";
+import type { BlockNode } from "@/lib/site/blocks/types";
 import { safeMediaUrl } from "@/lib/validation/url";
 import {
   ContactInfo,
@@ -25,7 +26,10 @@ import {
   parseStyleName,
 } from "./story";
 
-type SiteWithRelations = Site & { socialLinks?: SocialLink[] };
+type SiteWithRelations = Site & {
+  socialLinks?: SocialLink[];
+  pages?: Array<{ path: string; blockConfig: unknown }>;
+};
 
 const HEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
@@ -175,6 +179,17 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
   // the same generic renderer. Note `sections` above is always read from
   // `sectionConfig` regardless — that's what keeps the giving/YouTube/podcast
   // URLs above working on a composed site, since those live in section config.
+  /**
+   * Secondary pages, coerced with the same repair the homepage gets. A page
+   * whose stored tree is unusable degrades to an empty list, which
+   * `getPageBlocks` then falls back to the default composition for — the same
+   * posture as everything else on this read path.
+   */
+  const pages: Record<string, BlockNode[]> = {};
+  for (const page of site.pages ?? []) {
+    pages[page.path] = coerceBlocks(page.blockConfig);
+  }
+
   const blocks = toPageBlocks(site.blockConfig ?? site.sectionConfig, {
     youtubeChannelUrl: youtube.channelUrl,
     podcastRssUrl: podcast.rssUrl,
@@ -196,6 +211,7 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
     navigation,
     sections,
     blocks,
+    pages,
     seo,
     socialLinks,
     youtube,

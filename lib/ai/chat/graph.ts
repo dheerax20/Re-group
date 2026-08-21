@@ -1,9 +1,11 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
-import type { SectionInstance } from "@/lib/site/types";
 import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
-import { applyEditorAiPrompt, type ChatTurn } from "@/lib/ai/editor-prompt";
+import type { ChatTurn } from "@/lib/ai/block-prompt";
+import { runPageEdit } from "@/lib/ai/page-edit";
+import { describeBlocks } from "@/lib/site/blocks/patch";
+import type { PageBlocks } from "@/lib/site/blocks/types";
 import { buildRoleLlm, resolveGateway } from "@/lib/ai/agents/model-config";
 import { chatAnswerSchema, classifyResultSchema } from "./schemas";
 
@@ -17,22 +19,27 @@ import { chatAnswerSchema, classifyResultSchema } from "./schemas";
  * the message actually says, which is exactly the kind of branch a graph's
  * conditional edges are for rather than an if/else bolted onto a chain.
  *
- * The `applyChange` node calls `applyEditorAiPrompt` — the SAME function the
+ * The `applyChange` node calls `applyBlockAiPrompt` — the SAME function the
  * editor's one-shot "AI prompt" box uses, which runs every output through
- * `coerceSections` at the write site. The chatbot is not a second, less
- * validated way to touch a site's content; it is a second way to reach the
- * same one.
+ * `applyBlockEdits` (and so `repairBlocks`) at the write site. The chatbot is
+ * not a second, less validated way to touch a site's content; it is a second
+ * way to reach the same one.
  */
 
 const ChatState = Annotation.Root({
+  siteId: Annotation<string>,
   churchName: Annotation<string>,
   features: Annotation<Record<string, unknown>>,
-  sections: Annotation<SectionInstance[]>,
+  /** The page the editor is showing. `applyChange` may retarget from here. */
+  path: Annotation<string>,
+  blocks: Annotation<PageBlocks>,
   history: Annotation<ChatTurn[]>,
   message: Annotation<string>,
   intent: Annotation<"edit" | "question">,
   reply: Annotation<string>,
-  updatedSections: Annotation<SectionInstance[] | undefined>,
+  updatedBlocks: Annotation<PageBlocks | undefined>,
+  /** The page actually edited — not always the one being viewed. */
+  updatedPath: Annotation<string | undefined>,
   appliedSummary: Annotation<string | undefined>,
   improvements: Annotation<SiteImprovement[] | undefined>,
   designFeedback: Annotation<DesignFeedback[] | undefined>,
@@ -41,16 +48,17 @@ const ChatState = Annotation.Root({
 
 type ChatStateType = typeof ChatState.State;
 
-/** A short, human-readable snapshot of what the site currently says — cheap enough to hand to every node. */
-export function summarizeSections(sections: SectionInstance[]): string {
-  return sections
-    .map((section) => {
-      const title = typeof section.config.title === "string" ? section.config.title : "";
-      const description =
-        typeof section.config.description === "string" ? section.config.description : "";
-      return `- ${section.type} (${section.variant}): ${title}${description ? " — " + description : ""}`;
-    })
-    .join("\n");
+/**
+  * A short, human-readable snapshot of what the site currently says.
+  *
+  * Built from the BLOCK tree, not from `sectionConfig`. `commitBuild` only
+  * writes `sectionConfig` when the crew produced no blocks, so on an AI-built
+  * site that column still holds pre-AI wizard leftovers — the assistant was
+  * describing and answering questions about a page that had not been live for
+  * some time.
+  */
+export function summarizeBlocks(blocks: PageBlocks): string {
+  return describeBlocks(blocks);
 }
 
 export function historyBlock(history: ChatTurn[]): string {
@@ -87,18 +95,26 @@ async function classify(state: ChatStateType): Promise<Partial<ChatStateType>> {
 }
 
 async function applyChange(state: ChatStateType): Promise<Partial<ChatStateType>> {
-  const result = await applyEditorAiPrompt({
-    churchName: state.churchName,
+  // `runPageEdit` is the same function the editor's prompt box calls, so the
+  // chatbot stays a second DOOR to one write path rather than a second write
+  // path — and it inherits page resolution and retargeting for free.
+  const result = await runPageEdit({
+    siteId: state.siteId,
+    path: state.path,
     prompt: state.message,
-    sections: state.sections,
-    features: state.features,
     history: state.history,
   });
 
+  const summary = result.summary;
+
   return {
-    updatedSections: result.sections,
-    appliedSummary: result.summary,
-    reply: result.summary,
+    // Nothing usable means nothing changed; leaving this undefined is what
+    // keeps the caller from writing an identical tree and showing an
+    // "Applied" badge for an edit that did not happen.
+    updatedBlocks: result.changed ? result.blocks : undefined,
+    updatedPath: result.changed ? result.path : undefined,
+    appliedSummary: result.changed ? summary : undefined,
+    reply: summary,
     improvements: result.improvements,
     designFeedback: result.designFeedback,
     mobileFeedback: result.mobileFeedback,
@@ -131,7 +147,7 @@ async function answerQuestion(state: ChatStateType): Promise<Partial<ChatStateTy
 
   const result = await chain.invoke({
     churchName: state.churchName,
-    siteSnapshot: summarizeSections(state.sections),
+    siteSnapshot: summarizeBlocks(state.blocks),
     history: historyBlock(state.history),
     message: state.message,
   });
@@ -156,7 +172,8 @@ const compiledGraph = new StateGraph(ChatState)
 export type ChatTurnResult = {
   reply: string;
   intent: "edit" | "question";
-  updatedSections?: SectionInstance[];
+  updatedBlocks?: PageBlocks;
+  updatedPath?: string;
   appliedSummary?: string;
   improvements?: SiteImprovement[];
   designFeedback?: DesignFeedback[];
@@ -165,10 +182,14 @@ export type ChatTurnResult = {
 
 export async function runChatTurn(input: {
   churchName: string;
+  siteId: string;
   features: Record<string, unknown>;
-  sections: SectionInstance[];
+  path: string;
+  blocks: PageBlocks;
   history: ChatTurn[];
   message: string;
+  /** Re-run before a retarget's second provider call. */
+  assertBudget?: () => Promise<void>;
 }): Promise<ChatTurnResult> {
   if (!resolveGateway()) {
     throw new Error("No AI provider is configured (set OPENAI_API_KEY).");
@@ -178,7 +199,8 @@ export async function runChatTurn(input: {
   return {
     reply: result.reply,
     intent: result.intent,
-    updatedSections: result.updatedSections,
+    updatedBlocks: result.updatedBlocks,
+    updatedPath: result.updatedPath,
     appliedSummary: result.appliedSummary,
     improvements: result.improvements,
     designFeedback: result.designFeedback,

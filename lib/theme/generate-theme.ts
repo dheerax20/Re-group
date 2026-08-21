@@ -1,5 +1,6 @@
 import { BrandConfig } from "./types";
 import { fontKeyToCssVar } from "./fonts";
+import { readableOn } from "./contrast";
 import type { CSSProperties } from "react";
 
 /**
@@ -16,6 +17,20 @@ export function generateThemeStyle(brand: BrandConfig): CSSProperties {
     ["--color-foreground" as string]: brand.colors.foreground,
     ["--color-accent" as string]: brand.colors.accent,
     ["--color-muted" as string]: `${brand.colors.foreground}99`,
+    /**
+     * Text colour for a band filled with the brand's primary/accent. Computed
+     * per church rather than hardcoded to white: a church may pick a pale
+     * primary, and `text-white` on it is invisible. Candidates come from the
+     * church's own palette so a band still reads as theirs.
+     */
+    ["--color-primary-foreground" as string]: readableOn(brand.colors.primary, {
+      light: brand.colors.background,
+      dark: brand.colors.foreground,
+    }),
+    ["--color-accent-foreground" as string]: readableOn(brand.colors.accent, {
+      light: brand.colors.background,
+      dark: brand.colors.foreground,
+    }),
     ["--font-primary" as string]: fontKeyToCssVar(brand.typography.primaryFont),
     ["--font-secondary" as string]: fontKeyToCssVar(
       brand.typography.secondaryFont

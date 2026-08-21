@@ -289,6 +289,17 @@ export async function commitBuild(
   const blocks = built.blocks ? coerceBlocks(built.blocks) : [];
   const legacySections = built.blocks ? null : coerceSections(built.sections);
 
+  /**
+   * Secondary pages are deliberately NOT seeded here.
+   *
+   * Writing a row at build time froze the page: `/about`'s default composition
+   * reads `brand.tagline` and `features.ministries`, so a church that changed
+   * their tagline afterwards would see the homepage regenerate while `/about`
+   * kept the old wording forever, with no UI to fix it. Leaving the row absent
+   * means `getPageBlocks` recomputes the default on every render — and the
+   * first actual edit creates the row, which is the only moment a stored
+   * version is genuinely wanted.
+   */
   await prisma.$transaction([
     prisma.site.update({
       where: { id: siteId },

@@ -1,10 +1,18 @@
 import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
+import { getPageBlocks } from "@/lib/site/blocks/resolve-page";
 import { BlockTree } from "@/components/website/blocks/block-renderer";
-import type { BlockNode } from "@/lib/site/blocks/types";
 
 export const revalidate = 300;
 
+/**
+ * Renders whatever this page's stored block tree says.
+ *
+ * The composition used to be written inline here and rebuilt on every render,
+ * which is why nothing could edit it: there was no stored content to change.
+ * The default now lives in `lib/site/blocks/default-pages.ts`, and
+ * `getPageBlocks` prefers the church's own `SitePage` row once one exists.
+ */
 export default async function GivingPage({
   params,
 }: {
@@ -16,23 +24,7 @@ export default async function GivingPage({
 
   const { site, content } = data;
 
-  const blocks: BlockNode[] = [
-    {
-      id: "giving-page",
-      type: "section",
-      style: { padding: "lg", background: "primary", align: "center" },
-      children: [
-        { id: "giving-eyebrow", type: "eyebrow", text: "Generosity" },
-        { id: "giving-heading", type: "heading", text: "Give Online", scale: "h1" },
-        {
-          id: "giving-text",
-          type: "text",
-          text: "Your generosity helps us serve our community and share hope with more people.",
-        },
-        { id: "giving-cta", type: "givingCta" },
-      ],
-    },
-  ];
-
-  return <BlockTree nodes={blocks} site={site} content={content} />;
+  return (
+    <BlockTree nodes={getPageBlocks(site, "/giving")} site={site} content={content} />
+  );
 }

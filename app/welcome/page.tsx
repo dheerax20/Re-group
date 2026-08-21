@@ -37,7 +37,7 @@ export default async function OnboardingPage({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 shadow-[var(--shadow-soft)]">
+      <div className="w-full max-w-md rounded-panel border border-border bg-surface p-8 shadow-[var(--shadow-soft)]">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           You&rsquo;re all set
         </h1>

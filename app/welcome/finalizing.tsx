@@ -94,7 +94,7 @@ export function FinalizingSubscription({ sessionId }: { sessionId: string }) {
 
   if (timedOut) {
     return (
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 text-center shadow-[var(--shadow-soft)]">
+      <div className="w-full max-w-md rounded-panel border border-border bg-surface p-8 text-center shadow-[var(--shadow-soft)]">
         <h1 className="text-lg font-semibold text-foreground">
           This is taking longer than expected
         </h1>
@@ -127,7 +127,7 @@ export function FinalizingSubscription({ sessionId }: { sessionId: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="w-full max-w-md rounded-2xl border border-border bg-surface p-8 text-center shadow-[var(--shadow-soft)]"
+      className="w-full max-w-md rounded-panel border border-border bg-surface p-8 text-center shadow-[var(--shadow-soft)]"
     >
       <div
         aria-hidden

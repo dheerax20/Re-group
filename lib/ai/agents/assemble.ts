@@ -4,6 +4,7 @@ import { mergeNavigation } from "@/lib/site/pages";
 import { sectionTypes, type SectionInstance, type SectionType } from "@/lib/site/types";
 import type { BlockNode } from "@/lib/site/blocks/types";
 import { coerceBlocks, defaultNavBlock, defaultFooterBlock } from "@/lib/site/blocks/schema";
+import { applyDesignPass } from "@/lib/site/blocks/design-pass";
 import { composeSectionCopy } from "@/lib/ai/section-copy";
 import type { SiteGenerationInput, GeneratedSiteConfig } from "@/lib/ai/types";
 import {
@@ -264,6 +265,19 @@ export function assembleGeneratedBlocks(args: {
   const { input, composed } = args;
 
   let blocks = coerceBlocks(composed.blocks);
+
+  // Rhythm — and the bands the nav promises — are decided here, not by the
+  // model. The composer is asked to vary padding and background band to band
+  // and to emit one band per enabled feature; a small model asked that leaves
+  // half the bands unstyled and routinely ships a page with no sermons or
+  // events section while still linking to both. See
+  // `lib/site/blocks/design-pass.ts` — full builds only, never after an edit.
+  blocks = applyDesignPass(blocks, {
+    features: input.features as unknown as Record<string, unknown>,
+    churchName: input.churchName,
+    story: input.story,
+    tagline: input.tagline,
+  });
 
   // Nav + footer alone is not a homepage. `pageComposerResponseSchema` repairs
   // whatever it can out of the model's reply rather than throwing, so an

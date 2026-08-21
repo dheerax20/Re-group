@@ -1,18 +1,25 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Cormorant_Garamond, Geist_Mono } from "next/font/google";
+import { Figtree, EB_Garamond, Geist_Mono } from "next/font/google";
 import { fontVariables } from "@/lib/theme/fonts";
 import "./globals.css";
 
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+/*
+  Regroup's own chrome typefaces — Figtree for body, EB Garamond for headings,
+  eyebrows and nav labels. Both are variable fonts, so no `weight` is pinned:
+  the chrome uses 400 through 700 and a fixed subset would silently synthesize
+  the rest. This is separate from `fontVariables`, the registry of fonts a
+  *church* may pick for its own site (lib/theme/fonts.ts).
+*/
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
   display: "swap",
 });
 
-const cormorant = Cormorant_Garamond({
-  variable: "--font-cormorant",
+const ebGaramond = EB_Garamond({
+  variable: "--font-eb-garamond",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -31,9 +38,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${jakarta.variable} ${cormorant.variable} ${geistMono.variable} ${fontVariables} h-full antialiased`}
+      className={`${figtree.variable} ${ebGaramond.variable} ${geistMono.variable} ${fontVariables} h-full antialiased`}
     >
-      <body className={`${jakarta.className} min-h-full flex flex-col`}>
+      <body className={`${figtree.className} min-h-full flex flex-col`}>
         {children}
       </body>
     </html>
