@@ -46,7 +46,7 @@ export function GenerationPreview({ site }: { site: SiteConfig }) {
       <div className="flex max-h-[68vh] justify-center overflow-auto bg-editor-shell p-4">
         <div
           className={cn(
-            "overflow-hidden bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-[width,border-radius] duration-300",
+            "overflow-auto bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-[width,border-radius] duration-300",
             viewport === "mobile"
               ? "rounded-[1.5rem] border-[8px] border-editor-border"
               : viewport === "tablet"

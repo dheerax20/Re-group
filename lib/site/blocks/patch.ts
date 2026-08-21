@@ -91,7 +91,7 @@ const EDITABLE: Record<string, ReadonlySet<string>> = {
   row: new Set(["style", "columns"]),
   spacer: new Set(["style"]),
   heading: new Set(["style", "text", "scale"]),
-  text: new Set(["style", "text"]),
+  text: new Set(["style", "text", "scale"]),
   eyebrow: new Set(["style", "text", "accent"]),
   image: new Set(["style", "treatment", "aspect", "src", "videoSrc", "alt"]),
   button: new Set(["style", "label", "href", "emphasis"]),
@@ -380,6 +380,50 @@ function styleInsertedBand(blocks: PageBlocks, insertedId: string): PageBlocks {
   });
 }
 
+/**
+ * Reorders the top-level bands to match `order`.
+ *
+ * Only the bands NAMED in `order` change position, and only among the slots
+ * they already occupy — anything the caller left out keeps its exact index.
+ * That makes the operation total: a stale client list, an id that has since
+ * been deleted, or a partial selection all degrade to a smaller reshuffle
+ * rather than dropping a band off the page.
+ *
+ * Ends in `pinNavAndFooter`, so no client can drag content above the navigation
+ * or below the footer even by sending a hand-written order.
+ */
+export function reorderTopLevel(blocks: PageBlocks, order: readonly string[]): PageBlocks {
+  const present = new Set(blocks.map((block) => block.id));
+  const seen = new Set<string>();
+  const wanted: string[] = [];
+  for (const id of order) {
+    if (!present.has(id) || seen.has(id) || PROTECTED_IDS.has(id)) continue;
+    seen.add(id);
+    wanted.push(id);
+  }
+  if (wanted.length === 0) return blocks;
+
+  const byId = new Map(blocks.map((block) => [block.id, block]));
+  const queue = [...wanted];
+  const next = blocks.map((block) => {
+    if (!seen.has(block.id)) return block;
+    /**
+     * `queue` holds one entry per DISTINCT id while the map visits every slot,
+     * so a tree that somehow carried the same top-level id twice would drain
+     * the queue early and splice `undefined` into the page — a crash in
+     * `pinNavAndFooter` rather than the degraded reshuffle this function
+     * promises. Nothing reachable produces duplicate top-level ids today
+     * (`ensureBlockIds` and `deconflict` both mint unique ones); the guard is
+     * here because "total" has to mean total.
+     */
+    const id = queue.shift();
+    const replacement = id === undefined ? undefined : byId.get(id);
+    return replacement ?? block;
+  });
+
+  return pinNavAndFooter(next);
+}
+
 export type BlockEdits = {
   patches?: BlockPatch[];
   additions?: BlockAddition[];
@@ -455,6 +499,7 @@ function summarise(node: BlockNode): string {
   const parts: string[] = [node.id, node.type];
 
   if ("text" in node && node.text) parts.push(JSON.stringify(node.text.slice(0, 90)));
+  if ("scale" in node && node.scale) parts.push(`scale=${node.scale}`);
   if ("label" in node && node.label) parts.push(`label=${JSON.stringify(node.label)}`);
   if ("href" in node && node.href) parts.push(`href=${node.href}`);
   if ("layout" in node && node.layout) parts.push(`layout=${node.layout}`);

@@ -19,6 +19,7 @@ import {
   backgroundClass,
   textToneClass,
   headingScaleClass,
+  textScaleClass,
   rowColumnsClass,
   imageTreatmentClass,
   imageAspectClass,
@@ -58,14 +59,46 @@ function youtubeEmbedSrc(url: string): string | null {
   return null;
 }
 
-type Ctx = { site: SiteConfig; content: SiteContent };
+type Ctx = { site: SiteConfig; content: SiteContent; annotate?: boolean };
 
-export function BlockTree({ nodes, site, content }: { nodes: BlockNode[] } & Ctx) {
+/**
+ * `annotate` is the editor's preview mode, and only the editor's.
+ *
+ * The block outline panel needs to find the DOM node a block id rendered to so
+ * it can frame it on hover. Rather than tag every case in the switch below —
+ * several of which delegate to a component that owns its own root element —
+ * each node is wrapped in a `display: contents` div carrying the id.
+ * `contents` generates no box at all, so the wrapper's children stay direct
+ * flex/grid items of the band and the wrapper itself changes no layout. Measure
+ * `wrapper.firstElementChild`: a `contents` element has no box of its own, so
+ * its own rect is empty.
+ *
+ * One caveat this does NOT fix, and never did: the preview frame is narrower
+ * than the browser window, while Tailwind's `sm:`/`lg:` steps key off the
+ * VIEWPORT. A band in the preview can therefore be laid out at a breakpoint the
+ * same width of real page would not use. The device toggle is the honest way to
+ * check a narrow layout.
+ *
+ * The one thing that must never appear between a container and its block
+ * children is a rule targeting direct children — `space-y-*`, `divide-*`,
+ * `:first-child`. A `contents` wrapper has no box to take that margin or
+ * border. Use a container-level `gap`; `stackGapClass` was moved off
+ * `space-y-*` for exactly this reason.
+ *
+ * The public page passes nothing and emits neither wrapper nor attribute.
+ */
+export function BlockTree({ nodes, site, content, annotate }: { nodes: BlockNode[] } & Ctx) {
   return (
     <>
-      {nodes.map((node) => (
-        <RenderBlock key={node.id} node={node} site={site} content={content} />
-      ))}
+      {nodes.map((node) =>
+        annotate ? (
+          <div key={node.id} className="contents" data-block-id={node.id}>
+            <RenderBlock node={node} site={site} content={content} annotate />
+          </div>
+        ) : (
+          <RenderBlock key={node.id} node={node} site={site} content={content} />
+        )
+      )}
     </>
   );
 }
@@ -92,7 +125,7 @@ function containerStyle(
   );
 }
 
-function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
+function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ctx) {
   switch (node.type) {
     case "section": {
       const width = node.style?.width ?? "wide";
@@ -106,23 +139,42 @@ function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
       return (
         <section className={containerStyle(node.style, undefined, pinned ? "sm" : "lg")}>
           <div className={cn(widthClass[width], alignItemsClass[node.style?.align ?? "left"], "flex flex-col", node.style?.gap ? gapClass[node.style.gap] : "gap-6")}>
-            <BlockTree nodes={node.children} site={site} content={content} />
+            <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
           </div>
         </section>
       );
     }
 
+    /**
+     * `w-full` on both containers is load-bearing, not decoration.
+     *
+     * A band lays its children out with `flex flex-col` + `alignItemsClass`,
+     * and that map has NO stretch — only `items-start` / `items-center` /
+     * `items-end`. So every direct child of every band is shrink-to-fit, which
+     * is `min(max-content, available)`.
+     *
+     * A container holding text has a max-content wider than the band, gets
+     * clamped, and looks full width by accident. A container holding only
+     * `image` blocks has a max-content of ZERO — an aspect-ratio box whose only
+     * child is `position: absolute` contributes no intrinsic width — so it
+     * resolved to 0px and the photos silently disappeared. `image` carries its
+     * own `w-full`, but 100% of a zero-width parent is zero.
+     *
+     * Every data-bound view below already does this (`grid w-full`,
+     * `w-full divide-y`). These two are the generic containers the AI actually
+     * composes with, and they were the ones missing it.
+     */
     case "stack":
       return (
-        <div className={cn("flex flex-col", node.style?.gap ? stackGapClass[node.style.gap] : "space-y-4", alignItemsClass[node.style?.align ?? "left"])}>
-          <BlockTree nodes={node.children} site={site} content={content} />
+        <div className={cn("flex w-full flex-col", node.style?.gap ? stackGapClass[node.style.gap] : "gap-4", alignItemsClass[node.style?.align ?? "left"])}>
+          <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
         </div>
       );
 
     case "row":
       return (
-        <div className={cn("grid items-center", rowColumnsClass[node.columns ?? 2], node.style?.gap ? gapClass[node.style.gap] : "gap-8")}>
-          <BlockTree nodes={node.children} site={site} content={content} />
+        <div className={cn("grid w-full items-center", rowColumnsClass[node.columns ?? 2], node.style?.gap ? gapClass[node.style.gap] : "gap-8")}>
+          <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
         </div>
       );
 
@@ -143,7 +195,16 @@ function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
     }
 
     case "text":
-      return <p className={cn("text-lg leading-relaxed", node.style?.textTone ? textToneClass[node.style.textTone] : "text-site-muted")}>{node.text}</p>;
+      return (
+        <p
+          className={cn(
+            textScaleClass[node.scale ?? "body"],
+            node.style?.textTone ? textToneClass[node.style.textTone] : "text-site-muted"
+          )}
+        >
+          {node.text}
+        </p>
+      );
 
     case "eyebrow":
       return (
@@ -193,6 +254,12 @@ function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
         </Link>
       );
 
+    /**
+     * Deliberately NOT `w-full`, unlike `row`/`stack` above. A stat's children
+     * are always text pills, so this can never collapse to zero — and stretching
+     * two pills across a 1152px band reads worse than the content-width row it
+     * renders now.
+     */
     case "stats":
       return (
         <div className={cn("grid grid-cols-2 gap-3", node.items.length > 2 ? "sm:grid-cols-3" : "")}>
@@ -228,7 +295,7 @@ function RenderBlock({ node, site, content }: { node: BlockNode } & Ctx) {
 
     case "copyrightLine":
       return (
-        <p className="text-sm text-site-muted">
+        <p className="text-base text-site-muted">
           &copy; {new Date().getFullYear()} {site.site.name}. All rights reserved.
         </p>
       );
@@ -258,8 +325,8 @@ function SermonCollectionView({
               href={`/sermons/${sermon.slug}`}
               className="flex flex-col gap-1 hover:text-site-accent sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="min-w-0 truncate font-medium">{sermon.title}</span>
-              <span className="shrink-0 text-sm text-site-muted">{formatDate(sermon.date)}</span>
+              <span className="min-w-0 truncate text-lg font-medium">{sermon.title}</span>
+              <span className="shrink-0 text-base text-site-muted">{formatDate(sermon.date)}</span>
             </Link>
           </li>
         ))}
@@ -284,11 +351,11 @@ function SermonCollectionView({
           )}
         </Link>
         <div>
-          <h3 className="text-2xl font-semibold text-site-foreground">{featured.title}</h3>
-          <p className="mt-2 text-site-muted">
+          <h3 className="text-2xl font-semibold text-site-foreground sm:text-3xl">{featured.title}</h3>
+          <p className="mt-2 text-lg text-site-muted">
             {featured.speaker ?? "Guest Speaker"} &middot; {formatDate(featured.date)}
           </p>
-          <ul className="mt-6 space-y-2 text-sm">
+          <ul className="mt-6 space-y-2 text-base">
             {rest.slice(0, 4).map((s) => (
               <li key={s.id}>
                 <Link href={`/sermons/${s.slug}`} className="hover:text-site-accent">
@@ -318,14 +385,14 @@ function SermonCollectionView({
                 className="flex h-full w-full items-end p-4"
                 style={{ background: "linear-gradient(160deg, var(--color-primary), color-mix(in oklab, var(--color-accent) 55%, var(--color-primary)))" }}
               >
-                <span className="text-xs font-medium text-white/80">{sermon.series || "Message"}</span>
+                <span className="text-sm font-medium text-white/80">{sermon.series || "Message"}</span>
               </div>
             )}
           </div>
           <div className="p-4">
             {sermon.series && <Badge variant="secondary">{sermon.series}</Badge>}
-            <h3 className="mt-2 font-semibold text-site-foreground group-hover:text-site-accent">{sermon.title}</h3>
-            <p className="mt-1 text-sm text-site-muted">
+            <h3 className="mt-2 text-lg font-semibold text-site-foreground group-hover:text-site-accent sm:text-xl">{sermon.title}</h3>
+            <p className="mt-1 text-base text-site-muted">
               {sermon.speaker ?? "Guest Speaker"} &middot; {formatDate(sermon.date)}
             </p>
           </div>
@@ -356,10 +423,10 @@ function EventCollectionView({
               className="flex flex-col gap-1 hover:text-site-accent sm:flex-row sm:items-center sm:justify-between"
             >
               <span className="min-w-0 truncate">
-                <span className="font-medium">{event.title}</span>
-                {event.location && <span className="ml-2 text-sm text-site-muted">{event.location}</span>}
+                <span className="text-lg font-medium">{event.title}</span>
+                {event.location && <span className="ml-2 text-base text-site-muted">{event.location}</span>}
               </span>
-              <span className="shrink-0 text-sm text-site-muted">{formatDate(event.startAt)}</span>
+              <span className="shrink-0 text-base text-site-muted">{formatDate(event.startAt)}</span>
             </Link>
           </li>
         ))}
@@ -377,7 +444,7 @@ function EventCollectionView({
       <div className="w-full space-y-8">
         {Object.entries(groups).map(([month, monthEvents]) => (
           <div key={month}>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-site-muted">{month}</h3>
+            <h3 className="text-base font-semibold uppercase tracking-wide text-site-muted">{month}</h3>
             <ul className="mt-3 divide-y divide-site-muted/15">
               {monthEvents.map((event) => (
                 <li key={event.id} className="py-3">
@@ -385,8 +452,8 @@ function EventCollectionView({
                     href={`/events/${event.slug}`}
                     className="flex flex-col gap-1 hover:text-site-accent sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <span className="min-w-0 truncate font-medium">{event.title}</span>
-                    <span className="shrink-0 text-sm text-site-muted">{formatDate(event.startAt)}</span>
+                    <span className="min-w-0 truncate text-lg font-medium">{event.title}</span>
+                    <span className="shrink-0 text-base text-site-muted">{formatDate(event.startAt)}</span>
                   </Link>
                 </li>
               ))}
@@ -416,9 +483,9 @@ function EventCollectionView({
             )}
           </div>
           <div className="p-4">
-            <p className="text-sm font-medium text-site-accent">{formatDate(event.startAt)}</p>
-            <h3 className="mt-1 font-semibold text-site-foreground group-hover:text-site-accent">{event.title}</h3>
-            {event.location && <p className="mt-1 text-sm text-site-muted">{event.location}</p>}
+            <p className="text-base font-medium text-site-accent">{formatDate(event.startAt)}</p>
+            <h3 className="mt-1 text-lg font-semibold text-site-foreground group-hover:text-site-accent sm:text-xl">{event.title}</h3>
+            {event.location && <p className="mt-1 text-base text-site-muted">{event.location}</p>}
           </div>
         </Link>
       ))}
@@ -453,8 +520,8 @@ function MinistryCollectionView({ items }: { items: Array<{ name: string; descri
             }}
           />
           <div className="p-6">
-            <h3 className="font-semibold text-site-foreground">{ministry.name}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-site-muted">{ministry.description}</p>
+            <h3 className="text-xl font-semibold text-site-foreground">{ministry.name}</h3>
+            <p className="mt-2 text-base leading-relaxed text-site-muted">{ministry.description}</p>
           </div>
         </div>
       ))}
@@ -465,7 +532,7 @@ function MinistryCollectionView({ items }: { items: Array<{ name: string; descri
 function ContactInfoView({ site }: { site: SiteConfig }) {
   const contact = site.contact ?? {};
   return (
-    <div className="space-y-2 text-site-muted">
+    <div className="space-y-2 text-lg text-site-muted">
       {contact.email && <p>{contact.email}</p>}
       {contact.phone && <p>{contact.phone}</p>}
       {contact.address && <p>{contact.address}</p>}
@@ -478,7 +545,7 @@ function SocialLinksView({ site }: { site: SiteConfig }) {
   const socials = site.socialLinks ?? [];
   if (socials.length === 0) return null;
   return (
-    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm font-medium text-site-accent">
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-base font-medium text-site-accent">
       {socials.map((s) => (
         <a
           key={s.platform}

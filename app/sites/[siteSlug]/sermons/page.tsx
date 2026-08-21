@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { getCachedSermons, filterSermons } from "@/lib/site/get-site-sermons";
 import { Input } from "@/components/ui/input";
+import { headingScaleClass, widthClass } from "@/components/website/blocks/tokens";
+import { cn } from "@/lib/utils";
 
 export default async function SermonsPage({
   params,
@@ -23,8 +25,10 @@ export default async function SermonsPage({
   const sermons = filterSermons(allSermons, q);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold text-site-foreground">Sermons</h1>
+    /* Same width and heading scale as an AI-composed band — see the note in
+       ../events/page.tsx. */
+    <div className={cn(widthClass.wide, "py-20")}>
+      <h1 className={cn(headingScaleClass.h1, "text-site-foreground")}>Sermons</h1>
 
       {site.features.sermonSearch && (
         <form className="mt-6" action="">
@@ -38,7 +42,7 @@ export default async function SermonsPage({
       )}
 
       {sermons.length === 0 ? (
-        <p className="mt-8 text-site-muted">
+        <p className="mt-8 text-lg text-site-muted">
           {q ? "No sermons match your search." : "No sermons have been added yet."}
         </p>
       ) : (
@@ -46,9 +50,9 @@ export default async function SermonsPage({
           {sermons.map((sermon) => (
             <li key={sermon.id} className="py-5">
               <Link href={`/sermons/${sermon.slug}`} className="hover:text-site-accent">
-                <h2 className="text-lg font-semibold">{sermon.title}</h2>
+                <h2 className={headingScaleClass.h3}>{sermon.title}</h2>
               </Link>
-              <p className="mt-1 text-sm text-site-muted">
+              <p className="mt-1 text-base text-site-muted">
                 {sermon.speaker ?? "Guest Speaker"} &middot;{" "}
                 {new Date(sermon.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 {sermon.series ? ` · ${sermon.series}` : ""}

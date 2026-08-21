@@ -41,7 +41,12 @@ export type RowBlock = BaseBlock & { type: "row"; columns?: ColumnsToken; childr
 export type SpacerBlock = BaseBlock & { type: "spacer"; size?: SpacingToken };
 
 export type HeadingBlock = BaseBlock & { type: "heading"; text: string; scale?: TypeScaleToken };
-export type TextBlock = BaseBlock & { type: "text"; text: string };
+/**
+ * `scale` is the same `TypeScaleToken` a heading takes, read as a paragraph
+ * size by `textScaleClass` — so "make the intro bigger" is one token change
+ * rather than a second vocabulary the model has to learn.
+ */
+export type TextBlock = BaseBlock & { type: "text"; text: string; scale?: TypeScaleToken };
 export type EyebrowBlock = BaseBlock & { type: "eyebrow"; text: string; accent?: AccentToken };
 export type ImageBlock = BaseBlock & {
   type: "image";

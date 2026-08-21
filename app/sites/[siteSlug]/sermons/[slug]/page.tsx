@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { getCachedSermons, findSermonBySlug } from "@/lib/site/get-site-sermons";
+import { headingScaleClass } from "@/components/website/blocks/tokens";
+import { cn } from "@/lib/utils";
 
 export const revalidate = 300;
 
@@ -20,12 +22,12 @@ export default async function SermonDetailPage({
   return (
     <article className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
       {sermon.series && (
-        <p className="text-sm font-semibold uppercase tracking-wide text-site-accent">
+        <p className="text-base font-semibold uppercase tracking-wide text-site-accent">
           {sermon.series}
         </p>
       )}
-      <h1 className="mt-2 text-3xl font-bold text-site-foreground">{sermon.title}</h1>
-      <p className="mt-2 text-sm text-site-muted">
+      <h1 className={cn(headingScaleClass.h1, "mt-2 text-site-foreground")}>{sermon.title}</h1>
+      <p className="mt-2 text-base text-site-muted">
         {sermon.speaker ?? "Guest Speaker"} &middot;{" "}
         {new Date(sermon.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
       </p>
@@ -47,14 +49,16 @@ export default async function SermonDetailPage({
         </audio>
       )}
 
-      {sermon.description && <p className="mt-8 text-site-muted">{sermon.description}</p>}
+      {sermon.description && (
+        <p className="mt-8 text-lg leading-relaxed text-site-muted">{sermon.description}</p>
+      )}
 
       {sermon.transcript && (
         <details className="mt-8">
-          <summary className="cursor-pointer font-medium text-site-foreground">
+          <summary className="cursor-pointer text-lg font-medium text-site-foreground">
             Transcript
           </summary>
-          <p className="mt-4 whitespace-pre-line text-sm text-site-muted">
+          <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-site-muted">
             {sermon.transcript}
           </p>
         </details>

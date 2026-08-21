@@ -100,6 +100,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       type: z.literal("text"),
       style: blockStyleSchema,
       text: z.string().trim().min(1).max(2000),
+      scale: typeScaleSchema.optional(),
     }),
     z.object({
       id: idSchema,

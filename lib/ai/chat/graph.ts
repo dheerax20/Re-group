@@ -21,7 +21,7 @@ import { chatAnswerSchema, classifyResultSchema } from "./schemas";
  *
  * The `applyChange` node calls `applyBlockAiPrompt` — the SAME function the
  * editor's one-shot "AI prompt" box uses, which runs every output through
- * `applyBlockPatches` (and so `coerceBlocks`) at the write site. The chatbot is
+ * `applyBlockEdits` (and so `repairBlocks`) at the write site. The chatbot is
  * not a second, less validated way to touch a site's content; it is a second
  * way to reach the same one.
  */
