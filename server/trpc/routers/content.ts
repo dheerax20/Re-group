@@ -7,8 +7,10 @@ import {
   deleteSermon,
   listEvents,
   listSermons,
+  updateEvent,
   updateYoutubeChannel,
 } from "@/lib/site/content-service";
+import { exportRegistrationsCsv, listRegistrations } from "@/lib/site/registrations";
 import { updateSocialLinks } from "@/lib/site/service";
 import { socialLinksSchema } from "@/lib/validation/social";
 
@@ -37,9 +39,21 @@ export const contentRouter = router({
     .input(siteInput.extend({ data: z.unknown() }))
     .mutation(async ({ input }) => createEvent(input.siteId, input.data)),
 
+  updateEvent: paidSiteProcedure
+    .input(siteInput.extend({ eventId: z.string().min(1), data: z.unknown() }))
+    .mutation(async ({ input }) => updateEvent(input.siteId, input.eventId, input.data)),
+
   deleteEvent: paidSiteProcedure
     .input(siteInput.extend({ eventId: z.string().min(1) }))
     .mutation(async ({ input }) => deleteEvent(input.siteId, input.eventId)),
+
+  listRegistrations: ownedSiteProcedure
+    .input(siteInput.extend({ eventId: z.string().min(1) }))
+    .query(async ({ input }) => listRegistrations(input.siteId, input.eventId)),
+
+  exportRegistrations: ownedSiteProcedure
+    .input(siteInput.extend({ eventId: z.string().min(1) }))
+    .query(async ({ input }) => exportRegistrationsCsv(input.siteId, input.eventId)),
 
   listSermons: ownedSiteProcedure
     .input(siteInput)

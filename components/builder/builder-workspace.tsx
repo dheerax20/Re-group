@@ -16,6 +16,7 @@ import { BlockHighlight } from "@/components/builder/block-highlight";
 import { SiteChatPanel, type ComposerHandle } from "@/components/builder/site-chat-panel";
 import { PublishBar } from "@/components/builder/publish-bar";
 import { Button } from "@/components/ui/button";
+import { liveSiteUrl } from "@/lib/site/live-url";
 import { cn } from "@/lib/utils";
 
 type Tab = "assistant" | "pages";
@@ -206,7 +207,12 @@ export function BuilderWorkspace({
                 className="h-8 rounded-full border border-editor-border bg-white/5 px-3 text-xs text-editor-foreground"
               >
                 {pages.map((page) => (
-                  <option key={page.href} value={page.href} className="text-foreground">
+                  // Native <option> popups render with the browser/OS's own
+                  // background (usually light) regardless of page theme, so
+                  // `text-foreground` (which flips to near-white in dark
+                  // mode) goes invisible here. Pin to a color that stays
+                  // legible against that native background.
+                  <option key={page.href} value={page.href} className="text-neutral-900">
                     {page.label}
                   </option>
                 ))}
@@ -214,16 +220,28 @@ export function BuilderWorkspace({
             </label>
           ) : null}
 
-          <Link
-            href={`/sites/${site.site.slug}${activePath === HOME_PATH ? "" : activePath}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Button variant="outline" size="sm">
+          {site.site.status === "PUBLISHED" ? (
+            <Link
+              href={`${liveSiteUrl(site.site.slug)}${activePath === HOME_PATH ? "" : activePath}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Button variant="outline" size="sm">
+                <ExternalLink className="size-4" />
+                View site
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              title="Publish your site to view it live."
+            >
               <ExternalLink className="size-4" />
               View site
             </Button>
-          </Link>
+          )}
 
           <PublishBar
             siteId={site.site.id}

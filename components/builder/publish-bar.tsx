@@ -4,16 +4,9 @@ import { useTransition } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import type { PublishError } from "@/lib/site/publish-validation";
-
-const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "regroup.app";
-
-function liveUrl(slug: string) {
-  if (process.env.NODE_ENV === "development") {
-    return `http://${slug}.localhost:3000`;
-  }
-  return `https://${slug}.${ROOT_DOMAIN}`;
-}
+import { liveSiteUrl } from "@/lib/site/live-url";
 
 export function PublishBar({
   siteId,
@@ -50,17 +43,17 @@ export function PublishBar({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4">
+    <Card padding="sm" className="flex items-center justify-between">
       <div className="flex items-center gap-3">
         <Badge variant={status === "PUBLISHED" ? "success" : "secondary"}>{status}</Badge>
         {status === "PUBLISHED" && (
           <a
-            href={liveUrl(slug)}
+            href={liveSiteUrl(slug)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm font-medium text-foreground underline"
           >
-            {liveUrl(slug)}
+            {liveSiteUrl(slug)}
           </a>
         )}
       </div>
@@ -73,6 +66,6 @@ export function PublishBar({
           {isPending ? "Publishing..." : "Publish"}
         </Button>
       )}
-    </div>
+    </Card>
   );
 }

@@ -53,7 +53,7 @@ export default async function DashboardPagesPage() {
             {catalog.map((page) => (
               <li
                 key={page.href}
-                className="rounded-xl border border-border bg-surface px-3 py-2"
+                className="rounded-panel border border-border bg-surface px-3 py-2"
               >
                 <p className="text-sm font-medium">{page.label}</p>
                 <p className="mt-0.5 font-mono text-[11px] text-muted">{page.href}</p>

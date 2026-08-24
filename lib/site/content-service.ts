@@ -4,7 +4,7 @@ import { invalidateSite } from "@/lib/site/invalidate";
 import { toDatabaseError } from "@/lib/db/errors";
 import { slugify } from "@/lib/validation/slug";
 import { generateNavigation } from "@/lib/site/navigation";
-import { httpsUrlSchema } from "@/lib/validation/url";
+import { httpsUrlSchema, mediaUrlSchema } from "@/lib/validation/url";
 import { defaultFeatures, type FeatureConfig } from "@/lib/features/types";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -21,6 +21,14 @@ function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
+const eventStatusSchema = z.enum([
+  "DRAFT",
+  "PUBLISHED",
+  "REGISTRATION_CLOSED",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
 const eventSchema = z.object({
   title: z.string().min(2, "Title is required").max(160),
   description: z.string().max(2000).optional().or(z.literal("")),
@@ -28,6 +36,16 @@ const eventSchema = z.object({
   endAt: z.string().optional().or(z.literal("")),
   location: z.string().max(200).optional().or(z.literal("")),
   registrationUrl: httpsUrlSchema.optional(),
+  imageUrl: mediaUrlSchema.optional(),
+  status: eventStatusSchema.optional(),
+  category: z.string().max(80).optional().or(z.literal("")),
+  organizer: z.string().max(160).optional().or(z.literal("")),
+  address: z.string().max(240).optional().or(z.literal("")),
+  capacity: z.coerce.number().int().positive().optional(),
+  registrationDeadline: z.string().optional().or(z.literal("")),
+  rsvpEnabled: z.boolean().optional(),
+  allowGuests: z.boolean().optional(),
+  allowWaitlist: z.boolean().optional(),
 });
 
 const sermonSchema = z.object({
@@ -135,10 +153,71 @@ export async function createEvent(siteId: string, input: unknown) {
           endAt: data.endAt ? new Date(data.endAt) : null,
           location: data.location || null,
           registrationUrl: data.registrationUrl || null,
+          imageUrl: data.imageUrl || null,
+          status: data.status ?? "DRAFT",
+          category: data.category || null,
+          organizer: data.organizer || null,
+          address: data.address || null,
+          capacity: data.capacity,
+          registrationDeadline: data.registrationDeadline
+            ? new Date(data.registrationDeadline)
+            : null,
+          rsvpEnabled: data.rsvpEnabled ?? false,
+          allowGuests: data.allowGuests ?? false,
+          allowWaitlist: data.allowWaitlist ?? false,
         },
       });
       await enableFeatureOnSite(siteId, "events", { variant: "grid" }, tx);
       return created;
+    });
+
+    await invalidateSite(siteId);
+    return { success: true as const, event };
+  } catch (error) {
+    toDatabaseError(error);
+  }
+}
+
+export async function updateEvent(siteId: string, eventId: string, input: unknown) {
+  try {
+    const data = eventSchema.parse(input);
+    const existing = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!existing || existing.siteId !== siteId) {
+      throw new Error("Event not found");
+    }
+
+    let slug = existing.slug;
+    if (data.title.trim() && slugify(data.title) !== existing.slug) {
+      const siblings = await prisma.event.findMany({
+        where: { siteId, id: { not: eventId } },
+        select: { slug: true },
+      });
+      slug = uniqueSlug(data.title, siblings.map((e) => e.slug));
+    }
+
+    const event = await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        title: data.title,
+        slug,
+        description: data.description || null,
+        startAt: new Date(data.startAt),
+        endAt: data.endAt ? new Date(data.endAt) : null,
+        location: data.location || null,
+        registrationUrl: data.registrationUrl || null,
+        imageUrl: data.imageUrl || null,
+        status: data.status ?? existing.status,
+        category: data.category || null,
+        organizer: data.organizer || null,
+        address: data.address || null,
+        capacity: data.capacity ?? null,
+        registrationDeadline: data.registrationDeadline
+          ? new Date(data.registrationDeadline)
+          : null,
+        rsvpEnabled: data.rsvpEnabled ?? false,
+        allowGuests: data.allowGuests ?? false,
+        allowWaitlist: data.allowWaitlist ?? false,
+      },
     });
 
     await invalidateSite(siteId);

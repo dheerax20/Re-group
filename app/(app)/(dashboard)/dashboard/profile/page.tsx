@@ -2,6 +2,7 @@ import { syncCurrentUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "Profile — Regroup" };
 
@@ -17,7 +18,7 @@ export default async function ProfilePage() {
   const initial = (user.name?.trim()?.[0] ?? user.email?.trim()?.[0] ?? "U").toUpperCase();
 
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Profile"
         description="The account you sign in with."
@@ -28,7 +29,7 @@ export default async function ProfilePage() {
         }
       />
 
-      <div className="rounded-panel border border-border bg-surface p-6 shadow-[var(--shadow-soft)]">
+      <Card padding="lg">
         <div className="flex items-center gap-4">
           {user.picture ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -69,7 +70,7 @@ export default async function ProfilePage() {
             </dd>
           </div>
         </dl>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -2,11 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Mic2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import {
   Field,
   FieldGroup,
@@ -75,14 +78,12 @@ export function SermonsManager({
   }
 
   return (
-    <div className={cn("mx-auto max-w-3xl space-y-6", pending && "opacity-70")}>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sermons</h1>
-        <p className="mt-1 text-sm text-muted">
-          Add messages here — they appear in your website sermons section and pages.
-        </p>
-      </div>
-
+    <div className={cn("mx-auto max-w-3xl", pending && "opacity-70")}>
+      <PageHeader
+        title="Sermons"
+        description="Add messages here — they appear in your website sermons section and pages."
+      />
+      <div className="space-y-6">
       <form onSubmit={onCreate}>
         <FieldGroup title="New sermon" description="Synced to the live church website.">
           <Field>
@@ -159,9 +160,12 @@ export function SermonsManager({
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-muted">Library</h2>
         {sermons.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted">
-            No sermons yet. Add one to populate your site.
-          </div>
+          <EmptyState
+            icon={Mic2}
+            title="No sermons yet"
+            description="Add one to populate your site."
+            compact
+          />
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
             {sermons.map((sermon) => (
@@ -190,6 +194,7 @@ export function SermonsManager({
             ))}
           </ul>
         )}
+      </div>
       </div>
     </div>
   );

@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Calendar,
   Mic2,
-  Video,
   CreditCard,
   ChevronsLeft,
   ChevronsRight,
@@ -34,6 +33,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,7 +76,6 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { href: "/events", label: "Events", icon: Calendar },
       { href: "/sermons", label: "Sermons", icon: Mic2 },
-      { href: "/youtube", label: "YouTube", icon: Video },
     ],
   },
   {
@@ -157,17 +156,19 @@ export function AppSidebar({
             </p>
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={toggleSidebar}
             className={cn(
-              "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
+              "size-7 shrink-0 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
               collapsed && "hidden"
             )}
             aria-label="Collapse sidebar"
           >
             <ChevronsLeft className="size-4" />
-          </button>
+          </Button>
         </div>
 
         {siteName ? (
@@ -313,14 +314,16 @@ export function AppSidebar({
         </div>
 
         {collapsed ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={toggleSidebar}
-            className="mx-auto inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            className="mx-auto size-8 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
             aria-label="Expand sidebar"
           >
             <ChevronsRight className="size-4" />
-          </button>
+          </Button>
         ) : (
           <p className="px-2 pb-1 text-[10px] text-muted-foreground/70">
             Press ⌘B to collapse

@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache/redis";
 
+/** Statuses a church has made visible to the public — drafts and cancelled
+ * events never render, even if a stale cache entry is served. */
+const PUBLIC_EVENT_STATUSES = ["PUBLISHED", "REGISTRATION_CLOSED", "COMPLETED"] as const;
+
 /** Serializable mirror of the Event model — dates as ISO strings so it
  * survives a JSON round-trip through Redis. */
 export interface CachedEvent {
@@ -13,6 +17,14 @@ export interface CachedEvent {
   location: string | null;
   imageUrl: string | null;
   registrationUrl: string | null;
+  status: (typeof PUBLIC_EVENT_STATUSES)[number];
+  rsvpEnabled: boolean;
+  allowGuests: boolean;
+  capacity: number | null;
+  registrationDeadline: string | null;
+  address: string | null;
+  organizer: string | null;
+  category: string | null;
 }
 
 /** Full event list for a site, cached — list/detail pages read this instead
@@ -22,7 +34,7 @@ export async function getCachedEvents(siteId: string, slug: string): Promise<Cac
   // negative-cache path — `?? []` only covers the `cached` signature.
   const events = await cached(`site:${slug}:events`, 3600, async () => {
     const events = await prisma.event.findMany({
-      where: { siteId },
+      where: { siteId, status: { in: [...PUBLIC_EVENT_STATUSES] } },
       orderBy: { startAt: "asc" },
     });
 
@@ -36,6 +48,14 @@ export async function getCachedEvents(siteId: string, slug: string): Promise<Cac
       location: e.location,
       imageUrl: e.imageUrl,
       registrationUrl: e.registrationUrl,
+      status: e.status as (typeof PUBLIC_EVENT_STATUSES)[number],
+      rsvpEnabled: e.rsvpEnabled,
+      allowGuests: e.allowGuests,
+      capacity: e.capacity,
+      registrationDeadline: e.registrationDeadline ? e.registrationDeadline.toISOString() : null,
+      address: e.address,
+      organizer: e.organizer,
+      category: e.category,
     }));
   });
 

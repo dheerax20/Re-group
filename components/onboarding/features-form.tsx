@@ -5,17 +5,7 @@ import { useRouter } from "next/navigation";
 import { FeatureConfig } from "@/lib/features/types";
 import { validateFeatureDependencies } from "@/lib/features/validate";
 import { trpc } from "@/lib/trpc/client";
-import {
-  Calendar,
-  HandCoins,
-  Heart,
-  Mail,
-  Mic2,
-  Podcast,
-  Search,
-  Video,
-  type LucideIcon,
-} from "lucide-react";
+import { Calendar, Mail, Mic2, type LucideIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { FieldGroup, FormActions } from "@/components/onboarding/form-primitives";
@@ -28,12 +18,7 @@ const featureCopy: Array<{
   icon: LucideIcon;
 }> = [
   { key: "sermons", label: "Sermons", description: "Publish messages with video, audio, and transcripts.", icon: Mic2 },
-  { key: "sermonSearch", label: "Sermon search", description: "Search past sermons. Requires sermons.", icon: Search },
   { key: "events", label: "Events", description: "Upcoming gatherings and calendar pages.", icon: Calendar },
-  { key: "youtube", label: "YouTube", description: "Channel link and media section.", icon: Video },
-  { key: "podcast", label: "Podcast", description: "RSS link and episode section.", icon: Podcast },
-  { key: "giving", label: "Giving", description: "Online giving call-to-action.", icon: HandCoins },
-  { key: "ministries", label: "Ministries", description: "Highlight groups and teams.", icon: Heart },
   { key: "contact", label: "Contact", description: "Contact details and visit CTA.", icon: Mail },
 ];
 

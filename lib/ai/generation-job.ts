@@ -112,42 +112,42 @@ export async function getLatestJob(siteId: string, kind: string): Promise<JobVie
  * A `findActiveJob` check followed by a create is not safe: two clicks 200ms
  * apart both passed the check before either row existed, and both charged the
  * budget. The partial unique index added in
- * `20260819140000_one_active_job_per_site` makes the second insert fail with
- * P2002, which is the only account of "already running" that cannot race.
+ * `20260819140000_one_active_job_per_site` is what makes the second insert
+ * lose, deterministically — the only account of "already running" that
+ * cannot race.
  *
- * Callers must treat `claimed: false` as "do not charge, do not trigger".
+ * `createManyAndReturn` with `skipDuplicates` rather than `create` in a
+ * try/catch: both resolve the conflict at the database with the same
+ * `INSERT ... ON CONFLICT DO NOTHING` Postgres uses for either, but `create`
+ * makes the client throw P2002 on the (expected, routine) losing case, and
+ * Prisma's query-engine logs that as an `error`-level line before the catch
+ * ever runs — a double-click looks like a crash in the server log. Losing the
+ * race here is just an empty array, not an exception.
  */
 export async function claimJob(
   siteId: string,
   kind: "full_build" | "editor_prompt",
   prompt?: string
 ): Promise<{ claimed: true; job: JobView } | { claimed: false; job: JobView | null }> {
-  try {
-    const job = await prisma.siteGenerationJob.create({
-      data: {
+  const created = await prisma.siteGenerationJob.createManyAndReturn({
+    data: [
+      {
         siteId,
         kind,
         status: "QUEUED",
         totalSteps: kind === "full_build" ? CREW_STEPS.length : 1,
         prompt: prompt ?? null,
       },
-    });
-    return { claimed: true, job: toView(job) };
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      const existing = await findActiveJob(siteId, kind);
-      return { claimed: false, job: existing ? toView(existing) : null };
-    }
-    throw error;
-  }
-}
+    ],
+    skipDuplicates: true,
+  });
 
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: string }).code === "P2002"
-  );
+  if (created.length > 0) {
+    return { claimed: true, job: toView(created[0]) };
+  }
+
+  const existing = await findActiveJob(siteId, kind);
+  return { claimed: false, job: existing ? toView(existing) : null };
 }
 
 /** Records which Trigger.dev run is executing this job, for resume-on-reload. */

@@ -1,6 +1,5 @@
 import { api } from "@/server/trpc/caller";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Calendar,
@@ -9,7 +8,7 @@ import {
   Globe,
   Mic2,
   PanelsTopLeft,
-  Video,
+  Sparkles,
 } from "lucide-react";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -31,10 +30,30 @@ function formatEventDate(value: string | Date): string {
 
 export default async function DashboardPage() {
   const active = await (await api()).site.mine();
-  if (!active) redirect("/builder");
+
+  if (!active) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <PageHeader
+          title="Dashboard"
+          description="Everything about your church website will live here once it exists."
+        />
+        <EmptyState
+          icon={Sparkles}
+          title="You don't have a website yet"
+          description="Answer a few questions about your church and we'll generate a full site for you to publish."
+          action={
+            <Link href="/builder">
+              <Button>Generate my website</Button>
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
 
   const trpc = await api();
-  const [{ site, content }, domains] = await Promise.all([
+  const [{ content }, domains] = await Promise.all([
     trpc.site.get({ siteId: active.id }),
     trpc.domains.list({ siteId: active.id }),
   ]);
@@ -56,13 +75,6 @@ export default async function DashboardPage() {
       count: content.sermons.length,
       icon: Mic2,
       hint: "Synced to the sermons page",
-    },
-    {
-      href: "/youtube",
-      label: "YouTube",
-      count: site?.youtube?.channelUrl ? 1 : 0,
-      icon: Video,
-      hint: site?.youtube?.channelUrl ? "Channel connected" : "Not connected",
     },
   ];
 

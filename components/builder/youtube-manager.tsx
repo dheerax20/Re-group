@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/layout/page-header";
 import {
   Field,
   FieldGroup,
@@ -44,14 +45,11 @@ export function YoutubeManager({
   }
 
   return (
-    <div className={cn("mx-auto max-w-3xl space-y-6", pending && "opacity-70")}>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">YouTube</h1>
-        <p className="mt-1 text-sm text-muted">
-          Connect your channel — it powers the media section on your website.
-        </p>
-      </div>
-
+    <div className={cn("mx-auto max-w-3xl", pending && "opacity-70")}>
+      <PageHeader
+        title="YouTube"
+        description="Connect your channel — it powers the media section on your website."
+      />
       <form onSubmit={onSave}>
         <FieldGroup title="Channel" description="Paste your channel or playlist URL.">
           <Field>

@@ -25,6 +25,7 @@ export async function getSiteContent(siteId: string): Promise<SiteContent> {
         where: {
           siteId,
           startAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 24) },
+          status: { in: ["PUBLISHED", "REGISTRATION_CLOSED", "COMPLETED"] },
         },
         orderBy: { startAt: "asc" },
         take: 20,

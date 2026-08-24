@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowLeft, Calendar, Mic2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { getCachedSermons, findSermonBySlug } from "@/lib/site/get-site-sermons";
@@ -21,19 +23,40 @@ export default async function SermonDetailPage({
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
-      {sermon.series && (
-        <p className="text-base font-semibold uppercase tracking-wide text-site-accent">
-          {sermon.series}
-        </p>
-      )}
-      <h1 className={cn(headingScaleClass.h1, "mt-2 text-site-foreground")}>{sermon.title}</h1>
-      <p className="mt-2 text-base text-site-muted">
-        {sermon.speaker ?? "Guest Speaker"} &middot;{" "}
-        {new Date(sermon.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-      </p>
+      <Link
+        href="/sermons"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-site-muted hover:text-site-accent"
+      >
+        <ArrowLeft className="size-4" />
+        All sermons
+      </Link>
 
-      {sermon.videoUrl && (
-        <div className="mt-8 aspect-video overflow-hidden rounded-lg bg-black">
+      <div className="mt-8">
+        {sermon.series ? (
+          <p className="text-sm font-semibold uppercase tracking-wide text-site-accent">
+            {sermon.series}
+          </p>
+        ) : null}
+        <h1 className={cn(headingScaleClass.h1, "mt-2 text-site-foreground")}>{sermon.title}</h1>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-site-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <Mic2 className="size-4" />
+            {sermon.speaker ?? "Guest Speaker"}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="size-4" />
+            {new Date(sermon.date).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+        </div>
+      </div>
+
+      {sermon.videoUrl ? (
+        <div className="mt-10 aspect-video overflow-hidden rounded-2xl bg-black shadow-lg">
           <iframe
             src={sermon.videoUrl.replace("watch?v=", "embed/")}
             className="h-full w-full"
@@ -41,28 +64,30 @@ export default async function SermonDetailPage({
             title={sermon.title}
           />
         </div>
-      )}
+      ) : null}
 
-      {sermon.audioUrl && (
-        <audio controls className="mt-6 w-full">
-          <source src={sermon.audioUrl} />
-        </audio>
-      )}
+      {sermon.audioUrl ? (
+        <div className="mt-8 rounded-2xl border border-site-muted/15 p-4">
+          <audio controls className="w-full">
+            <source src={sermon.audioUrl} />
+          </audio>
+        </div>
+      ) : null}
 
-      {sermon.description && (
-        <p className="mt-8 text-lg leading-relaxed text-site-muted">{sermon.description}</p>
-      )}
+      {sermon.description ? (
+        <p className="mt-10 text-lg leading-relaxed text-site-muted">{sermon.description}</p>
+      ) : null}
 
-      {sermon.transcript && (
-        <details className="mt-8">
-          <summary className="cursor-pointer text-lg font-medium text-site-foreground">
+      {sermon.transcript ? (
+        <details className="group mt-10 rounded-2xl border border-site-muted/15 p-5">
+          <summary className="cursor-pointer text-lg font-medium text-site-foreground marker:content-none">
             Transcript
           </summary>
           <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-site-muted">
             {sermon.transcript}
           </p>
         </details>
-      )}
+      ) : null}
     </article>
   );
 }

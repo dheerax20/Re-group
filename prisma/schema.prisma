@@ -125,6 +125,7 @@ model Site {
   media           Media[]
   sermons         Sermon[]
   events          Event[]
+  registrations   Registration[]
   domains         SiteDomain[]
   generationJobs  SiteGenerationJob[]
   chatMessages    ChatMessage[]
@@ -379,8 +380,16 @@ model Sermon {
   @@index([siteId, date])
 }
 
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  REGISTRATION_CLOSED
+  COMPLETED
+  CANCELLED
+}
+
 model Event {
-  id              String    @id @default(cuid())
+  id              String      @id @default(cuid())
   siteId          String
   title           String
   slug            String
@@ -390,13 +399,52 @@ model Event {
   location        String?
   imageUrl        String?
   registrationUrl String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  status               EventStatus @default(DRAFT)
+  category             String?
+  organizer            String?
+  address              String?
+  capacity             Int?
+  registrationDeadline DateTime?
+  rsvpEnabled          Boolean     @default(false)
+  allowGuests          Boolean     @default(false)
+  allowWaitlist        Boolean     @default(false)
+
+  site          Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  registrations Registration[]
 
   @@unique([siteId, slug])
   @@index([siteId, startAt])
+}
+
+enum RegistrationStatus {
+  CONFIRMED
+  WAITLISTED
+  CANCELLED
+}
+
+model Registration {
+  id            String             @id @default(cuid())
+  eventId       String
+  siteId        String
+  status        RegistrationStatus @default(CONFIRMED)
+  attendeeName  String
+  attendeeEmail String
+  attendeePhone String?
+  guestCount    Int                @default(0)
+  dietaryNotes  String?
+  prayerRequest String?
+  qrToken       String             @unique
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  site  Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([siteId])
 }
 
 model Template {
