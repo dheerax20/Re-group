@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import { fontRegistry, isValidFontKey } from "@/lib/theme/font-registry";
+import { HEX_COLOR } from "@/lib/validation/brand";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,10 +20,8 @@ import { cn } from "@/lib/utils";
  * trusted: an invalid `fill` makes SVG fall back to black, which would show
  * the church a preview that has nothing to do with what they typed.
  */
-const HEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
-
 function safeColor(value: string | undefined, fallback: string): string {
-  return value && HEX.test(value.trim()) ? value.trim() : fallback;
+  return value && HEX_COLOR.test(value.trim()) ? value.trim() : fallback;
 }
 
 export function BrandPreview({

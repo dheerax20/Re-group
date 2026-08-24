@@ -17,6 +17,7 @@ import { SiteChatPanel, type ComposerHandle } from "@/components/builder/site-ch
 import { PublishBar } from "@/components/builder/publish-bar";
 import { Button } from "@/components/ui/button";
 import { liveSiteUrl } from "@/lib/site/live-url";
+import { useInertLinks } from "@/hooks/use-inert-links";
 import { cn } from "@/lib/utils";
 
 type Tab = "assistant" | "pages";
@@ -61,6 +62,7 @@ export function BuilderWorkspace({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const composer = useRef<ComposerHandle>(null);
+  const inertLinks = useInertLinks();
 
   const revealBlock = useCallback((id: string) => {
     // The annotate wrapper is `display: contents` and has no box of its own,
@@ -324,10 +326,17 @@ export function BuilderWorkspace({
         </aside>
 
         <div className="min-h-0 overflow-y-auto bg-editor-canvas p-4">
+          {/*
+            The preview is not a demo of the church's site, it IS the church's
+            site — so its links have to be neutered here or clicking the nav
+            throws the church out of the editor. See `useInertLinks`; the
+            cursor is flattened for the same reason the click is swallowed.
+          */}
           <div
             ref={frameRef}
+            {...inertLinks}
             className={cn(
-              "relative mx-auto overflow-hidden rounded-xl bg-white shadow-lg",
+              "relative mx-auto overflow-hidden rounded-xl bg-white shadow-lg [&_a]:cursor-default",
               device === "mobile" ? "w-[390px] max-w-full" : "w-full"
             )}
           >

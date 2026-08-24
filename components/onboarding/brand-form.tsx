@@ -2,9 +2,16 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import type { Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { brandConfigSchema, BrandConfigInput } from "@/lib/validation/brand";
+import {
+  brandConfigSchema,
+  defaultBrandConfig,
+  normalizeHexColor,
+  BrandConfigInput,
+  BrandConfigFormValues,
+} from "@/lib/validation/brand";
 import { trpc } from "@/lib/trpc/client";
 import { fontRegistry } from "@/lib/theme/font-registry";
 import { generateThemeStyle } from "@/lib/theme/generate-theme";
@@ -15,7 +22,9 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import {
   Field,
+  FieldError,
   FieldGroup,
+  FieldHint,
   FormActions,
 } from "@/components/onboarding/form-primitives";
 import { BrandPreview } from "@/components/onboarding/brand-preview";
@@ -29,6 +38,67 @@ async function uploadImage(siteId: string, type: "LOGO" | "FAVICON", file: File)
   if (!res.ok) throw new Error("Upload failed");
   const data = await res.json();
   return data.url as string;
+}
+
+type ColorName = "colors.primary" | "colors.secondary" | "colors.background" | "colors.foreground";
+
+/**
+ * A swatch and a hex box that are the same value.
+ *
+ * They used to be two `register()` calls on the same field name. React Hook
+ * Form keeps one ref per name, so the second registration won and neither
+ * input was ever written back to after mount: dragging the swatch moved the
+ * form state and the preview but left the hex text stale, and typing a hex
+ * left the swatch stale. `Controller` makes both controlled off one value, so
+ * whichever the church touches, the other follows.
+ */
+function ColorField({
+  control,
+  name,
+  label,
+}: {
+  control: Control<BrandConfigFormValues, unknown, BrandConfigInput>;
+  name: ColorName;
+  label: string;
+}) {
+  const fallback = defaultBrandConfig.colors[name.split(".")[1] as keyof typeof defaultBrandConfig.colors];
+
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field, fieldState }) => (
+        <Field>
+          <Label htmlFor={name}>{label}</Label>
+          <div className="flex items-center gap-2">
+            <input
+              id={name}
+              type="color"
+              className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-border bg-surface p-1"
+              /*
+                `<input type="color">` accepts `#rrggbb` and nothing else. The
+                schema also allows `#rgb`, and a half-typed `#ab` is neither —
+                handing either to the swatch makes the browser silently snap to
+                black, i.e. show a colour the church never picked.
+              */
+              value={normalizeHexColor(field.value, fallback)}
+              onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+              onBlur={field.onBlur}
+            />
+            <Input
+              value={field.value ?? ""}
+              onChange={(event) => field.onChange(event.target.value)}
+              onBlur={field.onBlur}
+              aria-label={`${label} hex value`}
+              aria-invalid={fieldState.error ? true : undefined}
+              className="font-mono text-xs uppercase"
+            />
+          </div>
+          <FieldError>{fieldState.error?.message}</FieldError>
+        </Field>
+      )}
+    />
+  );
 }
 
 export function BrandForm({
@@ -125,54 +195,10 @@ export function BrandForm({
         description="These become CSS tokens across every template."
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field>
-            <Label htmlFor="colors.primary">Primary</Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="colors.primary"
-                type="color"
-                className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-surface p-1"
-                {...register("colors.primary")}
-              />
-              <Input {...register("colors.primary")} className="font-mono text-xs uppercase" />
-            </div>
-          </Field>
-          <Field>
-            <Label htmlFor="colors.secondary">Secondary</Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="colors.secondary"
-                type="color"
-                className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-surface p-1"
-                {...register("colors.secondary")}
-              />
-              <Input {...register("colors.secondary")} className="font-mono text-xs uppercase" />
-            </div>
-          </Field>
-          <Field>
-            <Label htmlFor="colors.background">Background</Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="colors.background"
-                type="color"
-                className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-surface p-1"
-                {...register("colors.background")}
-              />
-              <Input {...register("colors.background")} className="font-mono text-xs uppercase" />
-            </div>
-          </Field>
-          <Field>
-            <Label htmlFor="colors.foreground">Text</Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="colors.foreground"
-                type="color"
-                className="h-10 w-12 cursor-pointer rounded-lg border border-border bg-surface p-1"
-                {...register("colors.foreground")}
-              />
-              <Input {...register("colors.foreground")} className="font-mono text-xs uppercase" />
-            </div>
-          </Field>
+          <ColorField control={control} name="colors.primary" label="Primary" />
+          <ColorField control={control} name="colors.secondary" label="Secondary" />
+          <ColorField control={control} name="colors.background" label="Background" />
+          <ColorField control={control} name="colors.foreground" label="Text" />
         </div>
       </FieldGroup>
 
@@ -202,10 +228,16 @@ export function BrandForm({
       </FieldGroup>
 
       <FieldGroup index={3} title="Assets" description="Optional now — templates still look polished without them.">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/*
+          Stacked rather than the two-column grid the other groups use: the
+          favicon needs an explainer image, and beside a bare Upload button in
+          the next column the two halves ended up wildly different heights.
+        */}
+        <div className="grid grid-cols-1 gap-4">
           <Field>
-            <Label>Logo</Label>
+            <Label htmlFor="logo">Logo</Label>
             <input
+              id="logo"
               ref={logoInputRef}
               type="file"
               accept="image/*"
@@ -215,15 +247,38 @@ export function BrandForm({
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full sm:w-auto"
               onClick={() => logoInputRef.current?.click()}
             >
               {uploading === "logo" ? "Uploading..." : values.logo.url ? "Change logo" : "Upload logo"}
             </Button>
           </Field>
           <Field>
-            <Label>Favicon</Label>
+            <Label htmlFor="favicon">Favicon</Label>
+            {/*
+              "Favicon" is jargon, and the field was a bare button — a church
+              had no way to know what it was being asked for. The picture
+              answers it faster than the sentence does, so it leads.
+
+              A plain <img>, matching the logo preview below: `ufs.sh` is not
+              in next.config's `remotePatterns`, so `next/image` would 400 on
+              it without a config change this one decorative asset does not
+              justify.
+            */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdFzTVOlkjhruTU0X3Nbvil6SHPWZeIdAkLzpf"
+              alt="A browser tab showing a small square church icon beside the church's name"
+              width={653}
+              height={117}
+              className="w-full max-w-sm rounded-lg"
+            />
+            <FieldHint>
+              The small square icon in a browser tab, beside your church&rsquo;s
+              name. A square image works best.
+            </FieldHint>
             <input
+              id="favicon"
               ref={faviconInputRef}
               type="file"
               accept="image/*"
@@ -233,7 +288,7 @@ export function BrandForm({
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full sm:w-auto"
               onClick={() => faviconInputRef.current?.click()}
             >
               {uploading === "favicon"

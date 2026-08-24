@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { BlockTree } from "@/components/website/blocks/block-renderer";
 import type { SiteConfig } from "@/lib/site/types";
 import { cn } from "@/lib/utils";
+import { useInertLinks } from "@/hooks/use-inert-links";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 
@@ -18,6 +19,9 @@ const VIEWPORTS: Record<Viewport, { width: number; label: string }> = {
 export function GenerationPreview({ site }: { site: SiteConfig }) {
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const width = VIEWPORTS[viewport].width;
+  // Same reason as the editor's frame: this renders the real block tree, so
+  // its nav would navigate the wizard away mid-generation.
+  const inertLinks = useInertLinks();
 
   return (
     <div className="overflow-hidden rounded-panel border border-border bg-editor-panel shadow-[var(--shadow-lift)]">
@@ -45,8 +49,9 @@ export function GenerationPreview({ site }: { site: SiteConfig }) {
       </div>
       <div className="flex max-h-[68vh] justify-center overflow-auto bg-editor-shell p-4">
         <div
+          {...inertLinks}
           className={cn(
-            "overflow-auto bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-[width,border-radius] duration-300",
+            "overflow-auto bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-[width,border-radius] duration-300 [&_a]:cursor-default",
             viewport === "mobile"
               ? "rounded-[1.5rem] border-[8px] border-editor-border"
               : viewport === "tablet"
