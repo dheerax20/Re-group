@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fontRegistry } from "@/lib/theme/fonts";
+import { fontRegistry } from "@/lib/theme/font-registry";
 import { mediaUrlSchema } from "./url";
 
 const hexColor = z

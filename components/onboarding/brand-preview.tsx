@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { fontRegistry, isValidFontKey } from "@/lib/theme/fonts";
+import { fontRegistry, isValidFontKey } from "@/lib/theme/font-registry";
 import { cn } from "@/lib/utils";
 
 /**

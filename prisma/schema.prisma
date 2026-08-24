@@ -261,6 +261,50 @@ model SiteGenerationJob {
   summary   String?
   log       Json    @default("[]")
 
+  /// Which surface started this job: "web" | "slack". Defaults to "web",
+  /// which is correct for every row that existed before Slack could edit.
+  source String @default("web")
+
+  /// Where the reply lives, when this job came from Slack.
+  slackChannelId String?
+  /// OUR message's `ts` — what `chat.update` targets as the job progresses.
+  /// Never the church member's message; we only ever edit our own.
+  slackMessageTs String?
+  /// The Slack user who ran the command, for the audit trail.
+  slackUserId    String?
+
+  /**
+   * The undo snapshot: this page's tree as it was immediately BEFORE this job
+   * wrote to it. Written inside the same transaction as the page write, so it
+   * exists if and only if a write actually happened — a snapshot taken before
+   * the provider call would leave a phantom undo point behind every failed
+   * prompt.
+   */
+  previousPath   String?
+  previousBlocks Json?
+
+  /**
+   * Whether a `SitePage` row existed for `previousPath` before this edit.
+   * The subtle one. A never-edited secondary page has NO row — `getPageBlocks`
+   * recomputes its default from the site's brand and features on every render.
+   * The edit creates the row. If undo merely wrote the old tree back, the page
+   * would stay frozen at whatever that default happened to be. False here
+   * tells undo to DELETE the row instead, returning the page to recomputing.
+   */
+  previousPageExisted Boolean?
+
+  /// The three sidecar keys of `storyConfig` this job overwrote
+  /// (improvements / designFeedback / mobileFeedback), never the whole column.
+  previousStory Json?
+
+  /// sha256 of the tree as this job wrote it. A mismatch at undo time means
+  /// the site changed afterwards — undo still wins, but says what it discarded.
+  writtenBlocksHash String?
+
+  revertedAt     DateTime?
+  /// What undo threw away. Insurance only; there is no redo.
+  revertedBlocks Json?
+
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   startedAt  DateTime?
@@ -322,6 +366,31 @@ model SlackConnection {
   botAccessToken String
 
   installedByUserId String
+
+  /**
+   * The single channel `/regroup` answers in, captured from
+   * `incoming_webhook.channel_id` during the install.
+   * NULLABLE on purpose. Connections made before the channel picker existed
+   * have none, and a backfill cannot invent one — nobody chose a channel. A
+   * null here means "pre-alpha connection": every command is refused with
+   * "reconnect Slack and pick a channel" rather than defaulting to somewhere
+   * the church did not ask for.
+   */
+  channelId   String?
+  /// `incoming_webhook.channel`, e.g. "#website". Display only, never matched on.
+  channelName String?
+
+  /**
+   * `authed_user.id` — the ONE Slack identity permitted to edit this site.
+   * Slack identity is not proof of Regroup identity, so this is a binding
+   * made at install time by someone already holding the Regroup session,
+   * not an email match. Null for the same reason `channelId` can be.
+   */
+  ownerSlackUserId String?
+
+  /// Bot scopes actually granted, so an install missing one is diagnosable
+  /// from the row instead of from a failed API call in production.
+  scopes String @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

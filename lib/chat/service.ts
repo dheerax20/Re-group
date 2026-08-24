@@ -9,7 +9,7 @@ import { getPageBlocks, HOME_PATH } from "@/lib/site/blocks/resolve-page";
 import { isEditablePath } from "@/lib/site/pages";
 import { loadSiteConfig, writePageBlocks } from "@/lib/ai/page-edit";
 import type { PageBlocks } from "@/lib/site/blocks/types";
-import { parseChurchStory, type DesignFeedback, type SiteImprovement } from "@/lib/site/story";
+import { withStoryFeedback, type DesignFeedback, type SiteImprovement } from "@/lib/site/story";
 
 /**
  * The site chatbot's server boundary.
@@ -157,12 +157,13 @@ export async function sendChatMessage(
           // in the editor reads this back from the site record, so a chat
           // edit's improvements/feedback have to survive a page reload the
           // same way the one-shot editor prompt's always did.
-          storyConfig: toJson({
-            ...parseChurchStory(site.storyConfig),
-            improvements: result.improvements,
-            designFeedback: result.designFeedback,
-            mobileFeedback: result.mobileFeedback,
-          }),
+          storyConfig: toJson(
+            withStoryFeedback(site.storyConfig, {
+              improvements: result.improvements,
+              designFeedback: result.designFeedback,
+              mobileFeedback: result.mobileFeedback,
+            })
+          ),
         },
       });
       await invalidateSite(siteId);

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { toSiteConfig } from "@/lib/site/to-site-config";
-import { getPageBlocks, HOME_PATH } from "@/lib/site/blocks/resolve-page";
+import { getPageBlocks, hasStoredPage, HOME_PATH } from "@/lib/site/blocks/resolve-page";
 import { applyBlockEdits } from "@/lib/site/blocks/patch";
 import { editableSitePages, isEditablePath } from "@/lib/site/pages";
 import type { PageBlocks } from "@/lib/site/blocks/types";
@@ -27,6 +27,24 @@ export type PageEditResult = {
   path: string;
   blocks: PageBlocks;
   changed: boolean;
+  /**
+   * `path`'s tree as it was BEFORE this edit. Returned rather than re-read by
+   * the caller because this function already resolved it, and reading it
+   * again after a retarget would mean loading the whole site a second time to
+   * snapshot the right page.
+   */
+  previousBlocks: PageBlocks;
+  /**
+   * Whether this page already had somewhere to live before the edit.
+   *
+   * Only ever false for a SECONDARY page, which is the case that matters:
+   * a never-edited one has no `SitePage` row and recomputes its default on
+   * every render, so undo has to delete the row this edit created rather than
+   * freeze the page at that default forever. The homepage always has a home
+   * (`Site.blockConfig`), so this is true for `/` regardless of whether the
+   * tree happens to be empty.
+   */
+  previousPageExisted: boolean;
   summary: string;
   improvements: BlockPromptResult["improvements"];
   designFeedback: BlockPromptResult["designFeedback"];
@@ -98,25 +116,56 @@ async function recordMedia(siteId: string, before: PageBlocks, after: PageBlocks
   }
 }
 
+/**
+ * The page write as an UNAWAITED Prisma operation.
+ *
+ * Prisma operations are lazy, so handing one back lets a caller put the page
+ * write in the same `$transaction` as whatever else must land with it — the
+ * undo snapshot, in particular, which is only trustworthy if it cannot exist
+ * without the write it describes, or vice versa.
+ *
+ * This is the only place that knows the home/secondary split on the write
+ * side: the homepage lives on `Site.blockConfig`, every other page on its own
+ * `SitePage` row.
+ */
+export function pageBlocksWriteOp(
+  siteId: string,
+  path: string,
+  blocks: PageBlocks
+): Prisma.PrismaPromise<unknown> {
+  if (path === HOME_PATH) {
+    return prisma.site.update({
+      where: { id: siteId },
+      data: { blockConfig: toJson(blocks) },
+    });
+  }
+
+  return prisma.sitePage.upsert({
+    where: { siteId_path: { siteId, path } },
+    create: { siteId, path, blockConfig: toJson(blocks) },
+    update: { blockConfig: toJson(blocks) },
+  });
+}
+
 /** Persists a page's tree to wherever that page lives. */
 export async function writePageBlocks(
   siteId: string,
   path: string,
   blocks: PageBlocks
 ): Promise<void> {
-  if (path === HOME_PATH) {
-    await prisma.site.update({
-      where: { id: siteId },
-      data: { blockConfig: toJson(blocks) },
-    });
-    return;
-  }
+  await pageBlocksWriteOp(siteId, path, blocks);
+}
 
-  await prisma.sitePage.upsert({
-    where: { siteId_path: { siteId, path } },
-    create: { siteId, path, blockConfig: toJson(blocks) },
-    update: { blockConfig: toJson(blocks) },
-  });
+/**
+ * Whether undo would find somewhere to put this page back.
+ *
+ * `hasStoredPage` answers a subtly different question for the homepage — it
+ * reports whether the home tree is non-empty, not whether a row exists — and
+ * the snapshot reads `false` as "delete the SitePage row". There is no
+ * SitePage row for `/` to delete, so the homepage is always true here.
+ */
+function pageAlreadyExisted(siteConfig: SiteConfig, path: string): boolean {
+  return path === HOME_PATH || hasStoredPage(siteConfig, path);
 }
 
 /**
@@ -171,6 +220,8 @@ export async function runPageEdit(args: {
         path,
         blocks: getPageBlocks(siteConfig, path),
         changed: false,
+        previousBlocks: getPageBlocks(siteConfig, path),
+        previousPageExisted: pageAlreadyExisted(siteConfig, path),
         summary: `${label} isn't a page I can edit — its content comes from your sermons, events and settings rather than editable text.`,
         improvements: result.improvements,
         designFeedback: result.designFeedback,
@@ -203,6 +254,11 @@ export async function runPageEdit(args: {
     path,
     blocks,
     changed,
+    previousBlocks: before,
+    // Captured BEFORE the write, which is the whole point: after it, a
+    // secondary page always has a row and undo could never tell that this
+    // edit is what created it.
+    previousPageExisted: pageAlreadyExisted(siteConfig, path),
     summary:
       (changed && result.summary) ||
       (changed

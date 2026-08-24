@@ -57,7 +57,24 @@ to be live; don't "clean up" one without following every call site.
   features on `Entitlement`, never on Stripe or `Subscription` from UI code.
 - **Spending money needs `assertAiBudget`** (`lib/ai/usage.ts`) *before* the
   provider call — kinds are `full_build`, `editor_prompt`, `chat_message`. The
-  Redis cooldown fails open; the Postgres count is the real ceiling.
+  Redis cooldown fails open; the Postgres count is the real ceiling. Note a
+  retarget makes a SECOND provider call, so the budget callback has to be
+  threaded all the way down to `runPageEdit` — it is checked per call, though
+  the ledger still counts one row per request.
+- **A caller without a session gates INSIDE the mutating function.**
+  `lib/ai/editor-prompt-run.ts`'s `runEditorPromptJob` and
+  `lib/ai/revert-page-edit.ts`'s `revertPageEdit` both re-assert ownership and
+  plan themselves rather than trusting `paidSiteProcedure` around them, because
+  Slack reaches them with no session at all. Anything that gains a non-session
+  caller must move its gate inward the same way, or the first non-negotiable
+  above quietly stops being true. Slack's own channel/identity/entitlement
+  check is `lib/slack/authorize.ts`, run on EVERY command — never once at
+  connect time.
+- **A Trigger.dev task must not import `next/font`.** Tasks are bundled by
+  esbuild, where `next/font` (a build-time transform) throws at import. The
+  font data a task transitively needs lives in `lib/theme/font-registry.ts`;
+  `lib/theme/fonts.ts` holds the `next/font` calls and `app/layout.tsx` is its
+  only importer. `tests/task-import-boundary.test.ts` enforces this.
 - **Third-party bearer tokens are encrypted before they touch Postgres**
   (`lib/slack/crypto.ts`, AES-256-GCM). Env-var secrets stay in env.
 
@@ -94,7 +111,7 @@ dashboard. Renderer code must never hardcode a hex or font name.
 
 ## Before calling work done
 
-Run `npm run typecheck && npm run lint`. **`npm run test` currently fails**:
-`tests/` was deleted but `vitest.config.mts` still points at
-`tests/**/*.test.ts` and a `tests/setup.ts` that does not exist, so
-`npm run verify` cannot pass until that is resolved.
+Run `npm run verify` (typecheck + lint + tests). All three pass; `tests/`
+exists and the suite is expected to stay green. Lint reports warnings from
+the untracked `.agents/skills` and `.claude/skills` directories — those are
+vendored tooling, not project source, and `0 errors` is the bar.
