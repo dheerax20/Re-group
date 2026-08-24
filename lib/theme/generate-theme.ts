@@ -1,5 +1,5 @@
 import { BrandConfig } from "./types";
-import { fontKeyToCssVar } from "./fonts";
+import { fontKeyToCssVar } from "./font-registry";
 import { readableOn } from "./contrast";
 import type { CSSProperties } from "react";
 

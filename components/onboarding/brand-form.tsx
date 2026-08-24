@@ -6,7 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { brandConfigSchema, BrandConfigInput } from "@/lib/validation/brand";
 import { trpc } from "@/lib/trpc/client";
-import { fontRegistry } from "@/lib/theme/fonts";
+import { fontRegistry } from "@/lib/theme/font-registry";
 import { generateThemeStyle } from "@/lib/theme/generate-theme";
 import type { BrandConfig } from "@/lib/theme/types";
 import { Input } from "@/components/ui/input";

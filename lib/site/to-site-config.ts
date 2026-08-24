@@ -1,6 +1,6 @@
 import type { Site, SocialLink } from "@prisma/client";
 import { BrandConfig } from "@/lib/theme/types";
-import { isValidFontKey } from "@/lib/theme/fonts";
+import { isValidFontKey } from "@/lib/theme/font-registry";
 import { FeatureConfig, defaultFeatures } from "@/lib/features/types";
 import { defaultBrandConfig } from "@/lib/validation/brand";
 import { coerceSections } from "@/lib/validation/section";

@@ -36,6 +36,45 @@ export function parseChurchStory(value: unknown): ChurchStory {
   };
 }
 
+/**
+ * The story column with fresh AI feedback laid over it.
+ *
+ * Spreads the RAW stored object, not `parseChurchStory`'s projection. That
+ * projection keeps exactly the six `ChurchStory` strings, so writing
+ * `{ ...parseChurchStory(col), improvements, ... }` — which both edit paths
+ * did — silently dropped every other key the column carries. `styleName` is
+ * one of them, and `runCrewBuild` reads it to keep a church's chosen visual
+ * style across rebuilds: one AI edit reset it. `agentLog` went the same way.
+ *
+ * Undo depends on this too. A snapshot that restores three keys is only
+ * correct if the write it reverses touched three keys.
+ */
+export function withStoryFeedback(
+  existing: unknown,
+  feedback: {
+    improvements?: SiteImprovement[];
+    designFeedback?: DesignFeedback[];
+    mobileFeedback?: DesignFeedback[];
+  }
+): Record<string, unknown> {
+  const base =
+    existing && typeof existing === "object" && !Array.isArray(existing)
+      ? (existing as Record<string, unknown>)
+      : {};
+
+  /**
+   * All three keys are written every time, empty when the model offered
+   * nothing. Leaving a stale list in place would show the church a "Needs"
+   * checklist about a version of the page that no longer exists.
+   */
+  return {
+    ...base,
+    improvements: feedback.improvements ?? [],
+    designFeedback: feedback.designFeedback ?? [],
+    mobileFeedback: feedback.mobileFeedback ?? [],
+  };
+}
+
 export function parseImprovements(value: unknown): SiteImprovement[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const raw = (value as Record<string, unknown>).improvements;

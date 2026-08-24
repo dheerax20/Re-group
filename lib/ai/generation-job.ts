@@ -127,7 +127,17 @@ export async function getLatestJob(siteId: string, kind: string): Promise<JobVie
 export async function claimJob(
   siteId: string,
   kind: "full_build" | "editor_prompt",
-  prompt?: string
+  prompt?: string,
+  /**
+   * Which surface asked for this job. Written with the row rather than
+   * updated afterwards: a follow-up write is one more thing that can fail
+   * between claiming the slot and spending money on it.
+   */
+  origin?: {
+    source: string;
+    slackChannelId?: string | null;
+    slackUserId?: string | null;
+  }
 ): Promise<{ claimed: true; job: JobView } | { claimed: false; job: JobView | null }> {
   const created = await prisma.siteGenerationJob.createManyAndReturn({
     data: [
@@ -137,6 +147,9 @@ export async function claimJob(
         status: "QUEUED",
         totalSteps: kind === "full_build" ? CREW_STEPS.length : 1,
         prompt: prompt ?? null,
+        source: origin?.source ?? "web",
+        slackChannelId: origin?.slackChannelId ?? null,
+        slackUserId: origin?.slackUserId ?? null,
       },
     ],
     skipDuplicates: true,

@@ -6,6 +6,19 @@ import {
   Montserrat,
 } from "next/font/google";
 
+/**
+ * Loads the church-selectable fonts and exposes their CSS variables.
+ *
+ * This module CANNOT be imported outside a Next.js compilation — `next/font`
+ * is a build-time transform, and these calls throw "Inter is not a function"
+ * under esbuild or vitest. `app/layout.tsx` is its only importer, and it must
+ * stay that way: anything that merely needs to know which font keys exist,
+ * or what CSS variable a key maps to, imports `./font-registry` instead.
+ *
+ * The names here must stay in step with `fontRegistry`'s `cssVar` values —
+ * that registry is what turns a stored key into `var(--font-…)`, and this is
+ * what defines those variables on the page.
+ */
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
 const playfairDisplay = Playfair_Display({
@@ -22,45 +35,6 @@ const montserrat = Montserrat({
   variable: "--font-montserrat",
 });
 
-export type FontKey =
-  | "inter"
-  | "dm-sans"
-  | "playfair-display"
-  | "cormorant-garamond"
-  | "montserrat";
-
-/**
- * The only fonts a brand config may reference. Keeping this a fixed
- * registry (rather than arbitrary font URLs) avoids uncontrolled
- * third-party asset loading and keeps Next.js font optimization working.
- */
-export const fontRegistry: Record<
-  FontKey,
-  { label: string; cssVar: string; className: string }
-> = {
-  inter: { label: "Inter", cssVar: "--font-inter", className: inter.className },
-  "dm-sans": {
-    label: "DM Sans",
-    cssVar: "--font-dm-sans",
-    className: dmSans.className,
-  },
-  "playfair-display": {
-    label: "Playfair Display",
-    cssVar: "--font-playfair-display",
-    className: playfairDisplay.className,
-  },
-  "cormorant-garamond": {
-    label: "Cormorant Garamond",
-    cssVar: "--font-cormorant-garamond",
-    className: cormorantGaramond.className,
-  },
-  montserrat: {
-    label: "Montserrat",
-    cssVar: "--font-montserrat",
-    className: montserrat.className,
-  },
-};
-
 export const fontVariables = [
   inter.variable,
   dmSans.variable,
@@ -68,14 +42,3 @@ export const fontVariables = [
   cormorantGaramond.variable,
   montserrat.variable,
 ].join(" ");
-
-export function isValidFontKey(value: string): value is FontKey {
-  return value in fontRegistry;
-}
-
-export function fontKeyToCssVar(key: string): string {
-  if (isValidFontKey(key)) {
-    return `var(${fontRegistry[key].cssVar})`;
-  }
-  return `var(${fontRegistry.inter.cssVar})`;
-}

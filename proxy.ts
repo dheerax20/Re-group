@@ -14,6 +14,24 @@ function isPlatformPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Webhook endpoints that are unauthenticated by design: each verifies a
+ * signature computed over the RAW request body, has no session to refresh
+ * and no cookies to set. Returning before `auth0.middleware()` keeps
+ * anything session-related well away from routes where the body must arrive
+ * byte-for-byte intact — a re-encode invalidates every signature.
+ *
+ * EXACT match, never a prefix. `/api/slack/oauth/callback` sits under the
+ * same namespace and genuinely needs the Auth0 session, so a
+ * `startsWith("/api/slack")` here would silently break connecting Slack.
+ */
+const RAW_BODY_WEBHOOKS = new Set([
+  "/api/stripe/webhook",
+  "/api/slack/commands",
+  "/api/slack/events",
+  "/api/slack/interactivity",
+]);
+
 function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach((cookie) => {
     to.cookies.set(cookie);
@@ -45,14 +63,7 @@ function slugFromPlatformHost(host: string): string | null {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  /**
-   * The Stripe webhook is unauthenticated by design — it is verified by
-   * signature over the RAW request body, has no session to refresh, and no
-   * cookies to set. Returning before auth0.middleware() keeps anything
-   * session-related well away from a route where the body must arrive
-   * byte-for-byte intact.
-   */
-  if (pathname === "/api/stripe/webhook") {
+  if (RAW_BODY_WEBHOOKS.has(pathname)) {
     return NextResponse.next();
   }
 
