@@ -24,6 +24,9 @@ export const ADDONS = {
     lookupKey: "website_builder_monthly",
     featureKey: "website_builder",
     label: "Website Builder with AI",
+    // Also what gates editing the site from Slack (`lib/slack/authorize.ts`).
+    // Slack is a second surface onto the same AI editor, not a second product,
+    // so it rides on this entitlement rather than charging twice for it.
     description: "Create websites with AI templates and enhance your reach",
   },
   automations: {

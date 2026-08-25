@@ -39,6 +39,27 @@ const MONTHLY_CHAT_LIMIT = () => intFromEnv("AI_MONTHLY_CHAT_LIMIT", 300);
 
 export type AiJobKind = "full_build" | "editor_prompt" | "chat_message";
 
+/**
+ * The monthly ceiling, as distinct from the short cooldown.
+ *
+ * Both refusals are `RateLimitError` — that is what makes the tRPC error
+ * translation pass their copy through verbatim, and every existing `catch`
+ * keeps working unchanged. But they are not the same event to a caller that
+ * has to explain itself: a cooldown means "in a few minutes", a spent budget
+ * means "next month". A non-HTTP caller (the Slack dispatcher) needs to tell
+ * them apart to pick the right sentence, and guessing from message text would
+ * be a copy change away from breaking.
+ */
+export class AiBudgetExhaustedError extends RateLimitError {
+  readonly budget: AiBudget;
+
+  constructor(message: string, budget: AiBudget) {
+    super(message);
+    this.name = "AiBudgetExhaustedError";
+    this.budget = budget;
+  }
+}
+
 function startOfMonth(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -126,8 +147,9 @@ export async function assertAiBudget(
       month: "long",
       day: "numeric",
     });
-    throw new RateLimitError(
-      `You have used all ${budget.limit} ${KIND_LABEL[kind]} for this month. Your allowance resets on ${resets}.`
+    throw new AiBudgetExhaustedError(
+      `You have used all ${budget.limit} ${KIND_LABEL[kind]} for this month. Your allowance resets on ${resets}.`,
+      budget
     );
   }
 

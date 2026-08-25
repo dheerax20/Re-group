@@ -157,11 +157,36 @@ project belongs to one).
     `chat_message` kind — a flat monthly quota per site,
     `AI_MONTHLY_CHAT_LIMIT`, counted in Postgres so it can't be reset by
     clearing a cache).
-- `lib/slack` — connects a church's Slack workspace to their site
-  (`/dashboard/slack`). **Connection only, so far** — a workspace and a site
-  can be introduced to each other; sending a message from Slack into the
-  chatbot above is a separate, not-yet-built piece, and the UI says so
-  rather than implying otherwise.
+- `lib/slack` — a church edits their website from their own Slack workspace
+  by typing `/regroup <what to change>`. Connect at `/dashboard/slack`; the
+  command surface is gated on the **`website_builder` add-on** — the same
+  entitlement the site editor needs, because Slack is a second surface onto
+  that editor rather than a second product — and on `SLACK_COMMANDS_ENABLED=1`,
+  which is the kill switch. The check runs on every command, not once at
+  connect, so a lapsed add-on closes both surfaces together.
+  - **One channel, one editor.** The installer picks a channel on Slack's own
+    consent screen (that is the only reason the `incoming-webhook` scope is
+    requested — the webhook URL itself is discarded, since a webhook post
+    returns no `ts` and so could never be edited in place). `/regroup`
+    answers in that channel and nowhere else, for the Slack account that
+    approved the install and nobody else. Reconnecting is how either is
+    changed, and the panel says so.
+  - **Three unauthenticated routes**, all verified by signature over the RAW
+    request body (`lib/slack/verify.ts`) — which is why `proxy.ts` returns
+    `/api/slack/commands`, `/events` and `/interactivity` before Auth0 runs,
+    by exact match, so the OAuth callback keeps its session.
+    `lib/slack/authorize.ts` decides permission; a signature only proves
+    origin.
+  - **The edit is the same one the web editor runs.**
+    `lib/ai/editor-prompt-run.ts` owns claim → budget → announce → provider →
+    close-out for both surfaces. Slack adds no second way to change a site.
+    The provider call runs in a Trigger.dev task (`trigger/slack-edit.ts`)
+    because Slack allows three seconds to acknowledge.
+  - **Undo reaches back exactly one edit**, expires 15 minutes after it
+    finishes, and costs no AI budget (`lib/ai/revert-page-edit.ts`). It
+    restores one page's block tree and the three AI-feedback keys — nothing
+    else — and for a page the edit itself created it DELETES the `SitePage`
+    row so the page returns to recomputing its default.
   - The OAuth flow is stateless: `lib/slack/state.ts` signs a short-lived,
     HMAC'd `state` param carrying the `siteId` through the redirect, which
     is both the CSRF protection Slack's flow expects and how
@@ -173,6 +198,8 @@ project belongs to one).
     in env vars, since it's a live ability to post into a church's Slack.
   - One workspace per site and one site per workspace, both directions
     unique — matching `Site.userId`'s shape elsewhere in the schema.
+    Uninstalling from Slack deletes the row (`app_uninstalled`), because a
+    kept-but-dead row would block that workspace from ever reconnecting.
 - `lib/validation/url.ts` — the rules for anything reaching an `href` or `src`
   on a published site.
 - `lib/features`, `lib/theme`, `lib/templates` — feature dependency rules, the

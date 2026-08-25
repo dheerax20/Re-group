@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { syncCurrentUser } from "@/lib/auth/session";
-import { hasBasePlan, listEntitlements } from "@/lib/billing/entitlements";
+import { hasBasePlan } from "@/lib/billing/entitlements";
 import { Button } from "@/components/ui/button";
 import { completeOnboarding } from "./actions";
 import { FinalizingSubscription } from "./finalizing";
+import { WelcomeSuccess } from "./success";
 
 export const metadata = {
   title: "Welcome — Regroup",
@@ -33,32 +34,14 @@ export default async function OnboardingPage({
     );
   }
 
-  const entitlements = await listEntitlements(user.id);
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md rounded-panel border border-border bg-surface p-8 shadow-[var(--shadow-soft)]">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          You&rsquo;re all set
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Your subscription is active. Next, let&rsquo;s build your church
-          website.
-        </p>
-
-        <div className="mt-6 rounded-xl border border-border bg-background px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">
-            Included
-          </p>
-          <ul className="mt-2 space-y-1">
-            {entitlements.map((entitlement) => (
-              <li key={entitlement.id} className="text-sm text-foreground">
-                {entitlement.featureKey}
-              </li>
-            ))}
-          </ul>
-        </div>
-
+      {/*
+        The heading and the animation live in `WelcomeSuccess`; the form stays
+        here so `completeOnboarding` is passed as a Server Function from the
+        server, not imported into the client bundle.
+      */}
+      <WelcomeSuccess>
         <form action={completeOnboarding}>
           <Button
             type="submit"
@@ -75,7 +58,7 @@ export default async function OnboardingPage({
           </a>
           .
         </p>
-      </div>
+      </WelcomeSuccess>
     </main>
   );
 }

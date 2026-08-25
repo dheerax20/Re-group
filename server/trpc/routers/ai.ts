@@ -8,13 +8,15 @@ import {
   findActiveJob,
   getLatestJob,
   markJobFailed,
-  markJobSucceeded,
   type JobView,
 } from "@/lib/ai/generation-job";
 import { reconcileJobWithRun } from "@/lib/ai/reconcile-run";
 import type { fullBuildTask } from "@/trigger/full-build";
 import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
-import { runEditorPrompt } from "@/lib/ai/editor-prompt-service";
+import {
+  runEditorPromptJob,
+  type EditorPromptFailureCode,
+} from "@/lib/ai/editor-prompt-run";
 import {
   getChatBudget,
   getChatHistory,
@@ -22,6 +24,26 @@ import {
 } from "@/lib/chat/service";
 
 const siteInput = z.object({ siteId: z.string().min(1) });
+
+/**
+ * How an edit refusal reaches the browser.
+ *
+ * `TOO_MANY_REQUESTS` for both budget refusals is what the error-translation
+ * middleware already produced when `assertAiBudget`'s `RateLimitError`
+ * propagated, and the editor's copy depends on it — so the extraction
+ * preserves it rather than picking a tidier code. `POST_FAILED` cannot occur
+ * on this path (nothing passes `onAccepted`) but is mapped for totality.
+ */
+const TRPC_CODE_FOR: Record<EditorPromptFailureCode, TRPCError["code"]> = {
+  NO_SITE: "FORBIDDEN",
+  NO_PLAN: "PAYMENT_REQUIRED",
+  ALREADY_RUNNING: "CONFLICT",
+  BUDGET_EXHAUSTED: "TOO_MANY_REQUESTS",
+  COOLDOWN: "TOO_MANY_REQUESTS",
+  POST_FAILED: "INTERNAL_SERVER_ERROR",
+  PROVIDER_FAILED: "INTERNAL_SERVER_ERROR",
+  INTERNAL: "INTERNAL_SERVER_ERROR",
+};
 
 /**
  * A read token scoped to one run, so the browser can subscribe to it.
@@ -162,49 +184,46 @@ export const aiRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Claim the slot first, for the same reason the build does: the ledger
-      // row is written whether or not the call succeeds (the provider was
-      // still going to be called, and the monthly cap counts rows), so two
-      // concurrent prompts must not produce two rows and two charges.
-      const claim = await claimJob(input.siteId, "editor_prompt", input.prompt);
-      if (!claim.claimed) {
+      /**
+       * The claim, the budget and the job bookkeeping all live in
+       * `runEditorPromptJob` now, shared with the Slack command surface. This
+       * procedure's remaining job is to translate one outcome into the tRPC
+       * vocabulary the editor already handles — the codes below are exactly
+       * the ones this mutation threw before the extraction.
+       */
+      const outcome = await runEditorPromptJob({
+        siteId: input.siteId,
+        userId: ctx.user.id,
+        prompt: input.prompt,
+        path: input.path,
+        source: "web",
+      });
+
+      if (!outcome.ok) {
         throw new TRPCError({
-          code: "CONFLICT",
-          message: "An AI edit is already running. Wait for it to finish.",
+          code: TRPC_CODE_FOR[outcome.code],
+          message: outcome.message,
         });
       }
-      const job = claim.job;
 
-      try {
-        await assertAiBudget(input.siteId, ctx.user.id, "editor_prompt");
-      } catch (error) {
-        await markJobFailed(job.id, "This edit was not started.");
-        throw error;
-      }
-
-      try {
-        const result = await runEditorPrompt(
-          input.siteId,
-          input.prompt,
-          input.path,
-          // Charged again if the model retargets to another page, since that
-          // is a second provider call.
-          () => assertAiBudget(input.siteId, ctx.user.id, "editor_prompt").then(() => undefined)
-        );
-        // Inline jobs must be closed out explicitly — an active row would
-        // block the next edit from claiming the slot.
-        await markJobSucceeded(job.id, result.summary);
-        return { job, result };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "The AI edit failed. Try again.";
-        await markJobFailed(job.id, message.slice(0, 280));
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-          cause: error,
-        });
-      }
+      /**
+       * The job the run CLAIMED, not the latest one on the site. Re-reading
+       * would be racy — the slot is released as soon as this job succeeds, so
+       * a concurrent edit can claim a newer row in between — and it would make
+       * a field that was always present suddenly nullable.
+       */
+      return {
+        job: outcome.job,
+        result: {
+          summary: outcome.summary,
+          path: outcome.path,
+          blocks: outcome.blocks,
+          applied: outcome.applied,
+          improvements: outcome.improvements,
+          designFeedback: outcome.designFeedback,
+          mobileFeedback: outcome.mobileFeedback,
+        },
+      };
     }),
 
   chatHistory: ownedSiteProcedure

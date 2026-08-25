@@ -35,6 +35,16 @@ const ChatState = Annotation.Root({
   blocks: Annotation<PageBlocks>,
   history: Annotation<ChatTurn[]>,
   message: Annotation<string>,
+  /**
+   * Charged before each provider call, and threaded through the STATE rather
+   * than closed over.
+   *
+   * It has to be declared here to exist at all: `compiledGraph.invoke()` keeps
+   * only the keys the annotation names, so a callback passed in the input
+   * object but missing from this list is silently dropped — which is exactly
+   * how a retarget's second provider call went unbilled.
+   */
+  assertBudget: Annotation<(() => Promise<void>) | undefined>,
   intent: Annotation<"edit" | "question">,
   reply: Annotation<string>,
   updatedBlocks: Annotation<PageBlocks | undefined>,
@@ -103,6 +113,14 @@ async function applyChange(state: ChatStateType): Promise<Partial<ChatStateType>
     path: state.path,
     prompt: state.message,
     history: state.history,
+    /**
+     * A retarget is a SECOND provider call, and CLAUDE.md requires the budget
+     * be asserted before the call rather than once per request. Note this
+     * CHECKS the second call (and consumes a cooldown token); it does not
+     * count a second unit against the monthly quota, which is one row per
+     * request by design.
+     */
+    assertBudget: state.assertBudget,
   });
 
   const summary = result.summary;
