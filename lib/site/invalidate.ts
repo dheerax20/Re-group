@@ -36,18 +36,73 @@ const APP_PATHS = [
 /**
  * `revalidatePath` throws when there is no request scope to attach the
  * revalidation to — which is exactly the case inside a Trigger.dev task, since
- * that runs in its own process rather than in a Next.js request. The Redis
- * invalidation below is the part that actually matters there (it is what the
- * public read path consults), and the ISR entries age out on their own
- * `revalidate = 300`. So a failure here is logged and stepped over rather than
- * being allowed to fail a build that has already succeeded.
+ * that runs in its own process rather than in a Next.js request.
+ *
+ * Returns whether it actually worked, because "it didn't" is now actionable:
+ * relying on the ISR entries ageing out on their own `revalidate = 300` meant
+ * a successful Slack edit showed no change for up to five minutes, which a
+ * church reads as a broken edit. `askAppToRevalidate` below covers that case.
  */
-function safeRevalidate(path: string, type?: "page" | "layout") {
+function safeRevalidate(path: string, type?: "page" | "layout"): boolean {
   try {
     if (type) revalidatePath(path, type);
     else revalidatePath(path);
+    return true;
   } catch {
     // Outside a request scope (Trigger.dev task, script). Redis still cleared.
+    return false;
+  }
+}
+
+/**
+ * The revalidation half, callable from inside a request.
+ *
+ * Split out so `app/api/internal/revalidate` can perform exactly what a
+ * task cannot, without duplicating the path list — which is the whole point of
+ * this module being the one place caches are cleared.
+ */
+export function revalidateSitePaths(
+  slug: string,
+  { publicOnly = false }: { publicOnly?: boolean } = {}
+): void {
+  for (const path of publicPaths(slug)) {
+    safeRevalidate(path);
+  }
+  // Detail pages are dynamic segments; revalidating the layout covers them.
+  safeRevalidate(`/sites/${slug}/sermons/[slug]`, "page");
+  safeRevalidate(`/sites/${slug}/events/[slug]`, "page");
+
+  if (!publicOnly) {
+    for (const path of APP_PATHS) {
+      safeRevalidate(path);
+    }
+  }
+}
+
+/**
+ * Asks the running app to revalidate, for callers with no request scope.
+ *
+ * Best effort by design: Redis has already been cleared by the time this runs,
+ * so the worst case is the pre-existing behaviour of waiting out the ISR
+ * timer. It must never fail an edit that has already committed.
+ */
+async function askAppToRevalidate(slug: string, publicOnly: boolean): Promise<void> {
+  const secret = process.env.INTERNAL_API_SECRET;
+  const origin = process.env.NEXT_PUBLIC_APP_URL;
+  if (!secret || !origin) return;
+
+  try {
+    const response = await fetch(`${origin.replace(/\/+$/, "")}/api/internal/revalidate`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-internal-secret": secret },
+      body: JSON.stringify({ slug, publicOnly }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      console.error(`[invalidate] revalidation request failed (${response.status})`);
+    }
+  } catch (error) {
+    console.error("[invalidate] could not reach the revalidation route", error);
   }
 }
 
@@ -71,19 +126,32 @@ export async function invalidateSite(
       })
     )?.slug;
 
-  if (resolvedSlug) {
-    for (const path of publicPaths(resolvedSlug)) {
-      safeRevalidate(path);
+  /**
+   * A site with no resolvable slug has no public pages to clear, but the
+   * authenticated screens still read its data — so they are refreshed anyway,
+   * exactly as before this function learned to reach outside a request.
+   */
+  if (!resolvedSlug) {
+    if (!publicOnly) {
+      for (const path of APP_PATHS) safeRevalidate(path);
     }
-    // Detail pages are dynamic segments; revalidating the layout covers them.
-    safeRevalidate(`/sites/${resolvedSlug}/sermons/[slug]`, "page");
-    safeRevalidate(`/sites/${resolvedSlug}/events/[slug]`, "page");
-    await invalidateSiteCache(resolvedSlug);
+    return;
   }
 
-  if (!publicOnly) {
-    for (const path of APP_PATHS) {
-      safeRevalidate(path);
-    }
+  await invalidateSiteCache(resolvedSlug);
+
+  /**
+   * Probe with one real path rather than testing for "am I in a request".
+   *
+   * There is no reliable way to ask that question, and getting it wrong in
+   * either direction is silent: a false negative fires a needless HTTP call, a
+   * false positive leaves the page stale. `revalidatePath` itself is the
+   * authority on whether `revalidatePath` works here.
+   */
+  if (safeRevalidate(`/sites/${resolvedSlug}`)) {
+    revalidateSitePaths(resolvedSlug, { publicOnly });
+    return;
   }
+
+  await askAppToRevalidate(resolvedSlug, publicOnly);
 }

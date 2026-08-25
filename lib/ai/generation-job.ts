@@ -137,6 +137,17 @@ export async function claimJob(
     source: string;
     slackChannelId?: string | null;
     slackUserId?: string | null;
+    /**
+     * The Trigger.dev run executing this claim, when the claim happens INSIDE
+     * a task.
+     *
+     * Written with the row rather than through `attachRunId` afterwards,
+     * because there is no safe window in between: the Slack path creates its
+     * job inside the run, so a row that fails to record its run id can never
+     * be reconciled and — since only one active job per (site, kind) may
+     * exist — jams every later edit permanently. See `./reconcile-run.ts`.
+     */
+    triggerRunId?: string | null;
   }
 ): Promise<{ claimed: true; job: JobView } | { claimed: false; job: JobView | null }> {
   const created = await prisma.siteGenerationJob.createManyAndReturn({
@@ -150,6 +161,7 @@ export async function claimJob(
         source: origin?.source ?? "web",
         slackChannelId: origin?.slackChannelId ?? null,
         slackUserId: origin?.slackUserId ?? null,
+        triggerRunId: origin?.triggerRunId ?? null,
       },
     ],
     skipDuplicates: true,

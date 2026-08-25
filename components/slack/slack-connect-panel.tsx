@@ -25,6 +25,11 @@ const NOTICE_COPY: Record<string, { tone: "warning" | "destructive"; message: st
     message:
       "No channel was chosen during the install, so nothing was connected. Try again and pick the channel Regroup should listen in.",
   },
+  channel_unreachable: {
+    tone: "destructive",
+    message:
+      "Regroup couldn't post in that channel, so nothing was connected. Invite @Regroup to the channel (type /invite @Regroup in it), or connect again and pick a public channel.",
+  },
   no_addon: {
     tone: "warning",
     message:

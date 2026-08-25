@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
-import { authTest, exchangeOAuthCode, revokeToken, slackRedirectUri } from "@/lib/slack/api";
+import {
+  authTest,
+  exchangeOAuthCode,
+  postMessage,
+  revokeToken,
+  slackRedirectUri,
+} from "@/lib/slack/api";
+import { connectedMessage } from "@/lib/slack/blocks";
 import { verifyOAuthState } from "@/lib/slack/state";
 import { decryptToken, encryptToken } from "@/lib/slack/crypto";
 import { hasFeature } from "@/lib/billing/entitlements";
@@ -120,6 +127,42 @@ export async function GET(request: NextRequest) {
     console.error(`[slack] auth.test rejected a fresh token: ${identity.error}`);
     await discard(accessToken);
     return redirectTo("/dashboard/slack?slack=failed", request);
+  }
+
+  /**
+   * Prove the bot can post to the channel that was just picked.
+   *
+   * `auth.test` proves the token works; it says nothing about whether
+   * `chat.postMessage` will be allowed HERE. Those are different questions
+   * because the channel is chosen through the `incoming-webhook` consent
+   * screen — which authorizes webhook delivery — while every message this app
+   * actually sends goes through `chat.postMessage`, whose rules depend on the
+   * bot's membership. With `chat:write` alone the bot may only post where it
+   * is a member; `chat:write.public` extends that to public channels only.
+   *
+   * Left unchecked, the mismatch surfaces once per command, forever, as an
+   * edit that is refused before the model runs and an explanation delivered
+   * over the one channel that had already failed. Checking it once, here,
+   * turns that into a refusal on a screen that can say what to do.
+   *
+   * The probe is a real post rather than `conversations.info`, which would
+   * need `channels:read`/`groups:read` that this app deliberately does not
+   * request. Posting exercises the exact call that matters, and the message
+   * doubles as the church's confirmation that it worked.
+   */
+  const hello = connectedMessage();
+  const greeted = await postMessage(
+    decryptToken(botAccessToken),
+    channel.id,
+    hello.text,
+    hello.blocks
+  );
+  if (!greeted.ok) {
+    console.error(
+      `[slack] cannot post to the chosen channel ${channel.id}: ${greeted.error}`
+    );
+    await discard(accessToken);
+    return redirectTo("/dashboard/slack?slack=channel_unreachable", request);
   }
 
   const fields = {

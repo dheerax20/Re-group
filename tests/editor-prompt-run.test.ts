@@ -34,10 +34,21 @@ vi.mock("@/lib/billing/entitlements", () => ({
 const claimJob = vi.fn();
 const markJobFailed = vi.fn().mockResolvedValue(undefined);
 const markJobSucceeded = vi.fn().mockResolvedValue(undefined);
+const isActiveStatus = vi.fn();
 vi.mock("@/lib/ai/generation-job", () => ({
   claimJob: (...args: [string, string, string?, unknown?]) => claimJob(...args),
   markJobFailed: (...args: [string, string]) => markJobFailed(...args),
   markJobSucceeded: (...args: [string, string]) => markJobSucceeded(...args),
+  isActiveStatus: (status: string) => isActiveStatus(status),
+}));
+
+/**
+ * Mocked rather than imported: the real module talks to the Trigger.dev SDK,
+ * and this file is about the ORDER of the guards, not about run liveness.
+ */
+const reconcileJobWithRun = vi.fn();
+vi.mock("@/lib/ai/reconcile-run", () => ({
+  reconcileJobWithRun: (job: unknown) => reconcileJobWithRun(job),
 }));
 
 const assertAiBudget = vi.fn();
@@ -76,6 +87,9 @@ beforeEach(() => {
   site.findFirst.mockResolvedValue({ id: "site-1" });
   hasBasePlan.mockResolvedValue(true);
   claimJob.mockResolvedValue({ claimed: true, job: { id: "job-1" } });
+  // Default: whatever holds the slot is genuinely alive, so a lost claim stands.
+  reconcileJobWithRun.mockImplementation(async (job: { status?: string }) => job);
+  isActiveStatus.mockReturnValue(true);
   assertAiBudget.mockResolvedValue({ remaining: 10 });
   siteGenerationJob.update.mockResolvedValue({});
   succeedingEdit();
@@ -209,6 +223,74 @@ describe("runEditorPromptJob", () => {
     // The loser of the race must not be billed for an edit it never started.
     expect(assertAiBudget).not.toHaveBeenCalled();
     expect(runEditorPrompt).not.toHaveBeenCalled();
+  });
+
+  it("reclaims the slot when the job holding it belongs to a dead run", async () => {
+    /**
+     * The failure this prevents: a run killed between claiming its row and its
+     * own error handling leaves that row QUEUED forever. Only one active job
+     * per site may exist, so without this ONE dead run disables editing for
+     * that church permanently — from Slack and from the web editor both.
+     */
+    const dead = { id: "job-dead", status: "QUEUED", triggerRunId: "run_dead" };
+    claimJob
+      .mockResolvedValueOnce({ claimed: false, job: dead })
+      .mockResolvedValueOnce({ claimed: true, job: { id: "job-2" } });
+    reconcileJobWithRun.mockResolvedValue({ ...dead, status: "FAILED" });
+    isActiveStatus.mockReturnValue(false);
+
+    const outcome = await runEditorPromptJob({ ...OWNED, source: "slack" });
+
+    expect(reconcileJobWithRun).toHaveBeenCalledWith(dead);
+    expect(claimJob).toHaveBeenCalledTimes(2);
+    expect(outcome).toMatchObject({ ok: true, jobId: "job-2" });
+  });
+
+  it("never reconciles an incumbent that has no run id", async () => {
+    /**
+     * The web editor runs this function INLINE, so its rows have no run id and
+     * are alive exactly while they hold the slot. `reconcileJobWithRun` reads a
+     * missing run id as "abandoned", so reconciling one would fail an edit that
+     * is still running and let a second claim in beside it — two provider
+     * calls, two charges, one overwriting the other.
+     */
+    claimJob.mockResolvedValue({
+      claimed: false,
+      job: { id: "job-inline", status: "RUNNING", triggerRunId: null },
+    });
+
+    const outcome = await runEditorPromptJob({ ...OWNED, source: "web" });
+
+    expect(reconcileJobWithRun).not.toHaveBeenCalled();
+    expect(claimJob).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ ok: false, code: "ALREADY_RUNNING" });
+    expect(assertAiBudget).not.toHaveBeenCalled();
+  });
+
+  it("does not retry the claim while the incumbent run is still alive", async () => {
+    // A genuinely concurrent edit must still lose — retrying past a live run
+    // would charge the church twice for one prompt.
+    const live = { id: "job-live", status: "RUNNING", triggerRunId: "run_live" };
+    claimJob.mockResolvedValue({ claimed: false, job: live });
+    reconcileJobWithRun.mockResolvedValue(live);
+    isActiveStatus.mockReturnValue(true);
+
+    const outcome = await runEditorPromptJob({ ...OWNED, source: "slack" });
+
+    expect(outcome).toMatchObject({ ok: false, code: "ALREADY_RUNNING" });
+    expect(claimJob).toHaveBeenCalledTimes(1);
+    expect(assertAiBudget).not.toHaveBeenCalled();
+  });
+
+  it("records the run id with the claim so a dead run can be identified later", async () => {
+    await runEditorPromptJob({ ...OWNED, source: "slack", triggerRunId: "run_abc" });
+
+    expect(claimJob).toHaveBeenCalledWith(
+      "site-1",
+      "editor_prompt",
+      expect.any(String),
+      expect.objectContaining({ triggerRunId: "run_abc" })
+    );
   });
 
   it("records where a Slack edit came from when it claims the slot", async () => {

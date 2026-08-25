@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { tasks } from "@trigger.dev/sdk";
 import type { slackEditTask } from "@/trigger/slack-edit";
 import { isSlackCommandsEnabled, respondViaResponseUrl } from "@/lib/slack/api";
-import { UNDO_ACTION_ID, failureMessage } from "@/lib/slack/blocks";
+import { UNDO_ACTION_ID, failureMessage, undoQueuedMessage } from "@/lib/slack/blocks";
 import { authorizeSlackActor, type SlackCommandContext } from "@/lib/slack/dispatch";
 import { parseInteractionBody, verifySlackRequest } from "@/lib/slack/verify";
 
@@ -80,7 +80,20 @@ export async function POST(request: NextRequest) {
     console.error("[slack] could not queue the undo", error);
     const message = failureMessage("Regroup couldn't undo that. Try again in a moment.");
     await respondViaResponseUrl(context.responseUrl, message.text, message.blocks);
+    return new NextResponse(null, { status: 200 });
   }
+
+  /**
+   * Acknowledge the click.
+   *
+   * A Block Kit button gives no feedback of its own, so without this the press
+   * looks like nothing happened for as long as the run takes to boot — and
+   * looks like nothing happened FOREVER if the run cannot post. Outside the
+   * try above so a delivery problem with the acknowledgement can never be
+   * reported as a failure to queue the undo, which did in fact queue.
+   */
+  const queued = undoQueuedMessage();
+  await respondViaResponseUrl(context.responseUrl, queued.text, queued.blocks);
 
   /**
    * A double-click needs no de-duplication here: the second run finds
