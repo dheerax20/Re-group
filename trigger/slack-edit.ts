@@ -1,7 +1,11 @@
 import { task } from "@trigger.dev/sdk";
-import { handlePrompt, handleUndo, type SlackCommandContext } from "@/lib/slack/dispatch";
+import {
+  handlePrompt,
+  handleUndo,
+  reportRunDeath,
+  type SlackCommandContext,
+} from "@/lib/slack/dispatch";
 import { failureMessage } from "@/lib/slack/blocks";
-import { respondViaResponseUrl } from "@/lib/slack/api";
 
 /**
  * One `/regroup <prompt>`, as a durable run.
@@ -44,7 +48,7 @@ export const slackEditTask = task({
   // a slow model, short enough that a hung run does not bill indefinitely.
   maxDuration: 120,
 
-  run: async (payload: SlackEditPayload) => {
+  run: async (payload: SlackEditPayload, { ctx }) => {
     if (payload.action === "undo") {
       await handleUndo(payload.context, {
         jobId: payload.jobId,
@@ -53,18 +57,26 @@ export const slackEditTask = task({
       return;
     }
 
-    await handlePrompt(payload.context, payload.prompt);
+    // The run id travels down to the job row, which is created inside this
+    // call rather than before it — see `onFailure` for why that matters.
+    await handlePrompt(payload.context, payload.prompt, ctx.run.id);
   },
 
   /**
    * `handlePrompt` already reports every outcome it can see. This covers what
-   * it cannot: the run dying underneath it. Without this the church is left
-   * watching a "working on it…" message that will never change.
+   * it cannot: the run dying underneath it.
    *
-   * The job row is closed out by `runEditorPromptJob`'s own error handling in
-   * every case where the job was actually claimed, so this only has to speak.
+   * This used to only speak, on the reasoning that `runEditorPromptJob`'s own
+   * error handling closes the row "in every case where the job was actually
+   * claimed". That holds only when the process survives long enough to run its
+   * `catch` — which is exactly what a killed run does not do. The row was then
+   * left QUEUED forever, and since only one active job per (site, kind) may
+   * exist, one dead run disabled editing for that church entirely.
+   *
+   * So `reportRunDeath` does both halves: releases the slot and replaces the
+   * orphaned "working on it…" message, as well as sending the ephemeral.
    */
-  onFailure: async ({ payload, error }) => {
+  onFailure: async ({ payload, error, ctx }) => {
     console.error("[slack-edit] run failed", error);
 
     const message = failureMessage(
@@ -73,10 +85,8 @@ export const slackEditTask = task({
         : "Something went wrong making that change, so nothing was updated. Try again in a moment."
     );
 
-    await respondViaResponseUrl(payload.context.responseUrl, message.text, message.blocks).catch(
-      (postError) => {
-        console.error("[slack-edit] could not report the failure to Slack", postError);
-      }
-    );
+    await reportRunDeath(payload.context, ctx.run.id, message).catch((reportError) => {
+      console.error("[slack-edit] could not report the failure to Slack", reportError);
+    });
   },
 });

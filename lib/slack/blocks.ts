@@ -40,6 +40,56 @@ function plain(value: string): string {
   return value.replace(/[*_~`>]/g, "");
 }
 
+/**
+ * Formats a channel for display. Slack sometimes hands back the name already
+ * prefixed and sometimes not, and a connection made before the picker existed
+ * has no name at all.
+ */
+export function channelLabel(name: string | null | undefined): string {
+  if (!name) return "this channel";
+  const clean = plain(name);
+  return clean.startsWith("#") ? clean : `#${clean}`;
+}
+
+/**
+ * The acknowledgement, returned in the slash command's own 200 body.
+ *
+ * The ONLY reply that cannot fail: no bot token, no `response_url` round-trip,
+ * no task runner. Everything else Regroup says in Slack depends on at least one
+ * of those, and when `chat.postMessage` was failing the church saw literally
+ * nothing — an empty 200 renders as silence, which is indistinguishable from a
+ * command that was never received.
+ *
+ * It names where the result will appear so the channel message that follows
+ * reads as progression rather than the same sentence twice.
+ */
+export function queuedMessage(channelName: string | null | undefined): SlackMessage {
+  const where = channelLabel(channelName);
+  const text =
+    where === "this channel"
+      ? "Got it — starting that now."
+      : `Got it — starting that now. I'll post the result in ${where}.`;
+  return { text, blocks: [section(`:hourglass_flowing_sand: ${text}`)] };
+}
+
+/** The same, for the Undo button, which otherwise looks like a dead click. */
+export function undoQueuedMessage(): SlackMessage {
+  const text = "Undoing that change…";
+  return { text, blocks: [section(`:leftwards_arrow_with_hook: ${text}`)] };
+}
+
+/** Posted once at connect time, proving the bot can actually reach the channel. */
+export function connectedMessage(): SlackMessage {
+  const text = "Regroup is connected.";
+  return {
+    text,
+    blocks: [
+      section(`:white_check_mark: *${text}*`),
+      context("Run `/regroup help` to see what I can change."),
+    ],
+  };
+}
+
 /** Posted as soon as an edit is accepted, then edited in place with the result. */
 export function workingMessage(prompt: string): SlackMessage {
   const text = "Regroup is updating your site…";
@@ -111,6 +161,14 @@ export function editResultMessage(input: EditResultInput): SlackMessage {
  * were not allowed to do something, and it must not describe the church's
  * setup to them.
  */
+/**
+ * Neither success nor failure: something happened that the church needs to
+ * know about but cannot act on as an error.
+ */
+export function noticeMessage(message: string): SlackMessage {
+  return { text: message, blocks: [section(`:information_source: ${plain(message)}`)] };
+}
+
 export function failureMessage(message: string): SlackMessage {
   return {
     text: message,

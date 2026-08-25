@@ -11,6 +11,7 @@ import {
   type JobView,
 } from "@/lib/ai/generation-job";
 import { reconcileJobWithRun } from "@/lib/ai/reconcile-run";
+import { MAX_PROMPT_CHARS, MIN_PROMPT_CHARS } from "@/lib/ai/prompt-limits";
 import type { fullBuildTask } from "@/trigger/full-build";
 import { assertAiBudget, getAiBudget } from "@/lib/ai/usage";
 import {
@@ -178,7 +179,7 @@ export const aiRouter = router({
   editorPrompt: paidSiteProcedure
     .input(
       siteInput.extend({
-        prompt: z.string().trim().min(4).max(600),
+        prompt: z.string().trim().min(MIN_PROMPT_CHARS).max(MAX_PROMPT_CHARS),
         /** Which page to edit. Validated against the site's editable pages. */
         path: z.string().trim().max(60).default("/"),
       })

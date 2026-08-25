@@ -2,15 +2,19 @@ import { prisma } from "@/lib/db";
 import { runEditorPromptJob } from "@/lib/ai/editor-prompt-run";
 import { revertPageEdit } from "@/lib/ai/revert-page-edit";
 import { getAiBudget } from "@/lib/ai/usage";
+import { markJobFailed, markJobSucceeded } from "@/lib/ai/generation-job";
 import { canonicalHostForSite } from "@/lib/domains/actions-support";
 import { SITE_PAGE_LINKS } from "@/lib/site/pages";
 import { authorizeSlackActor, type SlackActorAuthorization } from "./authorize";
+import { findConnectionByTeam } from "./connection";
 import { postMessage, respondViaResponseUrl, updateMessage } from "./api";
 import { decryptToken } from "./crypto";
 import {
+  channelLabel,
   editResultMessage,
   failureMessage,
   helpMessage,
+  noticeMessage,
   revertedMessage,
   statusMessage,
   workingMessage,
@@ -103,7 +107,9 @@ async function siteLinks(siteId: string): Promise<{ editorUrl: string; publicUrl
  */
 export async function handlePrompt(
   ctx: SlackCommandContext,
-  prompt: string
+  prompt: string,
+  /** The run executing this, recorded so a killed run's row can be resolved. */
+  triggerRunId?: string
 ): Promise<void> {
   const auth = await authorizeSlackActor(ctx.teamId, ctx.slackUserId, ctx.channelId);
   if (!auth.ok) {
@@ -128,6 +134,7 @@ export async function handlePrompt(
     prompt,
     source: "slack",
     externalRef: { channelId: ctx.channelId, actorId: ctx.slackUserId },
+    triggerRunId,
     onAccepted: async () => {
       const working = workingMessage(prompt);
       const posted = await postMessage(token, ctx.channelId, working.text, working.blocks);
@@ -184,6 +191,119 @@ export async function handlePrompt(
   if (!delivered.ok) {
     console.error(`[slack] could not deliver the edit result (${delivered.error})`);
     await ephemeral(ctx, result);
+  }
+}
+
+/**
+ * What to do when the RUN dies, rather than the edit failing.
+ *
+ * `handlePrompt` reports every outcome it can see, but it cannot report its
+ * own process being killed — a `maxDuration` timeout, an evicted worker, a
+ * deploy mid-flight. Two things are then left broken, and neither fixes
+ * itself:
+ *
+ * - the job row stays QUEUED, and because only one active job per (site, kind)
+ *   may exist, it blocks every future edit from Slack AND the web editor;
+ * - the "working on it…" post sits in the church's channel describing work
+ *   that stopped, with no indication it will never finish.
+ *
+ * The row is found by run id, which is why `claimJob` records one: it is exact,
+ * so this can never close out a DIFFERENT edit that legitimately started in the
+ * meantime. Every step is independently guarded — this is the last code that
+ * runs, and a throw here reports nothing at all.
+ */
+export async function reportRunDeath(
+  ctx: SlackCommandContext,
+  triggerRunId: string,
+  message: SlackMessage
+): Promise<void> {
+  let job: {
+    id: string;
+    slackChannelId: string | null;
+    slackMessageTs: string | null;
+    writtenBlocksHash: string | null;
+  } | null = null;
+
+  try {
+    job = await prisma.siteGenerationJob.findFirst({
+      where: { triggerRunId, status: { in: ["QUEUED", "RUNNING"] } },
+      select: {
+        id: true,
+        slackChannelId: true,
+        slackMessageTs: true,
+        // Written in the SAME transaction as the page itself, so its presence
+        // is proof the edit committed — and it is a short hash rather than the
+        // whole block tree the snapshot column holds.
+        writtenBlocksHash: true,
+      },
+    });
+  } catch (error) {
+    console.error("[slack] could not look up the job for a dead run", error);
+  }
+
+  /**
+   * A run can also die AFTER the edit committed but before it recorded that.
+   *
+   * The undo snapshot lands in the same transaction as the page write, so a
+   * row holding one describes a change that is live on the church's site right
+   * now. Telling them "nothing was updated" would be false, and worse than
+   * useless: they would run the prompt again and edit their page twice.
+   *
+   * The generic failure stays the default for every other case, including a
+   * lookup that failed — claiming an edit landed when we could not check is
+   * the one error worth being careful about in this direction.
+   */
+  const committed = Boolean(job?.writtenBlocksHash);
+  const outcome = committed
+    ? noticeMessage(
+        "That change was made, but Regroup lost track of it before it could show you. Open the editor to see your site."
+      )
+    : message;
+
+  // Sent regardless of what the lookup found: it needs no bot token, so it is
+  // the one report that still works when the channel itself is the problem.
+  await ephemeral(ctx, outcome).catch((error) => {
+    console.error("[slack] could not report a dead run", error);
+  });
+
+  if (!job) return;
+
+  /**
+   * Releasing the slot is the half that matters most.
+   *
+   * Only one active job per (site, kind) may exist, so a row left QUEUED by a
+   * killed run disables editing for that church entirely — from Slack and from
+   * the web editor both — until somebody notices and clears it by hand.
+   */
+  try {
+    if (committed) {
+      await markJobSucceeded(job.id, outcome.text.slice(0, 280));
+    } else {
+      await markJobFailed(job.id, outcome.text.slice(0, 280));
+    }
+  } catch (error) {
+    console.error(`[slack] could not close out job ${job.id}`, error);
+  }
+
+  if (!job.slackMessageTs) return;
+
+  // Replace the orphaned "working on it…" post, which otherwise describes work
+  // that stopped, with nothing to say it will never finish.
+  try {
+    const connection = await findConnectionByTeam(ctx.teamId);
+    if (!connection) return;
+    const updated = await updateMessage(
+      decryptToken(connection.botAccessToken),
+      job.slackChannelId ?? ctx.channelId,
+      job.slackMessageTs,
+      outcome.text,
+      outcome.blocks
+    );
+    if (!updated.ok) {
+      console.error(`[slack] could not clear the working message (${updated.error})`);
+    }
+  } catch (error) {
+    console.error("[slack] could not clear the working message", error);
   }
 }
 
@@ -248,7 +368,7 @@ export async function handleUndo(
  */
 export async function buildHelp(auth: SlackActorAuthorization): Promise<SlackMessage> {
   if (!auth.ok) return failureMessage(auth.message);
-  return helpMessage(channelLabel(auth));
+  return helpMessage(channelLabel(auth.connection.channelName));
 }
 
 export async function buildStatus(auth: SlackActorAuthorization): Promise<SlackMessage> {
@@ -273,14 +393,8 @@ export async function buildStatus(auth: SlackActorAuthorization): Promise<SlackM
     editsRemaining: budget.remaining,
     editsLimit: budget.limit,
     resetsOn: budget.resetsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" }),
-    channelName: channelLabel(auth),
+    channelName: channelLabel(auth.connection.channelName),
   });
-}
-
-function channelLabel(auth: Extract<SlackActorAuthorization, { ok: true }>): string {
-  const name = auth.connection.channelName;
-  if (!name) return "this channel";
-  return name.startsWith("#") ? name : `#${name}`;
 }
 
 export { authorizeSlackActor };

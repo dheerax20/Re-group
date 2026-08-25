@@ -3,7 +3,7 @@ import { tasks } from "@trigger.dev/sdk";
 import type { slackEditTask } from "@/trigger/slack-edit";
 import { isSlackCommandsEnabled } from "@/lib/slack/api";
 import { parseCommand } from "@/lib/slack/commands";
-import { failureMessage, type SlackMessage } from "@/lib/slack/blocks";
+import { failureMessage, queuedMessage, type SlackMessage } from "@/lib/slack/blocks";
 import {
   authorizeSlackActor,
   buildHelp,
@@ -103,12 +103,21 @@ export async function POST(request: NextRequest) {
   }
 
   /**
-   * Nothing in the body on the happy path.
+   * Acknowledge in the BODY, always.
    *
-   * An "on it…" ephemeral here would be immediately followed by the same
-   * sentence posted into the channel by the run, where the whole church can
-   * see it. One message is clearer than two, and the channel one is the one
-   * that gets edited in place with the result.
+   * This used to return an empty 200 on the reasoning that the run's own
+   * "working on it…" post would be along shortly and one message beats two.
+   * That reasoning holds only when the run succeeds in posting. When
+   * `chat.postMessage` fails — the bot is not in the channel, the token is
+   * dead — the run refuses the edit before spending anything and the church
+   * sees NOTHING, which is indistinguishable from a command that never
+   * arrived.
+   *
+   * This reply needs no bot token, no `response_url` and no task runner, so it
+   * is the one that still renders when every other path is broken. It is
+   * ephemeral, so it costs the channel nothing, and it names where the result
+   * will appear so the channel post reads as the next step rather than a
+   * repeat.
    */
-  return new NextResponse(null, { status: 200 });
+  return ephemeral(queuedMessage(auth.connection.channelName));
 }

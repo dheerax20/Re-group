@@ -12,6 +12,7 @@ import {
   type BlockPatch,
 } from "@/lib/site/blocks/patch";
 import type { PageBlocks } from "@/lib/site/blocks/types";
+import { MAX_PROMPT_CHARS } from "./prompt-limits";
 
 /** One turn of the site chatbot's conversation, as fed back into a prompt. */
 export type ChatTurn = { role: "user" | "assistant"; content: string };
@@ -261,7 +262,7 @@ export async function applyBlockAiPrompt(args: {
     churchName: args.churchName,
     features: JSON.stringify(args.features),
     history: historyBlock,
-    prompt: args.prompt.slice(0, 1200),
+    prompt: args.prompt.slice(0, MAX_PROMPT_CHARS),
     page: args.page,
     pages: args.editablePages
       .filter((p) => p.href !== args.page)

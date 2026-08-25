@@ -4,10 +4,12 @@ import type { DesignFeedback, SiteImprovement } from "@/lib/site/story";
 import type { PageBlocks } from "@/lib/site/blocks/types";
 import {
   claimJob,
+  isActiveStatus,
   markJobFailed,
   markJobSucceeded,
   type JobView,
 } from "./generation-job";
+import { reconcileJobWithRun } from "./reconcile-run";
 import { RateLimitError } from "@/lib/rate-limit";
 import { AiBudgetExhaustedError, assertAiBudget } from "./usage";
 import { runEditorPrompt } from "./editor-prompt-service";
@@ -88,6 +90,15 @@ export type RunEditorPromptJobArgs = {
   source: EditorPromptSource;
   externalRef?: ExternalRef;
   /**
+   * The Trigger.dev run this edit is executing inside, when there is one.
+   *
+   * Recorded on the job row so a run that dies without closing its row can be
+   * identified later. Without it a killed Slack edit leaves a row nothing can
+   * ever resolve, and one active job per site means that row blocks every
+   * future edit from BOTH surfaces.
+   */
+  triggerRunId?: string;
+  /**
    * Awaited once the claim and the budget have cleared, and BEFORE the
    * provider call.
    *
@@ -105,7 +116,8 @@ export type RunEditorPromptJobArgs = {
 export async function runEditorPromptJob(
   args: RunEditorPromptJobArgs
 ): Promise<EditorPromptOutcome> {
-  const { siteId, userId, prompt, path, source, externalRef, onAccepted } = args;
+  const { siteId, userId, prompt, path, source, externalRef, triggerRunId, onAccepted } =
+    args;
 
   /**
    * Ownership, re-asserted here rather than trusted from the caller.
@@ -138,11 +150,44 @@ export async function runEditorPromptJob(
    * for an edit it never got to start — and the monthly cap counts job rows,
    * so a second row is a second charge whether or not the provider was called.
    */
-  const claim = await claimJob(siteId, "editor_prompt", prompt, {
+  const origin = {
     source,
     slackChannelId: externalRef?.channelId,
     slackUserId: externalRef?.actorId,
-  });
+    triggerRunId,
+  };
+
+  let claim = await claimJob(siteId, "editor_prompt", prompt, origin);
+
+  /**
+   * A lost claim is not proof that anything is running.
+   *
+   * The slot is held by whatever row is QUEUED or RUNNING, and a row can be
+   * left in that state by a run that was killed between claiming and its own
+   * error handling — a `maxDuration` timeout, an evicted worker, a deploy.
+   * Nothing then clears it: the old elapsed-time sweep was removed, and a job
+   * whose run is genuinely gone will never fail itself. The result is that one
+   * dead run silently disables editing for the site, from Slack AND from the
+   * web editor, with "an AI edit is already running" forever.
+   *
+   * So the incumbent is checked against the task runner before its claim is
+   * honoured. Exactly one retry — a genuinely concurrent edit must still lose,
+   * and a retry loop here would be a way to charge twice for one prompt.
+   *
+   * ONLY when the incumbent has a run id. `reconcileJobWithRun` treats an
+   * active row without one as abandoned, which is correct for `full_build`
+   * (always dispatched through `tasks.trigger`) and wrong here: the web editor
+   * runs this function INLINE in the request, so its rows never have a run id
+   * and are alive precisely while they hold the slot. Reconciling those would
+   * fail a running edit and let a second one claim beside it — two provider
+   * calls, two charges, one of them writing over the other.
+   */
+  if (!claim.claimed && claim.job?.triggerRunId) {
+    const reconciled = await reconcileJobWithRun(claim.job);
+    if (!isActiveStatus(reconciled.status)) {
+      claim = await claimJob(siteId, "editor_prompt", prompt, origin);
+    }
+  }
 
   if (!claim.claimed) {
     return {
@@ -195,16 +240,23 @@ export async function runEditorPromptJob(
     try {
       accepted = await onAccepted({ id: job.id });
     } catch (error) {
-      await markJobFailed(job.id, "Could not post to the channel, so nothing was changed.");
-      return {
-        ok: false,
-        jobId: job.id,
-        code: "POST_FAILED",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Could not post to the channel, so nothing was changed.",
-      };
+      /**
+       * The SPECIFIC reason on the row, not the generic one.
+       *
+       * `onAccepted` throws copy that already names what went wrong ("invite
+       * it back", "reconnect Slack"), and that sentence is the only record of
+       * this attempt a person will ever find — the ephemeral carrying it is
+       * best-effort and may never arrive. Storing "could not post to the
+       * channel" instead made a one-line problem take a database query to
+       * diagnose.
+       */
+      const reason =
+        error instanceof Error
+          ? error.message
+          : "Could not post to the channel, so nothing was changed.";
+
+      await markJobFailed(job.id, reason.slice(0, 280));
+      return { ok: false, jobId: job.id, code: "POST_FAILED", message: reason };
     }
 
     /**

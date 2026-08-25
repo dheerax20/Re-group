@@ -246,7 +246,21 @@ async function callAsBot<T>(
     path
   );
   if (!json) return { ok: false, error: "invalid_response" };
-  if (!json.ok) return { ok: false, error: json.error ?? "unknown_error" };
+
+  /**
+   * Logged, not just returned.
+   *
+   * The raw code is the whole diagnostic — `not_in_channel` and `token_revoked`
+   * need completely different answers — and every caller above this maps it to
+   * prose and throws the code away. Without this line a church's edit fails
+   * with "could not post to the channel" and nothing anywhere records why.
+   */
+  if (!json.ok) {
+    const error = json.error ?? "unknown_error";
+    console.error(`[slack] ${path} failed (${error})`);
+    return { ok: false, error };
+  }
+
   return { ok: true, data: json as T };
 }
 
