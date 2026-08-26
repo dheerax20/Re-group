@@ -44,7 +44,7 @@ export function OnboardingWelcome({
             </motion.p>
             <motion.h1
               variants={fadeUp}
-              className="mt-4 font-serif text-4xl font-semibold tracking-tight text-foreground"
+              className="mt-4 text-4xl font-semibold tracking-tight text-foreground"
             >
               Create a site that feels like your church.
             </motion.h1>
@@ -63,7 +63,7 @@ export function OnboardingWelcome({
                 { step: "03", label: "Generate", desc: "Matched designs" },
               ].map((item) => (
                 <div key={item.step} className="bg-surface p-4">
-                  <p className="font-serif text-sm tabular-nums text-accent">{item.step}</p>
+                  <p className="text-sm tabular-nums text-accent">{item.step}</p>
                   <p className="mt-2 text-sm font-medium text-foreground">{item.label}</p>
                   <p className="mt-0.5 text-sm text-muted">{item.desc}</p>
                 </div>

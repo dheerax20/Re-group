@@ -2,23 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import * as React from "react";
 import {
-  LayoutDashboard,
-  Calendar,
-  Mic2,
+  ChevronDown,
+  ChevronsUpDown,
   CreditCard,
-  ChevronsLeft,
-  ChevronsRight,
-  Globe,
-  MessageSquare,
+  ExternalLink,
   LogOut,
   UserRound,
-  Users,
-  GraduationCap,
-  Link2,
-  PencilRuler,
-  ExternalLink,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -28,68 +34,44 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+import {
+  isImmersiveRoute,
+  NAV_GROUPS,
+  type NavItem,
+  type NavLeaf,
+} from "@/components/layout/nav-config";
 import { cn } from "@/lib/utils";
 
 /**
- * Navigation is grouped by what a church is actually doing: shaping the
- * website, keeping content current, and everything about the church itself.
- * A flat list of eight items gave no clue that "Pages & links" belongs with the
- * editor while "Events" does not.
+ * The application's one navigation surface.
  *
- * There are no `?siteId=` parameters here. One account owns one website, so the
- * site comes from the session; threading an id through every link only created
- * a second, spoofable source of truth.
+ * The structure comes from `nav-config.ts` and never changes between pages —
+ * that constancy is most of what makes a set of screens feel like a product.
+ * Items that own more than one screen nest: the parent is a Collapsible whose
+ * children render in a `SidebarMenuSub`, so a second level exists without
+ * flattening it into the first. Icon-collapsed mode hides the sub list (the
+ * primitive does that) and the parent keeps its tooltip.
+ *
+ * Visually the sidebar is quiet on purpose: 13px medium labels, muted icons,
+ * and exactly one highlighted row. The active state is a soft brand tint, not
+ * a filled block — a filled block reads as a selected *object*, and the point
+ * is to say where you are, not to shout.
  */
-type NavItem = {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  match?: "exact" | "prefix";
-  soon?: boolean;
-  /**
-   * Opens in a new tab. Used for hand-offs to another product (Courses lives
-   * in GoHighLevel), so the user keeps their Regroup work in the current tab.
-   * The href stays internal — the route itself owns the redirect.
-   */
-  newTab?: boolean;
-};
-
-const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
-  {
-    label: "Website",
-    items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutDashboard, match: "exact" },
-      { href: "/dashboard/builder", label: "Editor", icon: PencilRuler },
-      { href: "/dashboard/pages", label: "Pages & links", icon: Link2 },
-      { href: "/dashboard/domains", label: "Domains", icon: Globe },
-      { href: "/dashboard/slack", label: "Slack", icon: MessageSquare },
-    ],
-  },
-  {
-    label: "Content",
-    items: [
-      { href: "/events", label: "Events", icon: Calendar },
-      { href: "/sermons", label: "Sermons", icon: Mic2 },
-    ],
-  },
-  {
-    label: "Congregation",
-    items: [
-      { href: "/members", label: "Members", icon: Users, soon: true },
-      { href: "/courses", label: "Courses", icon: GraduationCap, newTab: true },
-    ],
-  },
-];
 
 function navButtonClass(active: boolean) {
   return cn(
-    "h-9 rounded-lg px-2.5 text-[13px] font-medium text-sidebar-foreground/70 transition-colors",
+    "h-9 rounded-lg px-2 text-[13px] font-medium text-sidebar-foreground/75 transition-colors",
     "hover:bg-sidebar-accent hover:text-sidebar-foreground",
     "group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center",
     active &&
@@ -97,156 +79,319 @@ function navButtonClass(active: boolean) {
   );
 }
 
-function isActive(pathname: string, item: NavItem) {
+function isActive(pathname: string, item: NavLeaf) {
   if (item.match === "exact") return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
+/** A parent highlights when any of its children match, not just its own href. */
+function isBranchActive(pathname: string, item: NavItem) {
+  if (item.items?.length) {
+    return item.items.some((child) => isActive(pathname, child));
+  }
+  return isActive(pathname, item);
+}
+
+function linkProps(item: NavLeaf) {
+  return item.newTab
+    ? ({ target: "_blank", rel: "noopener noreferrer" } as const)
+    : {};
+}
+
+function NavLabel({ item }: { item: NavLeaf }) {
+  return (
+    <>
+      <span className="flex-1 truncate">{item.label}</span>
+      {item.newTab ? (
+        <ExternalLink className="size-3 shrink-0 opacity-50 group-data-[collapsible=icon]:hidden" />
+      ) : null}
+    </>
+  );
+}
+
+function NavEntry({ item, pathname }: { item: NavItem; pathname: string }) {
+  const branchActive = isBranchActive(pathname, item);
+  const [open, setOpen] = React.useState(branchActive);
+  const [wasBranchActive, setWasBranchActive] = React.useState(branchActive);
+
+  // Navigating into a child from elsewhere reveals the branch; closing it by
+  // hand while already inside keeps it closed. Adjusted during render rather
+  // than in an effect so the sub-menu never paints in the wrong state.
+  if (branchActive !== wasBranchActive) {
+    setWasBranchActive(branchActive);
+    if (branchActive) setOpen(true);
+  }
+
+  if (!item.items?.length) {
+    const active = isActive(pathname, item);
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          className={cn(navButtonClass(active), item.soon && "pr-12")}
+          isActive={active}
+          tooltip={item.soon ? `${item.label} — coming soon` : item.label}
+        >
+          <Link href={item.href} {...linkProps(item)}>
+            <item.icon
+              className={cn("size-4! opacity-70", active && "text-brand opacity-100")}
+            />
+            <NavLabel item={item} />
+          </Link>
+        </SidebarMenuButton>
+        {item.soon ? (
+          <SidebarMenuBadge className="top-1.5 rounded-full bg-surface-muted px-1.5 text-[10px] font-medium text-muted">
+            Soon
+          </SidebarMenuBadge>
+        ) : null}
+      </SidebarMenuItem>
+    );
+  }
+
+  return (
+    <Collapsible asChild onOpenChange={setOpen} open={open}>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          className={navButtonClass(branchActive)}
+          isActive={branchActive}
+          tooltip={item.label}
+        >
+          <Link href={item.href}>
+            <item.icon
+              className={cn(
+                "size-4! opacity-70",
+                branchActive && "text-brand opacity-100"
+              )}
+            />
+            <NavLabel item={item} />
+          </Link>
+        </SidebarMenuButton>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuAction
+            aria-label={`${open ? "Collapse" : "Expand"} ${item.label}`}
+            className="top-2 text-muted"
+          >
+            <ChevronDown className="size-3.5 transition-transform duration-200 group-data-[state=closed]/collapsible:-rotate-90" />
+          </SidebarMenuAction>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="collapsible-panel">
+          <SidebarMenuSub className="gap-0.5 border-sidebar-border">
+            {item.items.map((child) => {
+              const childActive = isActive(pathname, child);
+              return (
+                <SidebarMenuSubItem key={child.href}>
+                  <SidebarMenuSubButton
+                    asChild
+                    className={cn(
+                      "h-7 rounded-lg text-[13px] text-sidebar-foreground/70",
+                      childActive &&
+                        "bg-brand-soft font-medium text-brand-strong data-[active=true]:bg-brand-soft data-[active=true]:text-brand-strong"
+                    )}
+                    isActive={childActive}
+                  >
+                    <Link href={child.href} {...linkProps(child)}>
+                      <NavLabel item={child} />
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
+/**
+ * Profile, billing and log out used to be three stacked rows competing with the
+ * nav for attention. One trigger with a menu keeps the footer to a single line
+ * and gives the icon-collapsed rail something it can actually show.
+ */
+function AccountMenu({
+  collapsed,
+  pathname,
+  userEmail,
+  userName,
+  userPicture,
+}: {
+  collapsed: boolean;
+  pathname: string;
+  userEmail?: string | null;
+  userName?: string | null;
+  userPicture?: string | null;
+}) {
+  const initial = (
+    userName?.trim()?.[0] ??
+    userEmail?.trim()?.[0] ??
+    "U"
+  ).toUpperCase();
+
+  const avatar = userPicture ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      alt=""
+      className="size-7 shrink-0 rounded-full object-cover"
+      src={userPicture}
+    />
+  ) : (
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-muted text-[11px] font-semibold text-muted">
+      {initial}
+    </span>
+  );
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              className={cn(
+                "h-11 rounded-lg px-1.5 data-[state=open]:bg-sidebar-accent",
+                "group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
+                pathname.startsWith("/dashboard/profile") && "bg-sidebar-accent"
+              )}
+              size="lg"
+              tooltip={userName ?? userEmail ?? "Account"}
+            >
+              {avatar}
+              <span className={cn("min-w-0 flex-1 text-left", collapsed && "hidden")}>
+                <span className="block truncate text-[13px] font-medium leading-tight">
+                  {userName ?? "Account"}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] leading-none text-muted">
+                  {userEmail ?? "Profile"}
+                </span>
+              </span>
+              <ChevronsUpDown
+                className={cn("size-3.5 shrink-0 text-muted", collapsed && "hidden")}
+              />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="min-w-56"
+            side={collapsed ? "right" : "top"}
+            sideOffset={8}
+          >
+            <DropdownMenuLabel className="flex items-center gap-2 px-2 py-1.5">
+              {avatar}
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] font-medium text-foreground">
+                  {userName ?? "Account"}
+                </span>
+                <span className="block truncate text-[11px] text-muted">
+                  {userEmail ?? "Profile"}
+                </span>
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/profile">
+                  <UserRound />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings/billing">
+                  <CreditCard />
+                  Billing &amp; plan
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild variant="destructive">
+              <a href="/auth/logout">
+                <LogOut />
+                Log out
+              </a>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
 export function AppSidebar({
-  siteName,
   userEmail,
   userName,
   userPicture,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
-  siteName?: string | null;
   userEmail?: string | null;
   userName?: string | null;
   userPicture?: string | null;
 }) {
   const pathname = usePathname();
-  const { state, toggleSidebar } = useSidebar();
+  const { state } = useSidebar();
   const collapsed = state === "collapsed";
 
-  // The website editor owns the full viewport — hide the product chrome.
-  if (pathname.startsWith("/dashboard/builder")) {
+  // The website editor and check-in own the full viewport — hide the chrome.
+  if (isImmersiveRoute(pathname)) {
     return null;
   }
 
-  const churchInitial = (siteName?.trim()?.[0] ?? "C").toUpperCase();
-
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border" {...props}>
+    <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader className="gap-0 p-0">
+        {/*
+          The collapse control is visible in BOTH states — that is the whole
+          point of it. Collapsed, the wordmark gives way to the trigger so the
+          rail always shows one obvious way back out; expanded, the trigger
+          sits at the right of the wordmark. Relying on `SidebarRail` alone (a
+          4px invisible strip) meant a collapsed sidebar had no discoverable
+          way to reopen at all.
+        */}
         <div
           className={cn(
             "flex h-14 items-center gap-2.5 px-3",
             collapsed && "justify-center px-0"
           )}
         >
-          <button
-            type="button"
-            onClick={collapsed ? toggleSidebar : undefined}
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-brand text-[13px] font-bold tracking-tight text-brand-foreground",
-              !collapsed && "pointer-events-none"
-            )}
-            title={collapsed ? "Expand sidebar" : "Regroup"}
-            aria-label={collapsed ? "Expand sidebar" : "Regroup"}
-          >
-            R
-          </button>
-
-          <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
-            <p className="truncate text-[15px] font-semibold leading-none tracking-tight">
-              Regroup
-            </p>
-            <p className="mt-1 truncate text-[11px] leading-none text-muted-foreground">
-              Church OS
-            </p>
-          </div>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className={cn(
-              "size-7 shrink-0 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-              collapsed && "hidden"
-            )}
-            aria-label="Collapse sidebar"
-          >
-            <ChevronsLeft className="size-4" />
-          </Button>
-        </div>
-
-        {siteName ? (
-          <div className={cn("px-3 pb-3", collapsed && "px-2")}>
-            <div
-              className={cn(
-                "flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-surface px-2.5 py-2",
-                collapsed && "justify-center border-0 bg-transparent p-0"
-              )}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-[11px] font-semibold text-brand-strong">
-                {churchInitial}
+          {collapsed ? (
+            <SidebarTrigger
+              className="size-8 text-muted hover:bg-sidebar-accent hover:text-foreground"
+              title="Expand sidebar"
+            />
+          ) : (
+            <>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand text-[12px] font-bold tracking-tight text-brand-foreground">
+                R
               </span>
-              <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
-                <p className="truncate text-[13px] font-medium leading-tight">{siteName}</p>
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  Your church
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-semibold leading-none tracking-[-0.01em]">
+                  Regroup
+                </p>
+                <p className="mt-1 truncate text-[11px] leading-none text-muted">
+                  Church OS
                 </p>
               </div>
-            </div>
-          </div>
-        ) : null}
+
+              <SidebarTrigger
+                className="size-7 shrink-0 text-muted hover:bg-sidebar-accent hover:text-foreground"
+                title="Collapse sidebar"
+              />
+            </>
+          )}
+        </div>
+
       </SidebarHeader>
 
-      <SidebarContent className="px-2 pt-1">
+      <SidebarContent className="gap-4 px-2 pt-1">
         {NAV_GROUPS.map((group) => (
-          <SidebarGroup key={group.label} className="p-0">
-            <SidebarGroupLabel className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">
+          <SidebarGroup className="p-0" key={group.label}>
+            <SidebarGroupLabel className="h-6 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted/80">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
-                {group.items.map((item) => {
-                  const active = isActive(pathname, item);
-                  return (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={active}
-                        tooltip={item.soon ? `${item.label} — coming soon` : item.label}
-                        className={navButtonClass(active)}
-                      >
-                        <Link
-                          href={item.href}
-                          {...(item.newTab
-                            ? { target: "_blank", rel: "noopener noreferrer" }
-                            : {})}
-                        >
-                          <item.icon
-                            className={cn(
-                              "size-4! opacity-80",
-                              active && "opacity-100 text-brand"
-                            )}
-                          />
-                          <span className="flex-1">{item.label}</span>
-                          {item.newTab ? (
-                            <ExternalLink
-                              className={cn(
-                                "size-3 opacity-50",
-                                collapsed && "hidden"
-                              )}
-                            />
-                          ) : null}
-                          {item.soon ? (
-                            <span
-                              className={cn(
-                                "rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
-                                collapsed && "hidden"
-                              )}
-                            >
-                              Soon
-                            </span>
-                          ) : null}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                {group.items.map((item) => (
+                  <NavEntry item={item} key={item.label} pathname={pathname} />
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -254,81 +399,13 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="gap-2 border-t border-sidebar-border p-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="Billing"
-              className={navButtonClass(pathname.startsWith("/settings/billing"))}
-            >
-              <Link href="/settings/billing">
-                <CreditCard className="size-4! opacity-80" />
-                <span>Billing</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
-        <div
-          className={cn(
-            "rounded-xl border border-sidebar-border bg-surface p-2",
-            collapsed && "border-0 bg-transparent p-0"
-          )}
-        >
-          <Link
-            href="/dashboard/profile"
-            className={cn(
-              "flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-sidebar-accent",
-              collapsed && "justify-center px-0",
-              pathname.startsWith("/dashboard/profile") && "bg-brand-soft"
-            )}
-          >
-            {userPicture ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={userPicture} alt="" className="size-8 shrink-0 rounded-full object-cover" />
-            ) : (
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand-strong">
-                {(userName?.trim()?.[0] ?? userEmail?.trim()?.[0] ?? "U").toUpperCase()}
-              </span>
-            )}
-            <span className={cn("min-w-0 flex-1", collapsed && "hidden")}>
-              <span className="block truncate text-[13px] font-medium leading-tight">
-                {userName ?? "Account"}
-              </span>
-              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                {userEmail ?? "Profile"}
-              </span>
-            </span>
-            <UserRound className={cn("size-3.5 text-muted-foreground", collapsed && "hidden")} />
-          </Link>
-          <a
-            href="/auth/logout"
-            className={cn(
-              "mt-1 flex h-9 items-center gap-2 rounded-lg px-2 text-[13px] font-medium text-destructive hover:bg-destructive-soft",
-              collapsed && "justify-center px-0"
-            )}
-          >
-            <LogOut className="size-4" />
-            <span className={cn(collapsed && "hidden")}>Log out</span>
-          </a>
-        </div>
-
-        {collapsed ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="mx-auto size-8 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-            aria-label="Expand sidebar"
-          >
-            <ChevronsRight className="size-4" />
-          </Button>
-        ) : (
-          <p className="px-2 pb-1 text-[10px] text-muted-foreground/70">
-            Press ⌘B to collapse
-          </p>
-        )}
+        <AccountMenu
+          collapsed={collapsed}
+          pathname={pathname}
+          userEmail={userEmail}
+          userName={userName}
+          userPicture={userPicture}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

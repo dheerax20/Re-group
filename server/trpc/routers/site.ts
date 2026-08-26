@@ -11,6 +11,7 @@ import {
   checkSlugAvailable,
   createDraftSite,
   getSite,
+  getSiteSummary,
   publishSite,
   resumeHref,
   suggestSlug,
@@ -50,6 +51,18 @@ export const siteRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "Site not found." });
     }
     return site;
+  }),
+
+  /**
+   * Status, publish time and content counts — what the dashboard says *about*
+   * a site. Read-only, so `ownedSiteProcedure` is the right gate.
+   */
+  summary: ownedSiteProcedure.input(siteInput).query(async ({ input }) => {
+    const summary = await getSiteSummary(input.siteId);
+    if (!summary) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Site not found." });
+    }
+    return summary;
   }),
 
   /**

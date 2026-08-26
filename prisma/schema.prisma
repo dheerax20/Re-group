@@ -494,6 +494,11 @@ enum RegistrationStatus {
   CANCELLED
 }
 
+enum CheckInMethod {
+  QR
+  MANUAL
+}
+
 model Registration {
   id            String             @id @default(cuid())
   eventId       String
@@ -506,6 +511,20 @@ model Registration {
   dietaryNotes  String?
   prayerRequest String?
   qrToken       String             @unique
+
+  /**
+   * Attendance. Null means "registered but not yet arrived" — the whole
+   * check-in screen is derived from this one nullable timestamp rather than a
+   * separate status enum, so a scan and a manual tap cannot disagree about
+   * what "checked in" means. `checkedInBy` records the staff email that did
+   * it (null for a scan performed by a volunteer without a session), and
+   * `checkedInVia` distinguishes a camera scan from a manual override so a
+   * church can see how often the QR path failed them.
+   */
+  checkedInAt   DateTime?
+  checkedInBy   String?
+  checkedInVia  CheckInMethod?
+
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
@@ -514,6 +533,7 @@ model Registration {
 
   @@index([eventId])
   @@index([siteId])
+  @@index([eventId, checkedInAt])
 }
 
 model Template {

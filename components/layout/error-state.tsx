@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -28,8 +27,6 @@ export function ErrorState({
   error,
   retry,
   logLabel,
-  homeHref = "/",
-  homeLabel = "Back home",
   className,
 }: {
   title: string;
@@ -38,14 +35,6 @@ export function ErrorState({
   retry?: () => void;
   /** Prefix for the console entry, e.g. "[dashboard]". */
   logLabel?: string;
-  /**
-   * Where the escape hatch goes. Defaults to the marketing page rather than the
-   * dashboard: when the cause is the database being unreachable, every
-   * authenticated route fails the same way, and sending the reader to one of
-   * them just loops them back to this screen. Pass `null` to omit the link.
-   */
-  homeHref?: string | null;
-  homeLabel?: string;
   className?: string;
 }) {
   useEffect(() => {
@@ -78,18 +67,11 @@ export function ErrorState({
         </p>
       ) : null}
 
-      <div className="mt-8 flex flex-wrap justify-center gap-2">
-        {retry ? (
-          <Button variant="outline" onClick={retry}>
-            Try again
-          </Button>
-        ) : null}
-        {homeHref ? (
-          <Link href={homeHref}>
-            <Button>{homeLabel}</Button>
-          </Link>
-        ) : null}
-      </div>
+      {retry ? (
+        <div className="mt-8 flex justify-center">
+          <Button onClick={retry}>Try again</Button>
+        </div>
+      ) : null}
     </div>
   );
 }

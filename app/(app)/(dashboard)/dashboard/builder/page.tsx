@@ -55,8 +55,8 @@ export default async function DashboardBuilderPage() {
         title="We could not open that site"
         description="Reload the page. If it keeps happening, go back to the dashboard and try again."
         action={
-          <Link href="/dashboard">
-            <Button variant="outline">Back to dashboard</Button>
+          <Link href="/dashboard/website">
+            <Button variant="outline">Website Builder</Button>
           </Link>
         }
       />

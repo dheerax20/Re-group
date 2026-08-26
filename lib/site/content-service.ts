@@ -56,6 +56,11 @@ const sermonSchema = z.object({
   date: z.string().min(1, "Date is required"),
   videoUrl: httpsUrlSchema.optional(),
   audioUrl: httpsUrlSchema.optional(),
+  /**
+   * An explicit poster. Left unset, the library derives one from the YouTube
+   * video id at render time, so most sermons never need this filled in.
+   */
+  thumbnailUrl: mediaUrlSchema.optional(),
 });
 
 const youtubeSchema = z.object({
@@ -269,10 +274,50 @@ export async function createSermon(siteId: string, input: unknown) {
           date: new Date(data.date),
           videoUrl: data.videoUrl || null,
           audioUrl: data.audioUrl || null,
+          thumbnailUrl: data.thumbnailUrl || null,
         },
       });
       await enableFeatureOnSite(siteId, "sermons", { variant: "cards" }, tx);
       return created;
+    });
+
+    await invalidateSite(siteId);
+    return { success: true as const, sermon };
+  } catch (error) {
+    toDatabaseError(error);
+  }
+}
+
+export async function updateSermon(siteId: string, sermonId: string, input: unknown) {
+  try {
+    const data = sermonSchema.parse(input);
+    const existing = await prisma.sermon.findUnique({ where: { id: sermonId } });
+    if (!existing || existing.siteId !== siteId) {
+      throw new Error("Sermon not found");
+    }
+
+    let slug = existing.slug;
+    if (data.title.trim() && slugify(data.title) !== existing.slug) {
+      const siblings = await prisma.sermon.findMany({
+        where: { siteId, id: { not: sermonId } },
+        select: { slug: true },
+      });
+      slug = uniqueSlug(data.title, siblings.map((s) => s.slug));
+    }
+
+    const sermon = await prisma.sermon.update({
+      where: { id: sermonId },
+      data: {
+        title: data.title,
+        slug,
+        description: data.description || null,
+        speaker: data.speaker || null,
+        series: data.series || null,
+        date: new Date(data.date),
+        videoUrl: data.videoUrl || null,
+        audioUrl: data.audioUrl || null,
+        thumbnailUrl: data.thumbnailUrl || null,
+      },
     });
 
     await invalidateSite(siteId);

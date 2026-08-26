@@ -3,23 +3,26 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Regroup chrome — editorial: cream ground, deep theological green accent, warm
-  gold secondary, ink-brown text. Premium theological publication x modern SaaS
-  x academic journal — calm, serious, restrained. No neon, no purple/blue SaaS
-  gradients, no pure-white or pure-black fields.
+  Regroup chrome — quiet, neutral, product-first.
 
-    neutral   bg #f7f4ee  surface #fffdf8  border #d9d4ca  muted #6f6b63  ink #171714
-    green     500 #263a32  600 #30483d  700 #1e3029
-    gold      500 #b18a4a  sand #e7dfd1  warm-gray #a6a096
+  The system is deliberately restrained: a near-white page, white surfaces one
+  step lighter, hairline borders, and ONE brand colour (deep evergreen) that is
+  spent only on the primary action, the active nav item, and status. Everything
+  else is greyscale. A church administrator should be able to scan any screen
+  and find the single thing they are meant to do next.
 
-  App chrome is intentionally single-themed (light) rather than following the
-  OS dark-mode preference: the `.dark` and `prefers-color-scheme: dark` blocks
-  below mirror the light values on purpose, so the editorial palette holds
-  regardless of the visitor's system setting. Site tokens are unaffected.
+    ground    bg #fafaf9  surface #ffffff  border #e7e5e4  muted #78716c  ink #1c1917
+    brand     500 #1f3d34  strong #16302a  soft #edf2ef
+    accent    gold #b18a4a  soft #f7f0e4  strong #7a5f33
+
+  App chrome is intentionally single-themed (light). The `.dark` class and the
+  OS `prefers-color-scheme: dark` are both no-ops for chrome on purpose — the
+  palette holds regardless of the visitor's system setting — and the blocks at
+  the bottom of this file exist to say so rather than to switch anything.
 
   Two token families live here and must not be confused:
 
-  - APP tokens (--background, --surface, --brand, --accent, ...) style Regroup's
+  - APP tokens (--background, --surface, --brand, --editor-*) style Regroup's
     own product chrome. Components consume them through Tailwind utilities such
     as `bg-surface` and `text-muted`.
   - SITE tokens (--color-primary, --color-accent, --font-primary, ...) are the
@@ -37,77 +40,75 @@
   color-scheme: light;
 
   /*
-    Container radius (28px). Controls — buttons, inputs, selects, badges — are
-    fully pill instead and say so directly with `rounded-full`; the radius scale
-    is not stretched to cover them. Exposed as `rounded-panel` rather than by
+    Container radius (12px) — cards, panels, popovers. Controls (buttons,
+    inputs, selects) sit one step tighter at `rounded-lg`, and only badges and
+    avatars go fully round. Exposed as `rounded-panel` rather than by
     redefining --radius-2xl, because the church renderer
     (components/website/blocks/tokens.ts) reads the stock scale and must keep
     its own shapes.
   */
-  --radius: 1.75rem;
+  --radius: 0.75rem;
 
-  --background: #f7f4ee;
-  --foreground: #171714;
-  /* Cards sit one step *lighter* than the page — a raised card, not a parchment
-     inset. */
-  --surface: #fffdf8;
-  --surface-muted: #f0ece2;
-  --surface-raised: #fffdf8;
-  --muted: #6f6b63;
-  --muted-foreground: #6f6b63;
-  --border: #d9d4ca;
-  --border-strong: #c7bfaf;
-  --input: #d9d4ca;
-  --ring: #263a32;
+  --background: #fafaf9;
+  --foreground: #1c1917;
+  /* Cards sit one step *lighter* than the page — a raised card, not an inset. */
+  --surface: #ffffff;
+  --surface-muted: #f5f5f4;
+  --surface-raised: #ffffff;
+  --muted: #78716c;
+  --muted-foreground: #78716c;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --input: #e0dedb;
+  --ring: #1f3d34;
 
-  --primary: #263a32;
-  --primary-foreground: #f7f4ee;
-  --secondary: #e7dfd1;
-  --secondary-foreground: #171714;
-  --destructive: #a23b2e;
-  --destructive-foreground: #f7f4ee;
-  --destructive-soft: #f3e3de;
+  --primary: #1f3d34;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f4;
+  --secondary-foreground: #1c1917;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --destructive-soft: #fdeeec;
 
-  --brand: #263a32;
-  --brand-foreground: #f7f4ee;
-  --brand-soft: #e4eae2;
+  --brand: #1f3d34;
+  --brand-foreground: #ffffff;
+  --brand-soft: #edf2ef;
   --accent: #b18a4a;
-  --accent-foreground: #171714;
-  --accent-soft: #e7dfd1;
+  --accent-foreground: #1c1917;
+  --accent-soft: #f7f0e4;
 
   /*
     Ink for text and icons sitting ON a -soft tint. The -foreground tokens are
-    what goes on the *solid* fill (cream on green, ink on gold); at 12px on a
-    pale tint neither the solid-fill foreground nor the mid-tone --brand /
-    --accent itself clears 4.5:1, so a darker step of the same ramp does that job.
+    what goes on the *solid* fill; at 12px on a pale tint neither the solid-fill
+    foreground nor the mid-tone --brand / --accent itself clears 4.5:1, so a
+    darker step of the same ramp does that job.
   */
-  --brand-strong: #1e3029;
+  --brand-strong: #16302a;
   --accent-strong: #7a5f33;
 
   /*
     Status colours. Separate from --accent on purpose: the accent is decoration
-    and can be brand-led, while these carry meaning and must stay legible. Kept
-    inside the same warm/restrained family — no bright SaaS blue for "info".
+    and can be brand-led, while these carry meaning and must stay legible.
   */
-  --success: #3d5a4c;
-  --success-soft: #e4eae2;
-  --warning: #8c6a35;
-  --warning-soft: #f5eddd;
-  --info: #5b6660;
-  --info-soft: #e9eae5;
+  --success: #2f6f52;
+  --success-soft: #eaf3ee;
+  --warning: #92600e;
+  --warning-soft: #fdf3e3;
+  --info: #52525b;
+  --info-soft: #f4f4f5;
 
   /*
     The website editor is a deliberately dark workspace so the church's own
     site reads as the bright object on the canvas. Tokenised rather than
     hardcoded so the editor stays consistent and themeable.
   */
-  --editor-shell: #201e1d;
-  --editor-panel: #2e2b25;
-  --editor-panel-raised: #3a352d;
-  --editor-border: #474238;
-  --editor-foreground: #f9f4ed;
-  --editor-muted: #a19786;
-  --editor-canvas: #eee7db;
+  --editor-shell: #1c1917;
+  --editor-panel: #26221f;
+  --editor-panel-raised: #322d29;
+  --editor-border: #3f3a35;
+  --editor-foreground: #fafaf9;
+  --editor-muted: #a8a29e;
+  --editor-canvas: #f0efed;
 
   /*
     Default site theme tokens — replaced per tenant by ThemeProvider. The fonts
@@ -124,14 +125,21 @@
   --font-primary: var(--font-inter);
   --font-secondary: var(--font-inter);
 
-  --sidebar: #f1ece1;
-  --sidebar-foreground: #171714;
-  --sidebar-primary: #263a32;
-  --sidebar-primary-foreground: #f7f4ee;
-  --sidebar-accent: #e7dfd1;
-  --sidebar-accent-foreground: #171714;
-  --sidebar-border: #d9d4ca;
-  --sidebar-ring: #263a32;
+  /*
+    The shell is an INSET layout: `--sidebar` is the ground the whole
+    application sits on, and the content panel floats on top of it as a rounded
+    card. So this token is not "the nav's colour" — it is the page's, and it
+    must stay one clear step darker than `--background` or the panel's edge
+    disappears and the rounding stops reading.
+  */
+  --sidebar: #f1f0ee;
+  --sidebar-foreground: #1c1917;
+  --sidebar-primary: #1f3d34;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eeedeb;
+  --sidebar-accent-foreground: #1c1917;
+  --sidebar-border: #e7e5e4;
+  --sidebar-ring: #1f3d34;
 }
 
 @theme inline {
@@ -196,8 +204,13 @@
   --radius-2xl: 1.25rem;
   /* Chrome's container radius. Additive on purpose — see --radius above. */
   --radius-panel: var(--radius);
-  --shadow-soft: 0 10px 30px -10px rgba(23, 23, 20, 0.08);
-  --shadow-lift: 0 20px 40px -15px rgba(23, 23, 20, 0.18);
+  /*
+    Shadows are structural, not decorative: just enough to lift a surface off
+    the page. Anything heavier turns a calm screen into a pile of floating
+    boxes, which is the exact "admin dashboard" look this system avoids.
+  */
+  --shadow-soft: 0 1px 2px rgba(28, 25, 23, 0.04), 0 1px 3px rgba(28, 25, 23, 0.03);
+  --shadow-lift: 0 4px 12px -2px rgba(28, 25, 23, 0.08), 0 2px 4px -2px rgba(28, 25, 23, 0.04);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -212,15 +225,22 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-chrome-sans), system-ui, sans-serif;
-  font-size: 17px;
-  line-height: 1.55;
+  /*
+    15px, not 17px. The product is dense with labels, statuses and list rows;
+    at 17px every screen needed a scroll to say very little, which is what made
+    the old dashboard feel oversized and empty at the same time.
+  */
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
   /*
-    Headings are serif, regular weight, tight, and deliberately unspaced —
-    dropping the base template's -0.015em tracking is what turns a generic
-    organic palette into this one (DESIGN_SYSTEM.md §1).
+    ONE typeface across the product chrome: Manrope, semibold for headings.
+    Marketing and the onboarding wizard opt back into the editorial serif with
+    an explicit `font-serif` utility, which wins because Tailwind's utilities
+    layer outranks this one.
 
     This lives in @layer base, never unlayered: unlayered rules outrank
     Tailwind's layered utilities, so a bare `h1 { font-weight: 400 }` would
@@ -233,10 +253,10 @@ body {
   h4,
   h5,
   h6 {
-    font-family: var(--font-chrome-serif), Georgia, serif;
-    font-weight: 400;
-    line-height: 1.12;
-    letter-spacing: 0;
+    font-family: var(--font-chrome-sans), system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.011em;
   }
 
   /*
@@ -265,6 +285,13 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-primary);
+  /*
+    Published church sites keep the larger reading size the block renderer's
+    scale was tuned against — the 15px above is a *product chrome* decision and
+    must not reach a church's homepage.
+  */
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 .regroup-grid {
@@ -297,7 +324,7 @@ body {
 */
 .chrome-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: var(--sidebar-border) transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 .chrome-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -307,11 +334,11 @@ body {
   background: transparent;
 }
 .chrome-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--sidebar-border);
+  background-color: var(--border-strong);
   border-radius: 9999px;
 }
 .chrome-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: var(--sidebar-accent);
+  background-color: var(--muted);
 }
 
 /*
@@ -347,6 +374,42 @@ body {
 .motion-drift-c { animation: drift-c 29s ease-in-out infinite; transform-origin: center; }
 .motion-pulse   { animation: soft-pulse 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
 
+/*
+  Radix Collapsible (the sidebar's nested nav) reports the panel height as
+  `--radix-collapsible-content-height` only while it is animating, so the height
+  has to be animated here rather than with a Tailwind transition. Killed by the
+  reduced-motion block below like everything else.
+*/
+@keyframes collapsible-down {
+  from { height: 0; }
+  to   { height: var(--radix-collapsible-content-height); }
+}
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to   { height: 0; }
+}
+.collapsible-panel { overflow: hidden; }
+.collapsible-panel[data-state="open"]   { animation: collapsible-down 180ms ease-out; }
+.collapsible-panel[data-state="closed"] { animation: collapsible-up 180ms ease-out; }
+
+/*
+  Toasts (components/ui/toast.tsx) enter from the bottom-right and leave the
+  same way. Radix swaps `data-state` on the item, so the animation is keyed to
+  that rather than to a mount/unmount transition.
+*/
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+.toast-item[data-state="open"]   { animation: toast-in 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.toast-item[data-state="closed"] { animation: toast-out 140ms ease-in; }
+.toast-item[data-swipe="move"]   { transform: translateX(var(--radix-toast-swipe-move-x)); }
+.toast-item[data-swipe="end"]    { animation: toast-out 140ms ease-in; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -359,119 +422,22 @@ body {
 }
 
 /*
-  The editorial palette is deliberately single-themed: `.dark` (an explicit
-  choice) and `prefers-color-scheme: dark` (following the OS) both mirror the
-  light values above rather than switching to a separate dark ramp, so the
-  calm cream-and-green look holds no matter the visitor's system setting. Kept
-  as two blocks — not deleted — so a real dark variant can be reintroduced
-  later without re-deriving the mechanism.
+  Product chrome is single-themed by design.
+
+  `.dark` (an explicit choice) and `prefers-color-scheme: dark` (following the
+  OS) deliberately override NOTHING here: every token above already holds, and
+  re-declaring the same forty values three times only guaranteed the copies
+  would drift. Both blocks stay so the mechanism is documented and a real dark
+  ramp can be introduced in one place later.
 */
 .dark {
   color-scheme: light;
-
-  --background: #f7f4ee;
-  --foreground: #171714;
-  --surface: #fffdf8;
-  --surface-muted: #f0ece2;
-  --surface-raised: #fffdf8;
-  --muted: #6f6b63;
-  --muted-foreground: #6f6b63;
-  --border: #d9d4ca;
-  --border-strong: #c7bfaf;
-  --input: #d9d4ca;
-  --ring: #263a32;
-
-  --primary: #263a32;
-  --primary-foreground: #f7f4ee;
-  --secondary: #e7dfd1;
-  --secondary-foreground: #171714;
-  --destructive: #a23b2e;
-  --destructive-foreground: #f7f4ee;
-  --destructive-soft: #f3e3de;
-
-  --brand: #263a32;
-  --brand-foreground: #f7f4ee;
-  --brand-soft: #e4eae2;
-  --accent: #b18a4a;
-  --accent-foreground: #171714;
-  --accent-soft: #e7dfd1;
-
-  --brand-strong: #1e3029;
-  --accent-strong: #7a5f33;
-
-  --success: #3d5a4c;
-  --success-soft: #e4eae2;
-  --warning: #8c6a35;
-  --warning-soft: #f5eddd;
-  --info: #5b6660;
-  --info-soft: #e9eae5;
-
-  --editor-canvas: #eee7db;
-
-  --sidebar: #f1ece1;
-  --sidebar-foreground: #171714;
-  --sidebar-primary: #263a32;
-  --sidebar-primary-foreground: #f7f4ee;
-  --sidebar-accent: #e7dfd1;
-  --sidebar-accent-foreground: #171714;
-  --sidebar-border: #d9d4ca;
-  --sidebar-ring: #263a32;
 }
 
 @media (prefers-color-scheme: dark) {
-  /*
-    `:not(.light)` so an explicit light choice still wins over a dark OS.
-  */
+  /* `:not(.light)` so an explicit light choice still wins over a dark OS. */
   :root:not(.light) {
     color-scheme: light;
-
-    --background: #f7f4ee;
-    --foreground: #171714;
-    --surface: #fffdf8;
-    --surface-muted: #f0ece2;
-    --surface-raised: #fffdf8;
-    --muted: #6f6b63;
-    --muted-foreground: #6f6b63;
-    --border: #d9d4ca;
-    --border-strong: #c7bfaf;
-    --input: #d9d4ca;
-    --ring: #263a32;
-
-    --primary: #263a32;
-    --primary-foreground: #f7f4ee;
-    --secondary: #e7dfd1;
-    --secondary-foreground: #171714;
-    --destructive: #a23b2e;
-    --destructive-foreground: #f7f4ee;
-    --destructive-soft: #f3e3de;
-
-    --brand: #263a32;
-    --brand-foreground: #f7f4ee;
-    --brand-soft: #e4eae2;
-    --accent: #b18a4a;
-    --accent-foreground: #171714;
-    --accent-soft: #e7dfd1;
-
-    --brand-strong: #1e3029;
-    --accent-strong: #7a5f33;
-
-    --success: #3d5a4c;
-    --success-soft: #e4eae2;
-    --warning: #8c6a35;
-    --warning-soft: #f5eddd;
-    --info: #5b6660;
-    --info-soft: #e9eae5;
-
-    --editor-canvas: #eee7db;
-
-    --sidebar: #f1ece1;
-    --sidebar-foreground: #171714;
-    --sidebar-primary: #263a32;
-    --sidebar-primary-foreground: #f7f4ee;
-    --sidebar-accent: #e7dfd1;
-    --sidebar-accent-foreground: #171714;
-    --sidebar-border: #d9d4ca;
-    --sidebar-ring: #263a32;
   }
 
   /*

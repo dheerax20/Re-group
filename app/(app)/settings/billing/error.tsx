@@ -21,7 +21,6 @@ export default function BillingSettingsError({
       description="Your subscription is unaffected — this is a display problem on our side. Try again, and contact us if it keeps happening."
       error={error}
       retry={retry}
-      homeHref={null}
     />
   );
 }

@@ -1,24 +1,36 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function ChurchPageSkeleton({ cards = 3 }: { cards?: number }) {
+/**
+ * The loading shape of a normal dashboard screen.
+ *
+ * It deliberately mirrors the real layout — header block, then a list — rather
+ * than showing a grid of squares. A skeleton that does not match what arrives
+ * makes the page appear to jump when it loads, which reads as slower than the
+ * same wait with no skeleton at all.
+ *
+ * No container of its own: `AppChrome` already provides the one content column
+ * every screen shares.
+ */
+export function ChurchPageSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="mx-auto max-w-5xl animate-in fade-in duration-200">
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="animate-in fade-in duration-200">
+      <div className="flex flex-col gap-3 pb-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-7 w-44" />
+          <Skeleton className="h-3.5 w-72" />
         </div>
-        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-9 w-32" />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: cards }).map((_, index) => (
-          <div
-            key={index}
-            className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]"
-          >
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="mt-3 h-4 w-full" />
-            <Skeleton className="mt-2 h-4 w-2/3" />
+
+      <div className="divide-y divide-border overflow-hidden rounded-panel border border-border bg-surface">
+        {Array.from({ length: rows }).map((_, index) => (
+          <div className="flex items-center gap-3 px-3.5 py-3" key={index}>
+            <Skeleton className="size-8 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-3.5 w-40" />
+              <Skeleton className="h-3 w-56" />
+            </div>
+            <Skeleton className="h-5 w-16 rounded-full" />
           </div>
         ))}
       </div>

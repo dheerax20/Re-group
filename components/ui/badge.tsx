@@ -5,26 +5,26 @@ import { cn } from "@/lib/utils";
 /**
  * Status and category labels.
  *
- * Token-driven rather than the previous raw `neutral-*` / `emerald-*` classes,
- * which did not follow the palette and became illegible in dark mode. Status
- * variants map to the semantic tokens, so "live" reads as success and "action
- * needed" reads as warning in both themes.
+ * Token-driven, so "live" reads as success and "action needed" reads as
+ * warning without any component knowing a hex. Badges keep `rounded-full` —
+ * with controls now at `rounded-lg`, the pill shape is what distinguishes a
+ * label you cannot click from a button you can.
  *
  * `dot` adds a coloured marker so state is not carried by colour alone.
  */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+  "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
   {
     variants: {
       variant: {
-        default: "bg-brand text-brand-foreground",
-        secondary: "bg-surface-muted text-foreground",
-        outline: "border border-border text-muted",
-        success: "bg-success-soft text-success",
-        warning: "bg-warning-soft text-warning",
-        info: "bg-info-soft text-info",
-        destructive: "bg-destructive-soft text-destructive",
-        accent: "bg-accent-soft text-accent-strong",
+        default: "border-transparent bg-brand text-brand-foreground",
+        secondary: "border-transparent bg-surface-muted text-muted",
+        outline: "border-border bg-surface text-muted",
+        success: "border-transparent bg-success-soft text-success",
+        warning: "border-transparent bg-warning-soft text-warning",
+        info: "border-transparent bg-info-soft text-info",
+        destructive: "border-transparent bg-destructive-soft text-destructive",
+        accent: "border-transparent bg-accent-soft text-accent-strong",
       },
     },
     defaultVariants: { variant: "default" },

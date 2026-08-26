@@ -26,8 +26,7 @@ export default function UpgradeError({
         description="This is on us, not you. Please try again in a moment — you haven't been charged."
         error={error}
         retry={retry}
-        homeHref={null}
-        className="py-0"
+          className="py-0"
       />
     </main>
   );

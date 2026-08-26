@@ -22,9 +22,16 @@ export type RsvpResult =
   | { success: true; registration: { id: string; status: "CONFIRMED" | "WAITLISTED" }; qrDataUrl: string }
   | { success: false; reason: "not_found" | "closed" | "full" | "invalid" | "site_unpublished"; message: string };
 
-/** The URL a QR code points at. Doesn't resolve to anything yet — check-in
- * scanning is a later phase — but shaping it as a real URL now means that
- * phase can add a page here without a new token format. */
+/**
+ * The URL a QR code points at.
+ *
+ * A real URL rather than a bare token so a phone's native camera app has
+ * somewhere to land: `/sites/<slug>/checkin/<token>` renders the attendee's own
+ * ticket, read-only. The staff scanner
+ * (`components/builder/checkin-station.tsx`) does not follow it — it pulls the
+ * token back out with `extractQrToken` and checks in through tRPC, so an
+ * attendee opening their own link can never mark themselves present.
+ */
 function checkinUrl(slug: string, qrToken: string): string {
   const host = process.env.NODE_ENV === "development" ? `${slug}.localhost:3000` : `${slug}.${ROOT_DOMAIN}`;
   const scheme = process.env.NODE_ENV === "development" ? "http" : "https";
@@ -146,7 +153,18 @@ function csvCell(value: string): string {
 
 export async function exportRegistrationsCsv(siteId: string, eventId: string): Promise<string> {
   const rows = (await listRegistrations(siteId, eventId)) ?? [];
-  const header = ["Name", "Email", "Phone", "Guests", "Status", "Registered At"];
+  const header = [
+    "Name",
+    "Email",
+    "Phone",
+    "Guests",
+    "Status",
+    "Registered At",
+    "Checked In",
+    "Checked In At",
+    "Checked In Via",
+    "Checked In By",
+  ];
   const lines = rows.map((r) =>
     [
       csvCell(r.attendeeName),
@@ -155,6 +173,10 @@ export async function exportRegistrationsCsv(siteId: string, eventId: string): P
       String(r.guestCount),
       r.status,
       r.createdAt.toISOString(),
+      r.checkedInAt ? "Yes" : "No",
+      r.checkedInAt ? r.checkedInAt.toISOString() : "",
+      r.checkedInVia ?? "",
+      csvCell(r.checkedInBy ?? ""),
     ].join(",")
   );
   return [header.join(","), ...lines].join("\n");

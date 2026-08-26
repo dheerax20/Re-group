@@ -21,7 +21,6 @@ export default function SiteError({
       description="Sorry about that. Please try again in a moment."
       error={error}
       retry={retry}
-      homeHref={null}
       className="min-h-[60vh] justify-center"
     />
   );

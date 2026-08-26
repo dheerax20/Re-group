@@ -104,6 +104,47 @@ export async function getSite(siteId: string) {
   return toSiteConfig(site);
 }
 
+/**
+ * The handful of scalars the dashboard shows *about* a site rather than *from*
+ * it: whether it is live, when it last went live, and how much content it has.
+ *
+ * Deliberately not part of `getSite`. Overview and Website Builder need these
+ * counts and nothing else, and `getSite` pulls every page's block tree through
+ * `toSiteConfig` to produce them — a whole render config parsed to print the
+ * number 3.
+ */
+export async function getSiteSummary(siteId: string) {
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+      publishedAt: true,
+      updatedAt: true,
+      _count: { select: { sermons: true, events: true, pages: true } },
+    },
+  });
+  if (!site) return null;
+
+  return {
+    id: site.id,
+    name: site.name,
+    slug: site.slug,
+    status: site.status,
+    // Dates cross the tRPC boundary through superjson, so these stay Date
+    // objects on the client rather than becoming strings.
+    publishedAt: site.publishedAt,
+    updatedAt: site.updatedAt,
+    counts: {
+      sermons: site._count.sermons,
+      events: site._count.events,
+      pages: site._count.pages,
+    },
+  };
+}
+
 /** The signed-in user's site only — one website per Auth0 account. */
 export async function resolveActiveSite(user: {
   site: { id: string; name: string; slug: string; status: string } | null;

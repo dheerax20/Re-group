@@ -42,11 +42,6 @@ export default function MembersPage() {
         icon={Users}
         title="Members is coming soon"
         description="We are building this next. Nothing is stored here yet, so there is nothing to set up — your website and content are unaffected."
-        action={
-          <Link href="/dashboard">
-            <Button>Back to dashboard</Button>
-          </Link>
-        }
       />
 
       <Card variant="flat" className="mt-4">

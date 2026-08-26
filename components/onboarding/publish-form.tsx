@@ -64,7 +64,7 @@ export function PublishForm({
     return (
       <div className="mt-8 space-y-4">
         <div className="rounded-panel border border-accent/30 bg-accent-soft p-6 text-center">
-          <h2 className="font-serif text-2xl font-semibold text-foreground">
+          <h2 className="text-2xl font-semibold text-foreground">
             Your site is live
           </h2>
           <a

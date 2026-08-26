@@ -5,11 +5,14 @@ import { cn } from "@/lib/utils";
 /**
  * The product's surface primitive.
  *
- * This used to hardcode Tailwind's raw `neutral-200` border and a plain white
- * fill, so every card in the app ignored the design tokens — white-on-warm in
- * light mode, white-on-black in dark. Everything here is token-driven, and the
+ * Everything here is token-driven, and the
  * `rounded-panel border border-border bg-surface shadow-[var(--shadow-soft)]`
- * incantation that was pasted across a dozen pages now lives in one place.
+ * incantation that was pasted across a dozen pages lives in one place.
+ *
+ * `feature` is deliberately quiet. It used to be a tinted brand panel, which
+ * meant any screen with two or three "important" things on it turned into a
+ * wall of colour; emphasis now comes from a slightly stronger border and the
+ * one filled button inside, not from painting the container.
  */
 const cardVariants = cva("rounded-panel border transition-colors", {
   variants: {
@@ -17,21 +20,20 @@ const cardVariants = cva("rounded-panel border transition-colors", {
       /** Default: sits on the page background. */
       raised: "border-border bg-surface shadow-[var(--shadow-soft)]",
       /** Quieter: for panels nested inside another card. */
-      flat: "border-border bg-background",
+      flat: "border-border bg-surface-muted/60",
       /** For empty states and drop targets. */
-      dashed: "border-dashed border-border-strong bg-background",
+      dashed: "border-dashed border-border-strong bg-surface-muted/40",
       /** Draws the eye to one primary action or announcement. */
-      feature:
-        "border-brand/25 bg-brand-soft/40 shadow-[var(--shadow-soft)]",
+      feature: "border-border-strong bg-surface shadow-[var(--shadow-soft)]",
     },
     padding: {
       none: "",
-      sm: "p-4",
-      md: "p-5",
-      lg: "p-6 sm:p-8",
+      sm: "p-3.5",
+      md: "p-4 sm:p-5",
+      lg: "p-5 sm:p-6",
     },
     interactive: {
-      true: "hover:border-brand/40 hover:shadow-[var(--shadow-lift)]",
+      true: "hover:border-border-strong hover:shadow-[var(--shadow-lift)]",
       false: "",
     },
   },
@@ -55,16 +57,13 @@ export function Card({
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1.5", className)} {...props} />;
+  return <div className={cn("flex flex-col gap-1", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn(
-        "font-semibold tracking-tight text-foreground text-balance",
-        className
-      )}
+      className={cn("text-sm font-semibold text-foreground text-balance", className)}
       {...props}
     />
   );
@@ -74,7 +73,7 @@ export function CardDescription({
   className,
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("text-sm text-muted", className)} {...props} />;
+  return <p className={cn("text-[13px] leading-relaxed text-muted", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -84,7 +83,7 @@ export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDi
 export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("mt-5 flex flex-wrap items-center gap-2", className)}
+      className={cn("mt-4 flex flex-wrap items-center gap-2", className)}
       {...props}
     />
   );

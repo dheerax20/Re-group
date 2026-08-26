@@ -1,22 +1,32 @@
 import type { Metadata } from "next";
-import { Inter, Cormorant_Garamond, Geist_Mono } from "next/font/google";
+import { Manrope, Cormorant_Garamond, Geist_Mono } from "next/font/google";
 import { fontVariables } from "@/lib/theme/fonts";
 import "./globals.css";
 
 /*
-  Regroup's own chrome typefaces — Inter for body/UI, Cormorant Garamond for
-  headings and editorial statements. The editorial-serif/functional-sans split
-  is deliberate: serif carries the emotional/theological weight, sans carries
-  the interface. This is separate from `fontVariables`, the registry of fonts a
-  *church* may pick for its own site (lib/theme/fonts.ts).
+  Regroup's chrome typeface is Manrope, and in the product it is the ONLY one:
+  every dashboard heading, label, table row and button is set in it, at one of
+  five sizes. A dashboard that mixes families reads as several tools stitched
+  together, which is precisely what a church administrator should never have to
+  parse.
+
+  Cormorant Garamond is still loaded and still exposed as `--font-chrome-serif`
+  (the `font-serif` utility resolves to it), but NOTHING in the product uses it
+  any more — the landing page, the onboarding wizard and the dashboard are all
+  Manrope. It is kept wired up so an editorial surface can opt back in with one
+  class, and `@layer base` in globals.css sets every heading to Manrope so
+  nothing inherits serif by accident.
+
+  Both are separate from `fontVariables`, the registry of fonts a *church* may
+  pick for its own site (lib/theme/fonts.ts).
 */
 /*
-  Named "--font-chrome-sans" rather than "--font-inter": the tenant font
-  registry (lib/theme/fonts.ts) already defines its own "--font-inter" for
-  churches that pick Inter as their site font, and two next/font instances
-  sharing one CSS variable name collide unpredictably.
+  Named "--font-chrome-sans" rather than "--font-manrope": the tenant font
+  registry (lib/theme/fonts.ts) defines its own variables for churches that
+  pick the same face for their site, and two next/font instances sharing one
+  CSS variable name collide unpredictably.
 */
-const inter = Inter({
+const manrope = Manrope({
   variable: "--font-chrome-sans",
   subsets: ["latin"],
   display: "swap",
@@ -45,9 +55,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${cormorant.variable} ${geistMono.variable} ${fontVariables} h-full antialiased`}
+      className={`${manrope.variable} ${cormorant.variable} ${geistMono.variable} ${fontVariables} h-full antialiased`}
     >
-      <body className={`${inter.className} min-h-full flex flex-col`}>
+      <body className={`${manrope.className} min-h-full flex flex-col`}>
         {children}
       </body>
     </html>

@@ -135,7 +135,7 @@ export function FieldGroup({
           <GroupGlyph index={index} />
           <div className="space-y-1">
             {title ? (
-              <h3 className="font-serif text-base font-medium tracking-tight text-foreground">
+              <h3 className="text-base font-medium tracking-tight text-foreground">
                 {title}
               </h3>
             ) : null}

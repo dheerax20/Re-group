@@ -140,7 +140,7 @@ export function AiWebsiteStudio({
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent">
               AI design studio
             </p>
-            <h2 className="mt-1 font-serif text-2xl font-semibold tracking-tight">
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
               Designing your church homepage
             </h2>
             <p className="mt-2 max-w-xl text-sm text-editor-muted">

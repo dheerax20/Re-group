@@ -2,181 +2,146 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Calendar, Check } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { RegroupLogo } from "@/components/layout/regroup-logo";
-import { fadeUp, scaleIn, staggerContainer } from "@/lib/motion/variants";
+import { BrowserFrame, FloatingCard } from "@/components/marketing/product-chrome";
+import { Float } from "@/components/marketing/motion-primitives";
+import { ChurchSitePreview } from "@/components/marketing/previews";
 
-export function MarketingNav() {
-  return (
-    <header className="absolute inset-x-0 top-0 z-20">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <RegroupLogo />
-        <nav className="hidden items-center gap-8 text-sm text-muted md:flex">
-          <a href="#builder" className="transition-colors hover:text-foreground">
-            Builder
-          </a>
-          <Link href="/upgrade" className="transition-colors hover:text-foreground">
-            Upgrade
-          </Link>
-          <Link href="/login" className="transition-colors hover:text-foreground">
-            Sign in
-          </Link>
-        </nav>
-        <Link href="/signup">
-          <Button size="sm" className="bg-brand text-brand-foreground hover:bg-brand/90">
-            Create your church
-          </Button>
-        </Link>
-      </div>
-    </header>
-  );
-}
+/**
+ * The hero.
+ *
+ * The product screenshot is the argument, so it gets the width and the copy
+ * gets four lines. A church deciding in five seconds needs to see what their
+ * site could look like — not read a paragraph about digital transformation.
+ *
+ * Load order is staged rather than simultaneous: headline, then sub, then the
+ * buttons, then the frame scaling up from 0.96, then the two floating cards.
+ * Roughly 0.9s end to end, and entirely skipped under reduced motion.
+ */
+export function Hero() {
+  const reduce = useReducedMotion();
 
-export function HeroSection() {
-  const reduceMotion = useReducedMotion();
+  const rise = (delay: number) => ({
+    initial: reduce ? false : { opacity: 0, y: 16 },
+    animate: reduce ? undefined : { opacity: 1, y: 0 },
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay },
+  });
 
   return (
-    <section className="relative overflow-hidden regroup-noise pt-28 pb-16 sm:pt-32 sm:pb-24">
-      <div className="regroup-grid absolute inset-0 opacity-60" />
-      <div className="relative mx-auto grid max-w-6xl gap-12 px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-        <motion.div
-          initial={reduceMotion ? false : "hidden"}
-          animate="visible"
-          variants={staggerContainer}
-          className="max-w-xl"
+    <section className="relative overflow-hidden px-5 pb-16 pt-28 sm:px-8 sm:pb-24 sm:pt-36">
+      {/* One very soft wash behind the frame. No gradient meshes. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[520px]"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 60% at 50% 0%, var(--brand-soft) 0%, transparent 70%)",
+        }}
+      />
+
+      <div className="relative mx-auto max-w-5xl text-center">
+        <motion.p
+          {...rise(0)}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-medium text-muted"
         >
-          <motion.p
-            variants={fadeUp}
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-accent"
-          >
-            <span className="h-px w-6 bg-accent" aria-hidden />
-            The digital home for your church
-          </motion.p>
-          <motion.h1
-            variants={fadeUp}
-            className="mt-5 font-serif text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-[3.6rem] lg:leading-[1.08]"
-          >
-            Build a website your church can call home.
-          </motion.h1>
-          <motion.p variants={fadeUp} className="mt-5 text-base leading-relaxed text-muted sm:text-lg">
-            Create a beautiful church website, manage your events, organize your courses,
-            and connect your community — all from one platform.
-          </motion.p>
-          <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
+          <span className="size-1.5 rounded-full bg-brand" />
+          Church OS — website, events, and people in one place
+        </motion.p>
+
+        <motion.h1
+          {...rise(0.08)}
+          className="mx-auto mt-6 max-w-[16ch] text-[42px] font-bold leading-[1.02] tracking-[-0.03em] text-foreground sm:text-[64px] md:text-[76px] lg:text-[84px]"
+        >
+          Your church. One beautiful digital home.
+        </motion.h1>
+
+        <motion.p
+          {...rise(0.16)}
+          className="mx-auto mt-5 max-w-[52ch] text-[17px] leading-relaxed text-muted sm:text-[19px]"
+        >
+          Build your church website, manage events, share sermons, and check
+          people in — all from one simple platform.
+        </motion.p>
+
+        <motion.div
+          {...rise(0.24)}
+          className="mt-8 flex flex-col items-center justify-center gap-2.5 sm:flex-row"
+        >
+          <Button asChild className="h-11 w-full rounded-full px-6 text-[15px] sm:w-auto" size="lg">
             <Link href="/signup">
-              <Button size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90">
-                Create your church
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              Start building
+              <ArrowRight />
             </Link>
-            <a href="#builder">
-              <Button size="lg" variant="outline">
-                Explore the builder
-              </Button>
-            </a>
-          </motion.div>
+          </Button>
+          <Button
+            asChild
+            className="h-11 w-full rounded-full px-6 text-[15px] sm:w-auto"
+            size="lg"
+            variant="outline"
+          >
+            <a href="#how-it-works">See how it works</a>
+          </Button>
         </motion.div>
 
-        <motion.div
-          initial={reduceMotion ? false : "hidden"}
-          animate="visible"
-          variants={scaleIn}
-          className="relative"
+        <motion.p {...rise(0.3)} className="mt-4 text-[13px] text-muted">
+          Free to start — no credit card required.
+        </motion.p>
+      </div>
+
+      {/* The product. */}
+      <motion.div
+        animate={reduce ? undefined : { opacity: 1, scale: 1, y: 0 }}
+        className="relative mx-auto mt-12 max-w-5xl sm:mt-16"
+        initial={reduce ? false : { opacity: 0, scale: 0.96, y: 24 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.32 }}
+      >
+        <BrowserFrame
+          label={
+            <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-1.5 py-0.5 text-[9px] font-medium text-success">
+              <span className="size-1 rounded-full bg-success" />
+              Live
+            </span>
+          }
+          url="gracecommunity.org"
         >
-          <BuilderPreviewMock />
-          <FloatingChip className="left-[-8%] top-[18%] hidden sm:flex" label="Pages" />
-          <FloatingChip className="right-[-4%] top-[42%] hidden sm:flex" label="Theme" />
-          <FloatingChip className="bottom-[8%] left-[12%] hidden sm:flex" label="Publish" />
-        </motion.div>
-      </div>
+          <ChurchSitePreview />
+        </BrowserFrame>
+
+        {/* Floating cards. Hidden on phones, where they would cover the site. */}
+        <Float className="absolute -left-6 top-[26%] hidden lg:block" delay={0}>
+          <FloatingCard>
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold">
+              <Calendar className="size-3.5 text-brand" />
+              New event
+            </p>
+            <p className="mt-1 text-[11px] text-muted">Sunday Worship</p>
+            <p className="tabular mt-0.5 text-[10px] text-muted">Sun · 10:00 AM</p>
+          </FloatingCard>
+        </Float>
+
+        <Float className="absolute -right-4 top-[14%] hidden lg:block" delay={1.2}>
+          <FloatingCard>
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold">
+              <span className="flex size-4 items-center justify-center rounded-full bg-success text-white">
+                <Check className="size-2.5" strokeWidth={3} />
+              </span>
+              Published
+            </p>
+            <p className="mt-1 text-[10px] text-muted">gracecommunity.org</p>
+          </FloatingCard>
+        </Float>
+
+        <Float className="absolute -right-8 bottom-[16%] hidden lg:block" delay={2.1}>
+          <FloatingCard>
+            <p className="tabular text-[15px] font-semibold leading-none text-brand-strong">
+              108
+            </p>
+            <p className="mt-1 text-[10px] text-muted">checked in today</p>
+          </FloatingCard>
+        </Float>
+      </motion.div>
     </section>
-  );
-}
-
-function FloatingChip({
-  label,
-  className,
-}: {
-  label: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`absolute rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground shadow-[var(--shadow-soft)] ${className}`}
-    >
-      {label}
-    </div>
-  );
-}
-
-export function BuilderPreviewMock({ compact = false }: { compact?: boolean }) {
-  return (
-    <div
-      className={`overflow-hidden rounded-panel border border-border bg-surface shadow-[var(--shadow-lift)] ${
-        compact ? "" : "rotate-[-1deg]"
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="h-2.5 w-2.5 rounded-full bg-accent-soft" />
-          <div className="h-2.5 w-2.5 rounded-full bg-accent-soft" />
-          <div className="h-2.5 w-2.5 rounded-full bg-accent-soft" />
-          <span className="ml-2 text-xs font-medium text-muted">Website Builder</span>
-        </div>
-        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent-strong">
-          Live preview
-        </span>
-      </div>
-      <div className="grid grid-cols-[72px_1fr]">
-        <div className="space-y-2 border-r border-border bg-surface-muted p-2">
-          {["Pages", "Sections", "Theme", "Media"].map((item) => (
-            <div
-              key={item}
-              className="rounded-lg bg-surface px-2 py-2 text-[10px] font-medium text-muted shadow-sm"
-            >
-              {item}
-            </div>
-          ))}
-        </div>
-        <div className="bg-surface-muted p-3">
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            <div className="flex items-center justify-between border-b border-border px-3 py-2">
-              <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-md bg-brand" />
-                <span className="font-serif text-[12px] font-semibold">Grace Community</span>
-              </div>
-              <div className="hidden gap-3 text-[10px] text-muted sm:flex">
-                <span>About</span>
-                <span>Events</span>
-                <span>Contact</span>
-              </div>
-            </div>
-            <div className="grid gap-3 p-3 sm:grid-cols-2">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-strong">
-                  Sundays 10 AM
-                </p>
-                <p className="mt-1 font-serif text-sm font-semibold leading-snug">
-                  Welcome to Grace Community Church
-                </p>
-                <div className="mt-3 inline-flex rounded-lg bg-accent px-2.5 py-1 text-[10px] font-medium text-accent-foreground">
-                  Plan a Visit
-                </div>
-              </div>
-              <div className="min-h-[88px] rounded-xl bg-gradient-to-br from-brand via-brand/70 to-accent" />
-            </div>
-            <div className="grid grid-cols-3 gap-2 border-t border-border bg-surface-muted p-3">
-              {["Sunday Worship", "Youth Night", "Bible Study"].map((title) => (
-                <div key={title} className="rounded-lg border border-border bg-surface p-2">
-                  <p className="text-[10px] font-semibold">{title}</p>
-                  <p className="mt-1 text-[9px] text-muted">This week</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }

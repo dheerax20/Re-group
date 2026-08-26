@@ -179,12 +179,6 @@ export default async function BillingSettingsPage() {
         </p>
         <ManageBillingButton className="mt-4" />
       </Card>
-
-      <div className="mt-6 flex justify-end">
-        <Link href="/dashboard">
-          <Button variant="outline">Back to dashboard</Button>
-        </Link>
-      </div>
     </div>
   );
 }
