@@ -23,10 +23,15 @@ enum MediaType {
 
 model User {
   id      String  @id @default(cuid())
-  auth0Id String  @unique
+  clerkId String  @unique
   email   String?
-  name    String?
-  picture String?
+  // Combined display name, derived from firstName/lastName at sync time.
+  // Kept as its own column because every screen that shows a user's name
+  // (greeting, avatar initial, account card) wants one string, not two.
+  name      String?
+  firstName String?
+  lastName  String?
+  picture   String?
 
   // Set once the user has paid and dismissed /welcome. Distinct from
   // `site` — a user can have a plan before a site exists.
@@ -549,8 +554,8 @@ model Template {
 // ============================================================
 // BILLING MODULE
 // Nothing here reads the user model directly — it only depends on a
-// `userId: String`, which is why swapping the temp auth shim for Auth0
-// touched only the two `user` relations below.
+// `userId: String`, which is why swapping identity providers only ever
+// touches the two `user` relations below.
 // ============================================================
 
 model BillingCustomer {

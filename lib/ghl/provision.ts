@@ -51,13 +51,17 @@ function sanitizeNamePart(value: string): string {
 /**
  * `User.name` is one column; GHL wants two required, validated ones.
  *
- * The case that matters in practice: Auth0 sets `name` to the email address
- * for database (email/password) signups, so a stored "name" is very often
+ * The case that matters in practice: some identity providers set `name` to
+ * the email address for password-based signups, so a stored "name" can be
  * `someone@gmail.com`. Sending that as `firstName` fails GHL validation, so an
  * email-shaped name is reduced to its local part with separators turned into
  * spaces — `dheeraj.kumar@gmail.com` becomes "Dheeraj / Kumar". Separator
  * splitting is applied ONLY on that path, so a genuine hyphenated surname
  * like "Mary-Jane" is left intact.
+ *
+ * This is the fallback: `resolveGhlName` below prefers Clerk's own
+ * `firstName`/`lastName` when they're set, since those are structured data
+ * rather than a guess.
  */
 export function splitName(
   name: string | null,
@@ -77,6 +81,24 @@ export function splitName(
   if (parts.length === 0) return { firstName: "Church", lastName: "Admin" };
   if (parts.length === 1) return { firstName: parts[0], lastName: "Admin" };
   return { firstName: parts[0], lastName: sanitizeNamePart(parts.slice(1).join(" ")) || "Admin" };
+}
+
+/**
+ * Prefers Clerk's structured `firstName`/`lastName` over `splitName`'s guess.
+ * Still sanitized and defaulted the same way, since Clerk's `firstName` can
+ * itself be empty (phone-only signups) or contain characters GHL rejects.
+ */
+export function resolveGhlName(user: {
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  email: string | null;
+}): { firstName: string; lastName: string } {
+  const firstName = sanitizeNamePart(user.firstName ?? "");
+  if (firstName) {
+    return { firstName, lastName: sanitizeNamePart(user.lastName ?? "") || "Admin" };
+  }
+  return splitName(user.name, user.email);
 }
 
 export async function ensureGhlAccount(
@@ -128,7 +150,7 @@ export async function ensureGhlAccount(
     update: { status: "PROVISIONING", attempts: { increment: 1 }, error: null },
   });
 
-  const { firstName, lastName } = splitName(user.name, user.email);
+  const { firstName, lastName } = resolveGhlName(user);
 
   try {
     // Reuse a Location from a previous half-failure rather than creating a
@@ -164,7 +186,10 @@ export async function ensureGhlAccount(
         firstName,
         lastName,
         locationId,
-        externalUserId: user.id,
+        // GHL's SSO login matches by this field against the OIDC `sub` claim
+        // the IdP (Clerk) returns, which IS the Clerk user id — not our
+        // internal cuid. See GHL-SSO-PLAN.md.
+        externalUserId: user.clerkId,
       });
     } catch (error) {
       // GHL enforces email uniqueness across users, so it rejects rather than

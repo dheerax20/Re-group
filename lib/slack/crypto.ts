@@ -5,7 +5,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
  *
  * This is the first third-party bearer credential this app stores in its own
  * database rather than only in env vars — every other provider secret
- * (Stripe, R2, Auth0) lives in deployment config, never in a table a query
+ * (Stripe, R2, Clerk) lives in deployment config, never in a table a query
  * could accidentally select and log. A leaked `SlackConnection` row must not
  * be a leaked ability to post into a church's Slack as their bot, so the
  * token is encrypted with a key that lives only in the deployment environment
@@ -28,9 +28,8 @@ function encryptionKey(): Buffer {
       "SLACK_TOKEN_ENCRYPTION_KEY is not set — required to store or read Slack bot tokens."
     );
   }
-  // Any length of secret in, a fixed 32-byte key out — same tolerance
-  // AUTH0_SECRET already gets from Auth0's own SDK, so ops does not need a
-  // second "must be exactly N bytes, base64" rule to remember.
+  // Any length of secret in, a fixed 32-byte key out — one less
+  // "must be exactly N bytes, base64" rule for ops to remember.
   return createHash("sha256").update(secret).digest();
 }
 

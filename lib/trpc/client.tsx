@@ -14,7 +14,7 @@ export const trpc = createTRPCReact<AppRouter>();
  *
  * A church editing from `grace.regroup.app` must call `/api/trpc` on that same
  * host — an absolute URL built from the platform root would be a cross-origin
- * request, and the Auth0 session cookie would not travel with it.
+ * request, and the Clerk session cookie would not travel with it.
  */
 function apiUrl() {
   return "/api/trpc";

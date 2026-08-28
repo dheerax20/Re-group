@@ -4,14 +4,14 @@ A multi-tenant church website builder. One Next.js application serves every
 church — each site is a row in Postgres rendered through a shared
 Template + Theme + Feature engine, not a separate deployment.
 
-Auth0 handles authentication, Stripe handles subscriptions, and every screen
+Clerk handles authentication, Stripe handles subscriptions, and every screen
 under `app/(app)/(paid)` plus every mutating Server Function requires a live
 base plan.
 
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · PostgreSQL · Prisma ·
-Zod · React Hook Form · Auth0 · Stripe · Upstash Redis · Cloudflare R2 ·
+Zod · React Hook Form · Clerk · Stripe · Upstash Redis · Cloudflare R2 ·
 LangChain (`langchain` + `@langchain/openai`) for the AI site-building crew.
 
 ## Getting started
@@ -25,8 +25,8 @@ LangChain (`langchain` + `@langchain/openai`) for the AI site-building crew.
 2. **Configure environment**
 
    Copy `.env.example` to `.env` and fill it in. Every variable is documented
-   there. The minimum for a working local app is `DATABASE_URL`, the four
-   `AUTH0_*` values, and `STRIPE_SECRET_KEY`.
+   there. The minimum for a working local app is `DATABASE_URL`, the two
+   `CLERK_*` / `NEXT_PUBLIC_CLERK_*` keys, and `STRIPE_SECRET_KEY`.
 
    Optional, each degrading cleanly when unset:
 
@@ -173,7 +173,7 @@ project belongs to one).
     changed, and the panel says so.
   - **Three unauthenticated routes**, all verified by signature over the RAW
     request body (`lib/slack/verify.ts`) — which is why `proxy.ts` returns
-    `/api/slack/commands`, `/events` and `/interactivity` before Auth0 runs,
+    `/api/slack/commands`, `/events` and `/interactivity` before Clerk runs,
     by exact match, so the OAuth callback keeps its session.
     `lib/slack/authorize.ts` decides permission; a signature only proves
     origin.

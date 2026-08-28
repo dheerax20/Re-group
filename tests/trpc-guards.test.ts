@@ -37,7 +37,7 @@ const createCaller = createCallerFactory(probe);
 
 type TestUser = {
   id: string;
-  auth0Id: string;
+  clerkId: string;
   email: string;
   name: string;
   picture: string | null;
@@ -46,7 +46,7 @@ type TestUser = {
 
 const user: TestUser = {
   id: "u1",
-  auth0Id: "auth0|1",
+  clerkId: "user_1",
   email: "pastor@grace.org",
   name: "Pastor",
   picture: null,

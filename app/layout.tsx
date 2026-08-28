@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Cormorant_Garamond, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import { fontVariables } from "@/lib/theme/fonts";
 import "./globals.css";
 
@@ -53,13 +54,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${manrope.variable} ${cormorant.variable} ${geistMono.variable} ${fontVariables} h-full antialiased`}
+    <ClerkProvider
+      signInUrl="/login"
+      signUpUrl="/signup"
+      // `--brand` from globals.css, hardcoded here to match: app chrome is
+      // intentionally single-themed (see the comment above `.dark` there),
+      // and Clerk's `appearance.variables` needs a literal color, not a CSS
+      // custom property, to compute its own hover/contrast shades from it.
+      appearance={{ variables: { colorPrimary: "#1f3d34" } }}
     >
-      <body className={`${manrope.className} min-h-full flex flex-col`}>
-        {children}
-      </body>
-    </html>
+      <html
+        lang="en"
+        className={`${manrope.variable} ${cormorant.variable} ${geistMono.variable} ${fontVariables} h-full antialiased`}
+      >
+        <body className={`${manrope.className} min-h-full flex flex-col`}>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

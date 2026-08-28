@@ -145,7 +145,7 @@ export async function getSiteSummary(siteId: string) {
   };
 }
 
-/** The signed-in user's site only — one website per Auth0 account. */
+/** The signed-in user's site only — one website per Clerk account. */
 export async function resolveActiveSite(user: {
   site: { id: string; name: string; slug: string; status: string } | null;
 }) {

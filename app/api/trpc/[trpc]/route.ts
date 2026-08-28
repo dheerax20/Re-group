@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { appRouter } from "@/server/trpc/routers/_app";
 import { createTrpcContext } from "@/server/trpc/context";
 
-// Prisma and the Auth0 session both need Node.
+// Prisma and the Clerk session both need Node.
 export const runtime = "nodejs";
 
 /**

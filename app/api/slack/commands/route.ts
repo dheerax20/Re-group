@@ -28,7 +28,7 @@ export const runtime = "nodejs";
  * the messages that report something being wrong.
  *
  * No session, no cookies: `proxy.ts` returns this path before
- * `auth0.middleware()` so the body arrives byte-for-byte intact for the
+ * `clerkMiddleware()` so the body arrives byte-for-byte intact for the
  * signature check.
  */
 function ephemeral(message: SlackMessage) {

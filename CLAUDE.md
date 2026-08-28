@@ -4,7 +4,7 @@
 
 Multi-tenant church website builder. One Next.js 16 app serves every church: a
 site is a `Site` row whose `Json` columns render through a shared block engine.
-No per-church deployment, no per-church code. Auth0 for identity, Stripe for
+No per-church deployment, no per-church code. Clerk for identity, Stripe for
 plans, OpenAI/LangChain for generation.
 
 `README.md` is the orientation doc and is current — read it before changing an

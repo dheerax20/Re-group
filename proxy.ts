@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { resolveHostnameInProxy } from "@/lib/domains/proxy-resolve";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "regroup.app";
@@ -17,12 +18,13 @@ function isPlatformPath(pathname: string): boolean {
 /**
  * Webhook endpoints that are unauthenticated by design: each verifies a
  * signature computed over the RAW request body, has no session to refresh
- * and no cookies to set. Returning before `auth0.middleware()` keeps
- * anything session-related well away from routes where the body must arrive
- * byte-for-byte intact — a re-encode invalidates every signature.
+ * and no cookies to set. Returning before `clerkMiddleware()` runs keeps
+ * anything session-related — including its own network call to Clerk — well
+ * away from routes where the body must arrive byte-for-byte intact — a
+ * re-encode invalidates every signature.
  *
  * EXACT match, never a prefix. `/api/slack/oauth/callback` sits under the
- * same namespace and genuinely needs the Auth0 session, so a
+ * same namespace and genuinely needs the Clerk session, so a
  * `startsWith("/api/slack")` here would silently break connecting Slack.
  */
 const RAW_BODY_WEBHOOKS = new Set([
@@ -31,13 +33,6 @@ const RAW_BODY_WEBHOOKS = new Set([
   "/api/slack/events",
   "/api/slack/interactivity",
 ]);
-
-function copyCookies(from: NextResponse, to: NextResponse) {
-  from.cookies.getAll().forEach((cookie) => {
-    to.cookies.set(cookie);
-  });
-  return to;
-}
 
 /**
  * The tenant slug for a platform subdomain (`grace.regroup.app`), or null.
@@ -57,27 +52,18 @@ function slugFromPlatformHost(host: string): string | null {
 }
 
 /**
- * Auth0 session/OAuth routes plus multi-tenant hostname rewrites.
- * Always start from auth0.middleware() so /auth/* and session cookies stay intact.
+ * Multi-tenant hostname rewrites. clerkMiddleware() appends its own headers
+ * to whatever response the handler returns (see `handlerResult.headers.append`
+ * in its implementation), so — unlike the Auth0 middleware this replaced — no
+ * manual cookie-copying is needed around the tenant rewrite.
  */
-export async function proxy(request: NextRequest) {
+const clerkProxy = clerkMiddleware(async (_auth, request: NextRequest) => {
   const { pathname } = request.nextUrl;
-
-  if (RAW_BODY_WEBHOOKS.has(pathname)) {
-    return NextResponse.next();
-  }
-
-  const authResponse = await auth0.middleware(request);
-
-  if (pathname.startsWith("/auth")) {
-    return authResponse;
-  }
-
   const hostname = request.headers.get("host") ?? "";
   const host = hostname.split(":")[0].toLowerCase();
 
   if (isPlatformPath(pathname)) {
-    return authResponse;
+    return NextResponse.next();
   }
 
   // The platform's own root domain serves the marketing site and the app.
@@ -88,7 +74,7 @@ export async function proxy(request: NextRequest) {
     host === "127.0.0.1";
 
   if (isPlatformHost) {
-    return authResponse;
+    return NextResponse.next();
   }
 
   let slug = slugFromPlatformHost(host);
@@ -105,12 +91,24 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!slug) {
-    return authResponse;
+    return NextResponse.next();
   }
 
   const url = request.nextUrl.clone();
   url.pathname = `/sites/${slug}${pathname === "/" ? "" : pathname}`;
-  return copyCookies(authResponse, NextResponse.rewrite(url));
+  return NextResponse.rewrite(url);
+});
+
+/**
+ * Entry point Next.js calls directly. Raw-body webhooks are filtered out
+ * here, before `clerkProxy` (and the `authenticateRequest` network call
+ * inside it) ever runs — see `RAW_BODY_WEBHOOKS` above.
+ */
+export function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (RAW_BODY_WEBHOOKS.has(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+  return clerkProxy(request, event);
 }
 
 export const config = {

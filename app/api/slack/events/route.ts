@@ -14,7 +14,7 @@ export const runtime = "nodejs";
  * "this connection is over".
  *
  * No session, no cookies: `proxy.ts` returns this path before
- * `auth0.middleware()` so the body arrives byte-for-byte intact, and the
+ * `clerkMiddleware()` so the body arrives byte-for-byte intact, and the
  * signature is the only thing that makes this request trustworthy.
  *
  * The response contract that matters here is that Slack RETRIES anything it

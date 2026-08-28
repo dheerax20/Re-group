@@ -1,48 +1,51 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { auth0 } from "@/lib/auth0";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { requireActivePlan } from "@/lib/billing/guard";
 import { hasBasePlan } from "@/lib/billing/entitlements";
 
 export type AppUser = {
   id: string;
-  auth0Id: string;
+  clerkId: string;
   email: string | null;
   name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   picture: string | null;
   site: { id: string; name: string; slug: string; status: "DRAFT" | "PUBLISHED" | "ARCHIVED" } | null;
 };
 
 export async function requireSession() {
-  const session = await auth0.getSession();
-  if (!session) {
-    redirect("/auth/login?returnTo=/post-auth");
+  const { userId } = await auth();
+  if (!userId) {
+    redirect("/login");
   }
-  return session;
+  return userId;
 }
 
-type Auth0Session = NonNullable<Awaited<ReturnType<typeof auth0.getSession>>>;
+type ClerkUser = NonNullable<Awaited<ReturnType<typeof currentUser>>>;
 
-/** Mirrors the Auth0 profile into our own users table. */
-async function upsertFromSession(session: Auth0Session): Promise<AppUser> {
-  const auth0Id = session.user.sub;
-  const picture =
-    typeof session.user.picture === "string" ? session.user.picture : null;
+/** Mirrors the Clerk profile into our own users table. */
+async function upsertFromClerkUser(clerkUser: ClerkUser): Promise<AppUser> {
+  const clerkId = clerkUser.id;
+  const primaryEmail =
+    clerkUser.emailAddresses.find(
+      (address) => address.id === clerkUser.primaryEmailAddressId
+    ) ?? clerkUser.emailAddresses[0];
+  const email = primaryEmail?.emailAddress ?? null;
+  const firstName = clerkUser.firstName || null;
+  const lastName = clerkUser.lastName || null;
+  // Combined for display; kept in sync with firstName/lastName below rather
+  // than being the source of truth — GHL provisioning reads the structured
+  // fields directly instead of re-splitting this string.
+  const name = [firstName, lastName].filter(Boolean).join(" ") || null;
+  const picture = clerkUser.imageUrl || null;
 
   const user = await prisma.user.upsert({
-    where: { auth0Id },
-    create: {
-      auth0Id,
-      email: session.user.email ?? null,
-      name: session.user.name ?? null,
-      picture,
-    },
-    update: {
-      email: session.user.email ?? null,
-      name: session.user.name ?? null,
-      picture,
-    },
+    where: { clerkId },
+    create: { clerkId, email, name, firstName, lastName, picture },
+    update: { email, name, firstName, lastName, picture },
     include: {
       site: { select: { id: true, name: true, slug: true, status: true } },
     },
@@ -60,22 +63,22 @@ async function upsertFromSession(session: Auth0Session): Promise<AppUser> {
  * renders through `(app)/layout.tsx` and `(paid)/layout.tsx` and usually calls
  * again in the page body; without this that is three identical upserts per
  * navigation. Note this only works because the function takes no arguments —
- * `cache()` keys on argument identity, and `getSession()` hands back a fresh
+ * `cache()` keys on argument identity, and `currentUser()` hands back a fresh
  * object every call, so wrapping the upsert itself would never hit.
  */
 export const getCurrentUser = cache(async function getCurrentUser(): Promise<
   AppUser | null
 > {
-  const session = await auth0.getSession();
-  if (!session) return null;
-  return upsertFromSession(session);
+  const clerkUser = await currentUser();
+  if (!clerkUser) return null;
+  return upsertFromClerkUser(clerkUser);
 });
 
 /** The current user, or a redirect to login. For Server Components. */
 export async function syncCurrentUser(): Promise<AppUser> {
   // Routes through getCurrentUser() so both share the per-request cache.
   const user = await getCurrentUser();
-  if (!user) redirect("/auth/login?returnTo=/post-auth");
+  if (!user) redirect("/login");
   return user;
 }
 

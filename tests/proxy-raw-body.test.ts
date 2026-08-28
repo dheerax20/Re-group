@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 /**
- * Which paths skip Auth0.
+ * Which paths skip Clerk.
  *
  * Slack and Stripe both sign the RAW request body, so any middleware that
  * buffers, re-encodes or attaches cookies to those requests breaks signature
@@ -16,12 +16,12 @@ import { NextRequest } from "next/server";
  * session, so the check has to be exact-match. A `startsWith("/api/slack")`
  * would pass every other assertion here and break connecting a workspace.
  */
-const authSentinel = { __auth0: true };
-const middleware = vi.fn(async () => authSentinel);
+const clerkSentinel = { __clerk: true };
+const middleware = vi.fn(async () => clerkSentinel);
 const resolveHostnameInProxy = vi.fn(async () => null);
 
-vi.mock("@/lib/auth0", () => ({
-  auth0: { middleware: () => middleware() },
+vi.mock("@clerk/nextjs/server", () => ({
+  clerkMiddleware: () => () => middleware(),
 }));
 
 vi.mock("@/lib/domains/proxy-resolve", () => ({
@@ -49,24 +49,24 @@ describe("proxy raw-body webhooks", () => {
     "/api/slack/interactivity",
   ];
 
-  it.each(webhooks)("%s returns before auth0.middleware()", async (pathname) => {
-    const response = await proxy(request(pathname));
+  it.each(webhooks)("%s returns before clerkMiddleware() runs", async (pathname) => {
+    const response = await proxy(request(pathname), {} as never);
 
     expect(middleware).not.toHaveBeenCalled();
-    expect(response).not.toBe(authSentinel);
+    expect(response).not.toBe(clerkSentinel);
   });
 
-  it("the Slack OAuth callback still goes through auth0.middleware()", async () => {
-    const response = await proxy(request("/api/slack/oauth/callback"));
+  it("the Slack OAuth callback still goes through clerkMiddleware()", async () => {
+    const response = await proxy(request("/api/slack/oauth/callback"), {} as never);
 
     expect(middleware).toHaveBeenCalledTimes(1);
-    expect(response).toBe(authSentinel);
+    expect(response).toBe(clerkSentinel);
   });
 
   it("matches exactly — a path merely starting with a webhook path is not exempt", async () => {
-    const response = await proxy(request("/api/slack/commands/extra"));
+    const response = await proxy(request("/api/slack/commands/extra"), {} as never);
 
     expect(middleware).toHaveBeenCalledTimes(1);
-    expect(response).toBe(authSentinel);
+    expect(response).toBe(clerkSentinel);
   });
 });

@@ -5,7 +5,7 @@ import { getCurrentUser, type AppUser } from "@/lib/auth/session";
 /**
  * Per-request tRPC context.
  *
- * Deliberately thin: the Auth0-backed user and the database client, nothing
+ * Deliberately thin: the Clerk-backed user and the database client, nothing
  * else. Ownership is NOT resolved here — it is checked per procedure by
  * `paidSiteProcedure`, mirroring the rule the server actions followed ("per
  * action, not once at a layout boundary"). Resolving a site in context would

@@ -13,7 +13,7 @@ import { getStripe } from "./stripe";
  */
 export async function getOrCreateBillingCustomer(user: {
   id: string;
-  // Auth0 does not guarantee an email claim (a phone-only or social connection
+  // Clerk does not guarantee an email claim (a phone-only or social connection
   // may omit it), so this must tolerate null rather than assume one.
   email: string | null;
   name: string | null;

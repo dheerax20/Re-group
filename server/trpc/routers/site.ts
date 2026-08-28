@@ -69,7 +69,7 @@ export const siteRouter = router({
    * The caller's own site, or null.
    *
    * User-scoped rather than site-scoped: it is what a screen calls when it
-   * does not yet know a siteId. One website per Auth0 account, so there is
+   * does not yet know a siteId. One website per Clerk account, so there is
    * never more than one to choose between.
    */
   mine: authedProcedure.query(async ({ ctx }) => ctx.user.site),

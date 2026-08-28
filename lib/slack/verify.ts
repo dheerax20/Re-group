@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * Proving a request actually came from Slack.
  *
  * These routes are the only unauthenticated write surface this app exposes
- * besides the Stripe webhook: no session, no CSRF token, no Auth0 — a POST
+ * besides the Stripe webhook: no session, no CSRF token, no Clerk — a POST
  * from anywhere on the internet that ends in an LLM call and a change to a
  * church's website. The signature is the ONLY thing standing between those
  * two facts, so everything here fails closed.
@@ -14,7 +14,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * 1. The body is read as TEXT, once, before anything else. Slack signs the
  *    exact bytes it sent; `.json()` or `.formData()` consume the stream and
  *    re-encode it, and a re-encoded body produces a different HMAC. This is
- *    also why `proxy.ts` returns these paths before `auth0.middleware()`.
+ *    also why `proxy.ts` returns these paths before `clerkMiddleware()`.
  * 2. Parsing happens strictly AFTER verification. An unverified body is
  *    attacker-controlled input, and there is no reason to parse it at all if
  *    it is going to be thrown away.

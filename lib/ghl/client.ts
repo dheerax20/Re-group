@@ -123,9 +123,64 @@ export type CreateUserInput = {
   firstName: string;
   lastName: string;
   locationId: string;
-  /** Our own user id — the link back from GHL to this app. */
+  /**
+   * The link back from GHL to this app — but specifically the CLERK user id
+   * (`User.clerkId`), not our internal `User.id`. GHL's SSO login matches
+   * users by this field against the OIDC `sub` claim the IdP returns, and
+   * Clerk (the IdP) asserts `sub` as its own user id. See GHL-SSO-PLAN.md.
+   */
   externalUserId: string;
 };
+
+/**
+ * Every user this app provisions is a church admin whose only reason to be
+ * in GHL at all is Membership (Courses), Marketing, Conversations, and
+ * Contacts — everything else in GHL's admin surface (workflows, funnels,
+ * payments, settings, reporting, social planner, ...) is switched off so a
+ * church admin never lands on a GHL feature this app doesn't support or
+ * explain. One constant because this app only ever creates this one kind of
+ * user — there is no per-call variation to plumb through `CreateUserInput`.
+ */
+const SCOPED_PERMISSIONS = {
+  campaignsEnabled: false,
+  campaignsReadOnly: false,
+  contactsEnabled: true,
+  workflowsEnabled: false,
+  workflowsReadOnly: false,
+  triggersEnabled: false,
+  funnelsEnabled: false,
+  websitesEnabled: false,
+  opportunitiesEnabled: false,
+  dashboardStatsEnabled: false,
+  bulkRequestsEnabled: false,
+  appointmentsEnabled: false,
+  reviewsEnabled: false,
+  onlineListingsEnabled: false,
+  phoneCallEnabled: false,
+  conversationsEnabled: true,
+  assignedDataOnly: false,
+  adwordsReportingEnabled: false,
+  membershipEnabled: true,
+  facebookAdsReportingEnabled: false,
+  attributionsReportingEnabled: false,
+  settingsEnabled: false,
+  tagsEnabled: false,
+  leadValueEnabled: false,
+  marketingEnabled: true,
+  agentReportingEnabled: false,
+  botService: false,
+  socialPlanner: false,
+  bloggingEnabled: false,
+  invoiceEnabled: false,
+  affiliateManagerEnabled: false,
+  contentAiEnabled: false,
+  refundsEnabled: false,
+  recordPaymentEnabled: false,
+  cancelSubscriptionEnabled: false,
+  paymentsEnabled: false,
+  communitiesEnabled: false,
+  exportPaymentsEnabled: false,
+} as const;
 
 /** Returns the new GHL user's id. */
 export async function createUser(
@@ -137,11 +192,15 @@ export async function createUser(
     email: input.email,
     password: input.password,
     type: "account",
-    role: "admin",
+    // "user", not "admin": GHL's `permissions` toggles below only mean
+    // anything for a non-admin role — an admin user is commonly not gated
+    // by them at all, which would make every `false` below a no-op.
+    role: "user",
     locationIds: [input.locationId],
     firstName: input.firstName,
     lastName: input.lastName,
     externalUserId: input.externalUserId,
+    permissions: SCOPED_PERMISSIONS,
   });
 
   if (!result.id) {
