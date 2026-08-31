@@ -261,23 +261,41 @@ export function assembleGeneratedSite(args: {
 export function assembleGeneratedBlocks(args: {
   input: SiteGenerationInput;
   composed: PageComposerOutput;
+  /** The build's design template. Its recipe is what makes two churches differ. */
+  direction?: ArtDirection;
+  /** The photo the last build used, so a redesign does not reuse it. */
+  previousHeroImage?: string;
 }): GeneratedSiteConfig & { blocks: BlockNode[] } {
-  const { input, composed } = args;
+  const { input, composed, direction, previousHeroImage } = args;
 
   let blocks = coerceBlocks(composed.blocks);
 
   // Rhythm — and the bands the nav promises — are decided here, not by the
-  // model. The composer is asked to vary padding and background band to band
-  // and to emit one band per enabled feature; a small model asked that leaves
-  // half the bands unstyled and routinely ships a page with no sermons or
-  // events section while still linking to both. See
+  // model. The composer is asked to emit one band per enabled feature, and a
+  // small model asked that routinely ships a page with no sermons or events
+  // section while still linking to both. Everything else the pass applies —
+  // band rhythm, padding, alignment, collection layout, the nav bar's height —
+  // comes from the chosen template's recipe rather than from the prompt, which
+  // is what stops every church converging on one look. See
   // `lib/site/blocks/design-pass.ts` — full builds only, never after an edit.
-  blocks = applyDesignPass(blocks, {
-    features: input.features as unknown as Record<string, unknown>,
-    churchName: input.churchName,
-    story: input.story,
-    tagline: input.tagline,
-  });
+  blocks = applyDesignPass(
+    blocks,
+    {
+      features: input.features as unknown as Record<string, unknown>,
+      churchName: input.churchName,
+      story: input.story,
+      tagline: input.tagline,
+      // The hero band is BUILT here rather than composed: the block vocabulary
+      // cannot express text over a photograph, and the model has no photograph
+      // to place. Its presence is also what gates injection — a reply with no
+      // hero copy produces a page with no hero, rather than a headline nobody
+      // wrote. See `injectHero`.
+      hero: composed.hero,
+      siteId: input.siteId,
+      previousHeroImage,
+    },
+    direction?.recipe
+  );
 
   // Nav + footer alone is not a homepage. `pageComposerResponseSchema` repairs
   // whatever it can out of the model's reply rather than throwing, so an

@@ -24,6 +24,7 @@ import {
   parseMobileFeedback,
   parseAgentLog,
   parseStyleName,
+  parseNavVariant,
 } from "./story";
 
 type SiteWithRelations = Site & {
@@ -224,5 +225,6 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
     mobileFeedback: parseMobileFeedback(site.storyConfig),
     agentLog: parseAgentLog(site.storyConfig),
     styleName: parseStyleName(site.storyConfig),
+    navVariant: parseNavVariant(site.storyConfig),
   };
 }

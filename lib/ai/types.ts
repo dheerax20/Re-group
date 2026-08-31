@@ -29,6 +29,12 @@ export interface TemplateRecommendationEngine {
 }
 
 export interface SiteGenerationInput {
+  /**
+   * The stored site's id. Seeds the deterministic stock-photo pick, so a
+   * rebuild that keeps its direction keeps its photograph and a church does
+   * not see the picture change under them for no reason.
+   */
+  siteId?: string;
   churchName: string;
   tagline?: string;
   denomination?: string;

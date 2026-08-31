@@ -46,7 +46,10 @@ export default async function SiteLayout({
 
   return (
     <ThemeProvider brand={site.brand}>
-      <div className="flex min-h-screen flex-col">
+      {/* `relative` is the positioning context the `transparent` navbar
+          variant is absolutely positioned against — without it the bar
+          anchors to the viewport and stops scrolling away with the hero. */}
+      <div className="relative flex min-h-screen flex-col">
         {navBlock ? <BlockTree nodes={[navBlock]} site={site} content={content} /> : null}
         <div className="flex-1">{children}</div>
         {footerBlock ? <BlockTree nodes={[footerBlock]} site={site} content={content} /> : null}

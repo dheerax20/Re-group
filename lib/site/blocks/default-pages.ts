@@ -18,6 +18,14 @@ import type { SiteConfig } from "@/lib/site/types";
  * Keep them deterministic and grounded in real site fields. Nothing here may
  * invent a claim about a church — the copy below is either the church's own
  * (`brand.tagline`) or generic enough to be true of any congregation.
+ *
+ * They also have to hold to the same craft floor as an AI-composed page,
+ * because a church sees them side by side with one. Two rules earn their
+ * place: no `eyebrow` above a heading that already reads clearly (a small
+ * tracked-out label above every band is the fastest way a site reads as
+ * generated), and no reflexive `align: "center"`. Prose and contact details
+ * range left and take a reading measure; giving is the one page that genuinely
+ * is a single call to action, so it is the one that stays centred.
  */
 
 function band(id: string, children: BlockNode[], style?: BlockNode["style"]): BlockNode {
@@ -29,7 +37,6 @@ function aboutPage(site: SiteConfig): PageBlocks {
     band(
       "about-page",
       [
-        { id: "about-eyebrow", type: "eyebrow", text: "About Us" },
         { id: "about-heading", type: "heading", text: "Who We Are", scale: "h1" },
         {
           id: "about-text",
@@ -39,7 +46,7 @@ function aboutPage(site: SiteConfig): PageBlocks {
             `${site.site.name} exists to help people know God and grow in community. We gather to worship, learn, and serve together.`,
         },
       ] as BlockNode[],
-      { padding: "lg", align: "center" }
+      { padding: "xl", align: "left", width: "normal" }
     ),
   ];
 
@@ -64,12 +71,11 @@ function contactPage(): PageBlocks {
     band(
       "contact-page",
       [
-        { id: "contact-eyebrow", type: "eyebrow", text: "Get In Touch" },
         { id: "contact-heading", type: "heading", text: "Contact Us", scale: "h1" },
         { id: "contact-info", type: "contactInfo" },
         { id: "contact-social", type: "socialLinks" },
       ] as BlockNode[],
-      { padding: "lg", align: "center" }
+      { padding: "xl", align: "left", width: "normal" }
     ),
   ];
 }
@@ -79,7 +85,6 @@ function givingPage(): PageBlocks {
     band(
       "giving-page",
       [
-        { id: "giving-eyebrow", type: "eyebrow", text: "Generosity" },
         { id: "giving-heading", type: "heading", text: "Give Online", scale: "h1" },
         {
           id: "giving-text",
@@ -90,7 +95,7 @@ function givingPage(): PageBlocks {
       ] as BlockNode[],
       // `primary` is a 10% wash of the brand, not a solid fill — see
       // components/website/blocks/tokens.ts.
-      { padding: "lg", background: "primary", align: "center" }
+      { padding: "xl", background: "primary", align: "center", width: "narrow" }
     ),
   ];
 }
@@ -100,7 +105,6 @@ function ministriesPage(): PageBlocks {
     band(
       "ministries-page",
       [
-        { id: "ministries-eyebrow", type: "eyebrow", text: "Get Involved" },
         { id: "ministries-heading", type: "heading", text: "Ministries", scale: "h1" },
         { id: "ministries-collection", type: "ministryCollection" },
       ] as BlockNode[],

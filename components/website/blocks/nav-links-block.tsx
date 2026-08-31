@@ -6,11 +6,12 @@ import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import type { SiteConfig } from "@/lib/site/types";
 import { cn } from "@/lib/utils";
+import { focusRingClass } from "./tokens";
 
 /** Ported from the old `navbar.tsx` — the mobile hamburger needs client state, so this is the one interactive island the (server) block renderer mounts. */
 export function BrandLogoBlockView({ site }: { site: SiteConfig }) {
   return (
-    <Link href="/" className="flex items-center gap-2 font-semibold">
+    <Link href="/" className={cn("flex items-center gap-2 rounded-sm font-semibold", focusRingClass)}>
       {site.brand.logo.url ? (
         <Image
           src={site.brand.logo.url}
@@ -35,7 +36,7 @@ export function NavLinksBlockView({ site, tone = "default" }: { site: SiteConfig
       <ul className="hidden items-center gap-6 text-base font-medium md:flex">
         {site.navigation.map((item) => (
           <li key={item.href}>
-            <Link href={item.href} className="hover:text-site-accent">
+            <Link href={item.href} className={cn("rounded-sm hover:text-site-accent", focusRingClass)}>
               {item.label}
             </Link>
           </li>
@@ -45,13 +46,14 @@ export function NavLinksBlockView({ site, tone = "default" }: { site: SiteConfig
         type="button"
         className={cn(
           "inline-flex size-10 items-center justify-center rounded-xl md:hidden",
+          focusRingClass,
           dark ? "text-white hover:bg-white/10" : "text-site-foreground hover:bg-site-muted/10"
         )}
         aria-expanded={open}
         aria-label={open ? "Close menu" : "Open menu"}
         onClick={() => setOpen((value) => !value)}
       >
-        {open ? <X className="size-5" /> : <Menu className="size-5" />}
+        {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
       </button>
       {open ? (
         <ul
@@ -64,7 +66,7 @@ export function NavLinksBlockView({ site, tone = "default" }: { site: SiteConfig
             <li key={item.href}>
               <Link
                 href={item.href}
-                className="block rounded-lg px-3 py-2 hover:bg-site-muted/10"
+                className={cn("block rounded-lg px-3 py-2 hover:bg-site-muted/10", focusRingClass)}
                 onClick={() => setOpen(false)}
               >
                 {item.label}

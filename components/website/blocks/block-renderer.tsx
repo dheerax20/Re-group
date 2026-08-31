@@ -6,9 +6,10 @@ import type { SiteConfig, SiteContent, EventSummary, SermonSummary } from "@/lib
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, TraitEyebrow, StatPill } from "./shared";
-import { safeLinkTarget } from "@/lib/validation/url";
+import { safeLinkTarget, safeMediaUrl } from "@/lib/validation/url";
 import { cn } from "@/lib/utils";
 import { BrandLogoBlockView, NavLinksBlockView } from "./nav-links-block";
+import { SiteHeader } from "./site-header";
 import {
   paddingClass,
   gapClass,
@@ -21,9 +22,17 @@ import {
   headingScaleClass,
   textScaleClass,
   rowColumnsClass,
+  rowLayoutClass,
+  overlayClass,
+  minHeightClass,
+  fontWeightClass,
+  pinnedBandClass,
   imageTreatmentClass,
   imageAspectClass,
   buttonEmphasisVariant,
+  blockButtonSizeClass,
+  buttonShapeClass,
+  focusRingClass,
 } from "./tokens";
 
 /**
@@ -130,17 +139,108 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
     case "section": {
       const width = node.style?.width ?? "wide";
       /**
-       * The `lg` padding default below is right for a content band and wrong
-       * for the pinned nav/footer bands, which the design pass deliberately
-       * skips — an unstyled nav would otherwise render with a band's worth of
-       * vertical padding.
+       * The pinned nav/footer bands are chrome, not content bands, and their
+       * height is not a creative decision — so they take a fixed bar treatment
+       * and the model's `padding` token is ignored outright. It has to be
+       * ignored rather than defaulted: the composer is required to emit `nav`
+       * as a top-level `section`, the band padding scale starts at `py-10` and
+       * climbs to `py-36`, and an obedient model wrapped a 32px logo in 160px
+       * of air. `applyDesignPass` strips the token as well, but a stored tree
+       * from before that pass still renders correctly here.
+       *
+       * They also skip the `flex flex-col` content column: a bar's single
+       * `split` row already does its own layout, and stacking it re-introduces
+       * the column gap the design is trying to remove.
        */
-      const pinned = node.id === NAV_BLOCK_ID || node.id === FOOTER_BLOCK_ID;
+      /**
+       * The nav band is a marker, not a layout.
+       *
+       * Its children are ignored: `SiteHeader` owns the bar's shape, its three
+       * variants, and the mobile drawer, none of which the generic block
+       * vocabulary can express. The band stays in `blockConfig` because the
+       * builder, `block-prompt.ts` and the public layout all find the header
+       * by `id === "nav"`.
+       */
+      if (node.id === NAV_BLOCK_ID) {
+        return <SiteHeader site={site} variant={site.navVariant ?? "solid"} />;
+      }
+
+      /**
+       * The footer is still a band, but chrome — its height is not a creative
+       * decision, so the model's `padding` token is ignored outright rather
+       * than defaulted. It has to be ignored: the composer is required to emit
+       * the band as a top-level `section`, the band padding scale starts at
+       * `py-10`, and an obedient model wrapped one line of text in 160px of
+       * air. It also skips the `flex flex-col` content column — a bar's `bar`
+       * row does its own layout, and stacking it re-opens the gap.
+       */
+      if (node.id === FOOTER_BLOCK_ID) {
+        return (
+          <section
+            className={cn(
+              pinnedBandClass.footer,
+              node.style?.background ? backgroundClass[node.style.background] : "",
+              node.style?.textTone ? textToneClass[node.style.textTone] : ""
+            )}
+          >
+            <div className={widthClass[width]}>
+              <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
+            </div>
+          </section>
+        );
+      }
+      /**
+       * A photograph behind the band, with the copy over it.
+       *
+       * An `<img>` rather than a CSS `background-image`, because the hero photo
+       * is the page's largest-contentful paint and only a real element can be
+       * told `fetchPriority="high"` — and it is the one image on the page that
+       * must NOT be lazy, which is why it opts out of the `loading="lazy"`
+       * default every other block image takes.
+       *
+       * `safeMediaUrl` on the way out even though `mediaUrlSchema` guards the
+       * way in: a stored tree is not trusted input just because a template
+       * wrote it once.
+       */
+      const photo = safeMediaUrl(node.style?.backgroundImage);
+      const minHeight = node.style?.minHeight ?? "none";
+      const band = (
+        <div className={cn(widthClass[width], alignItemsClass[node.style?.align ?? "left"], "flex flex-col", node.style?.gap ? gapClass[node.style.gap] : "gap-6")}>
+          <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
+        </div>
+      );
+
       return (
-        <section className={containerStyle(node.style, undefined, pinned ? "sm" : "lg")}>
-          <div className={cn(widthClass[width], alignItemsClass[node.style?.align ?? "left"], "flex flex-col", node.style?.gap ? gapClass[node.style.gap] : "gap-6")}>
-            <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
-          </div>
+        <section
+          className={containerStyle(
+            node.style,
+            cn(
+              minHeightClass[minHeight],
+              // A band with a floor centres its copy on the optical centre
+              // line; without this the text pins to the top of a 78vh box.
+              minHeight === "none" ? "" : "flex flex-col justify-center",
+              photo ? "relative isolate overflow-hidden" : ""
+            )
+          )}
+        >
+          {photo ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo}
+                alt=""
+                aria-hidden="true"
+                loading="eager"
+                fetchPriority="high"
+                className="absolute inset-0 -z-10 h-full w-full object-cover"
+              />
+              <div
+                aria-hidden="true"
+                className={cn("absolute inset-0 -z-10", overlayClass[node.style?.overlay ?? "none"])}
+              />
+            </>
+          ) : null}
+          {band}
         </section>
       );
     }
@@ -171,12 +271,25 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
         </div>
       );
 
-    case "row":
+    /**
+     * `bar` distributes by flex and the asymmetric splits draw their own
+     * fractions, so `columns` is only meaningful for `columns` — passing it to
+     * any other layout would silently do nothing.
+     */
+    case "row": {
+      const layout = node.layout ?? "columns";
       return (
-        <div className={cn("grid w-full items-center", rowColumnsClass[node.columns ?? 2], node.style?.gap ? gapClass[node.style.gap] : "gap-8")}>
+        <div
+          className={cn(
+            rowLayoutClass[layout],
+            layout === "columns" ? rowColumnsClass[node.columns ?? 2] : "",
+            node.style?.gap ? gapClass[node.style.gap] : layout === "bar" ? "gap-6" : "gap-8"
+          )}
+        >
           <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
         </div>
       );
+    }
 
     case "spacer":
       return <div className={spacerHeightClass[node.size ?? "md"]} />;
@@ -188,7 +301,16 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
       // top-level heading at all (the old hero components each rendered one).
       const Tag = scale === "display" || scale === "h1" ? "h1" : scale === "h2" ? "h2" : "h3";
       return (
-        <Tag className={cn(headingScaleClass[scale], node.style?.textTone ? textToneClass[node.style.textTone] : "")}>
+        <Tag
+          className={cn(
+            headingScaleClass[scale],
+            // Overrides the weight baked into the scale — the hero subhead is
+            // a heading (for the display face) that has to read at regular
+            // weight while `h3` elsewhere stays semibold.
+            node.weight ? fontWeightClass[node.weight] : "",
+            node.style?.textTone ? textToneClass[node.style.textTone] : ""
+          )}
+        >
           {node.text}
         </Tag>
       );
@@ -215,8 +337,27 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
 
     case "image": {
       const treatment = imageTreatmentClass[node.treatment ?? "rounded"];
-      const aspect = imageAspectClass[node.aspect ?? "wide"];
+      const aspectToken = node.aspect ?? "wide";
+      const aspect = imageAspectClass[aspectToken];
       const embed = node.videoSrc ? youtubeEmbedSrc(node.videoSrc) : null;
+      /**
+       * `fill` has no ratio box, so its `<img>` cannot be absolutely
+       * positioned against one — it fills whatever cell the grid gave it. Used
+       * by the hero's bleeding photo column, which must match the height of
+       * the text column beside it rather than impose a ratio of its own.
+       */
+      if (aspectToken === "fill" && !embed && node.src) {
+        return (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={node.src}
+            alt={node.alt ?? ""}
+            loading="eager"
+            fetchPriority="high"
+            className={cn("h-full min-h-full w-full object-cover", treatment)}
+          />
+        );
+      }
       return (
         <div className={cn("relative overflow-hidden", treatment, aspect, "w-full")}>
           {embed ? (
@@ -228,8 +369,26 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
               allowFullScreen
             />
           ) : node.src ? (
+            /**
+             * `width`/`height` are the intrinsic ratio, not a rendered size —
+             * the wrapper's `aspect-*` decides the box. Without them the
+             * browser has no ratio to reserve before the bytes arrive and the
+             * whole page below shifts when a church's photo loads.
+             *
+             * `loading="lazy"` on every block image: only the hero is above
+             * the fold, and a block tree cannot tell the renderer which band
+             * it is in.
+             */
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={node.src} alt={node.alt ?? ""} className="absolute inset-0 h-full w-full object-cover" />
+            <img
+              src={node.src}
+              alt={node.alt ?? ""}
+              width={1600}
+              height={1200}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           ) : (
             <div
               className="absolute inset-0"
@@ -249,7 +408,17 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
 
     case "button":
       return (
-        <Link href={node.href} className={buttonVariants({ variant: buttonEmphasisVariant[node.emphasis ?? "primary"], size: "lg" })}>
+        <Link
+          href={node.href}
+          className={cn(
+            buttonVariants({ variant: buttonEmphasisVariant[node.emphasis ?? "primary"], size: "lg" }),
+            // After `buttonVariants`, so the block scale wins over the shared
+            // app-chrome one.
+            blockButtonSizeClass,
+            buttonShapeClass[node.shape ?? "default"],
+            focusRingClass
+          )}
+        >
           {node.label}
         </Link>
       );
@@ -323,10 +492,13 @@ function SermonCollectionView({
           <li key={sermon.id} className="py-4">
             <Link
               href={`/sermons/${sermon.slug}`}
-              className="flex flex-col gap-1 hover:text-site-accent sm:flex-row sm:items-center sm:justify-between"
+              className={cn(
+                "flex flex-col gap-1 rounded-sm hover:text-site-accent sm:flex-row sm:items-center sm:justify-between",
+                focusRingClass
+              )}
             >
               <span className="min-w-0 truncate text-lg font-medium">{sermon.title}</span>
-              <span className="shrink-0 text-base text-site-muted">{formatDate(sermon.date)}</span>
+              <span className="shrink-0 text-base tabular-nums text-site-muted">{formatDate(sermon.date)}</span>
             </Link>
           </li>
         ))}
@@ -339,7 +511,10 @@ function SermonCollectionView({
     if (!featured) return <EmptyState message="No sermons have been added yet." />;
     return (
       <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-2">
-        <Link href={`/sermons/${featured.slug}`} className="block aspect-video rounded-lg bg-site-primary/10">
+        <Link
+          href={`/sermons/${featured.slug}`}
+          className={cn("block aspect-video rounded-lg bg-site-primary/10", focusRingClass)}
+        >
           {featured.thumbnailUrl && (
             <Image
               src={featured.thumbnailUrl}
@@ -351,14 +526,14 @@ function SermonCollectionView({
           )}
         </Link>
         <div>
-          <h3 className="text-2xl font-semibold text-site-foreground sm:text-3xl">{featured.title}</h3>
+          <h3 className="text-balance text-2xl font-semibold text-site-foreground sm:text-3xl">{featured.title}</h3>
           <p className="mt-2 text-lg text-site-muted">
             {featured.speaker ?? "Guest Speaker"} &middot; {formatDate(featured.date)}
           </p>
           <ul className="mt-6 space-y-2 text-base">
             {rest.slice(0, 4).map((s) => (
               <li key={s.id}>
-                <Link href={`/sermons/${s.slug}`} className="hover:text-site-accent">
+                <Link href={`/sermons/${s.slug}`} className={cn("rounded-sm hover:text-site-accent", focusRingClass)}>
                   {s.title}
                 </Link>
               </li>
@@ -375,7 +550,10 @@ function SermonCollectionView({
         <Link
           key={sermon.id}
           href={`/sermons/${sermon.slug}`}
-          className="group overflow-hidden rounded-lg border border-site-muted/15 transition-shadow hover:shadow-md"
+          className={cn(
+            "group overflow-hidden rounded-lg border border-site-muted/15 transition-shadow hover:shadow-md",
+            focusRingClass
+          )}
         >
           <div className="aspect-video bg-site-primary/10">
             {sermon.thumbnailUrl ? (
@@ -391,7 +569,9 @@ function SermonCollectionView({
           </div>
           <div className="p-4">
             {sermon.series && <Badge variant="secondary">{sermon.series}</Badge>}
-            <h3 className="mt-2 text-lg font-semibold text-site-foreground group-hover:text-site-accent sm:text-xl">{sermon.title}</h3>
+            <h3 className="mt-2 line-clamp-2 text-lg font-semibold text-site-foreground group-hover:text-site-accent sm:text-xl">
+              {sermon.title}
+            </h3>
             <p className="mt-1 text-base text-site-muted">
               {sermon.speaker ?? "Guest Speaker"} &middot; {formatDate(sermon.date)}
             </p>
@@ -420,13 +600,16 @@ function EventCollectionView({
           <li key={event.id} className="py-4">
             <Link
               href={`/events/${event.slug}`}
-              className="flex flex-col gap-1 hover:text-site-accent sm:flex-row sm:items-center sm:justify-between"
+              className={cn(
+                "flex flex-col gap-1 rounded-sm hover:text-site-accent sm:flex-row sm:items-center sm:justify-between",
+                focusRingClass
+              )}
             >
               <span className="min-w-0 truncate">
                 <span className="text-lg font-medium">{event.title}</span>
                 {event.location && <span className="ml-2 text-base text-site-muted">{event.location}</span>}
               </span>
-              <span className="shrink-0 text-base text-site-muted">{formatDate(event.startAt)}</span>
+              <span className="shrink-0 text-base tabular-nums text-site-muted">{formatDate(event.startAt)}</span>
             </Link>
           </li>
         ))}
@@ -450,10 +633,13 @@ function EventCollectionView({
                 <li key={event.id} className="py-3">
                   <Link
                     href={`/events/${event.slug}`}
-                    className="flex flex-col gap-1 hover:text-site-accent sm:flex-row sm:items-center sm:justify-between"
+                    className={cn(
+                "flex flex-col gap-1 rounded-sm hover:text-site-accent sm:flex-row sm:items-center sm:justify-between",
+                focusRingClass
+              )}
                   >
                     <span className="min-w-0 truncate text-lg font-medium">{event.title}</span>
-                    <span className="shrink-0 text-base text-site-muted">{formatDate(event.startAt)}</span>
+                    <span className="shrink-0 text-base tabular-nums text-site-muted">{formatDate(event.startAt)}</span>
                   </Link>
                 </li>
               ))}
@@ -470,7 +656,10 @@ function EventCollectionView({
         <Link
           key={event.id}
           href={`/events/${event.slug}`}
-          className="group overflow-hidden rounded-lg border border-site-muted/15 transition-shadow hover:shadow-md"
+          className={cn(
+            "group overflow-hidden rounded-lg border border-site-muted/15 transition-shadow hover:shadow-md",
+            focusRingClass
+          )}
         >
           <div className="aspect-video bg-site-secondary/10">
             {event.imageUrl ? (
@@ -483,9 +672,11 @@ function EventCollectionView({
             )}
           </div>
           <div className="p-4">
-            <p className="text-base font-medium text-site-accent">{formatDate(event.startAt)}</p>
-            <h3 className="mt-1 text-lg font-semibold text-site-foreground group-hover:text-site-accent sm:text-xl">{event.title}</h3>
-            {event.location && <p className="mt-1 text-base text-site-muted">{event.location}</p>}
+            <p className="text-base font-medium tabular-nums text-site-accent">{formatDate(event.startAt)}</p>
+            <h3 className="mt-1 line-clamp-2 text-lg font-semibold text-site-foreground group-hover:text-site-accent sm:text-xl">
+              {event.title}
+            </h3>
+            {event.location && <p className="mt-1 line-clamp-1 text-base text-site-muted">{event.location}</p>}
           </div>
         </Link>
       ))}
@@ -521,7 +712,7 @@ function MinistryCollectionView({ items }: { items: Array<{ name: string; descri
           />
           <div className="p-6">
             <h3 className="text-xl font-semibold text-site-foreground">{ministry.name}</h3>
-            <p className="mt-2 text-base leading-relaxed text-site-muted">{ministry.description}</p>
+            <p className="mt-2 text-pretty text-base leading-relaxed text-site-muted">{ministry.description}</p>
           </div>
         </div>
       ))}
@@ -545,14 +736,14 @@ function SocialLinksView({ site }: { site: SiteConfig }) {
   const socials = site.socialLinks ?? [];
   if (socials.length === 0) return null;
   return (
-    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-base font-medium text-site-accent">
+    <div className="flex flex-wrap gap-x-4 gap-y-2 text-base font-medium text-site-accent">
       {socials.map((s) => (
         <a
           key={s.platform}
           href={safeLinkTarget(s.url, "#")}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-1 py-1.5 capitalize hover:underline"
+          className={cn("rounded-sm px-1 py-1.5 capitalize hover:underline", focusRingClass)}
         >
           {s.platform}
         </a>
