@@ -1,7 +1,8 @@
 import { syncCurrentUser } from "@/lib/auth/session";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "Profile — Regroup" };
@@ -23,9 +24,9 @@ export default async function ProfilePage() {
         title="Profile"
         description="The account you sign in with."
         actions={
-          <Button asChild variant="outline">
-            <a href="/auth/logout">Log out</a>
-          </Button>
+          <LogoutButton className={buttonVariants({ variant: "outline" })}>
+            Log out
+          </LogoutButton>
         }
       />
 

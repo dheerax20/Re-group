@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { CreditCard, LogOut, PanelsTopLeft, UserRound } from "lucide-react";
 import { syncCurrentUser } from "@/lib/auth/session";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { DataList, DataListRow, RowIcon } from "@/components/layout/data-list";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageSections, Section } from "@/components/layout/section";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export const metadata = { title: "Settings — Regroup" };
 
@@ -110,9 +111,9 @@ export default async function SettingsPage() {
           <DataList>
             <DataListRow
               actions={
-                <Button asChild size="sm" variant="outline">
-                  <a href="/auth/logout">Log out</a>
-                </Button>
+                <LogoutButton className={buttonVariants({ size: "sm", variant: "outline" })}>
+                  Log out
+                </LogoutButton>
               }
               description="Sign out of Regroup on this device."
               leading={

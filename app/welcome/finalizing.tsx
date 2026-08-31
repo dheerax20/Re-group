@@ -8,25 +8,11 @@ const POLL_INTERVAL_MS = 2000;
 const FALLBACK_AFTER_MS = 5000;
 const GIVE_UP_AFTER_MS = 20000;
 
-/**
- * Bridges the gap between the Checkout redirect and the webhook.
- *
- * Since Basil, Checkout postpones subscription creation until after payment
- * completes, so arriving here before entitlements exist is the normal case,
- * not an error.
- */
+
 export function FinalizingSubscription({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const [timedOut, setTimedOut] = React.useState(false);
-  /**
-   * Bumped by "Check again". It is in the effect deps, so incrementing it
-   * restarts the polling loop.
-   *
-   * Without this the timeout state was terminal: polling had stopped, the deps
-   * `[sessionId, router]` never change (Next memoizes the router instance), and
-   * a still-not-ready server re-render RECONCILES this component rather than
-   * remounting it — so `timedOut` stayed true and the button did nothing at all.
-   */
+  
   const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {

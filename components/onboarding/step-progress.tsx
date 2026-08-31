@@ -7,6 +7,7 @@ import { wizardSteps } from "@/lib/onboarding/steps";
 import { RegroupLogo } from "@/components/layout/regroup-logo";
 import { cn } from "@/lib/utils";
 import { CrewCircuit, ProgressRing } from "./wizard-art";
+import { WizardAccountMenu } from "./wizard-account-menu";
 
 const statusCopy: Record<string, string> = {
   church: "Gathering context for tone, size, and messaging.",
@@ -27,7 +28,15 @@ const statusCopy: Record<string, string> = {
  * final "designing your homepage" screen read as the end of this bar rather
  * than as a different product.
  */
-export function StepProgress() {
+export function StepProgress({
+  userEmail,
+  userName,
+  userPicture,
+}: {
+  userEmail?: string | null;
+  userName?: string | null;
+  userPicture?: string | null;
+}) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
 
@@ -44,15 +53,22 @@ export function StepProgress() {
     <div className="border-b border-border bg-surface/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
         <RegroupLogo href="/" />
-        <div className="flex items-center gap-3">
-          <p className="tabular-nums text-sm text-muted">
-            {step + 1} / {wizardSteps.length}
-          </p>
-          <ProgressRing value={percent} size={34} className="text-border">
-            <span className="text-[10px] font-bold tabular-nums text-foreground">
-              {Math.round(percent)}
-            </span>
-          </ProgressRing>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <p className="tabular-nums text-sm text-muted">
+              {step + 1} / {wizardSteps.length}
+            </p>
+            <ProgressRing value={percent} size={34} className="text-border">
+              <span className="text-[10px] font-bold tabular-nums text-foreground">
+                {Math.round(percent)}
+              </span>
+            </ProgressRing>
+          </div>
+          <WizardAccountMenu
+            userEmail={userEmail}
+            userName={userName}
+            userPicture={userPicture}
+          />
         </div>
       </div>
 
