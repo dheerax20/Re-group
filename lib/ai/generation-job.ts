@@ -1,7 +1,7 @@
 import type { GenerationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { invalidateSite } from "@/lib/site/invalidate";
-import { parseChurchStory, parseStyleName } from "@/lib/site/story";
+import { parseChurchStory, parseHeroImage, parseStyleName } from "@/lib/site/story";
 import { coerceSections } from "@/lib/validation/section";
 import { coerceBlocks } from "@/lib/site/blocks/schema";
 import { getChurchWebsiteCrew } from "./multi-agent-site-builder";
@@ -269,6 +269,7 @@ export async function runCrewBuild(
 
   const built = await getChurchWebsiteCrew().build(
     {
+      siteId: site.id,
       churchName: site.name,
       tagline: site.tagline ?? undefined,
       denomination: site.denomination ?? undefined,
@@ -281,7 +282,8 @@ export async function runCrewBuild(
     async (step) => {
       await onProgress?.(step.id, step.index);
     },
-    parseStyleName(site.storyConfig)
+    parseStyleName(site.storyConfig),
+    parseHeroImage(site.storyConfig)
   );
 
   return { built, site: { id: site.id, slug: site.slug } };
@@ -342,6 +344,10 @@ export async function commitBuild(
           mobileFeedback: built.mobileFeedback,
           agentLog: built.log,
           styleName: built.styleName,
+          navVariant: built.navVariant,
+          // Read back on the next build as `avoid`, so a regeneration onto a
+          // new direction does not reuse the same photograph.
+          heroImageUrl: built.heroImageUrl,
         }),
       },
     }),

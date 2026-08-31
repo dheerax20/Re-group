@@ -10,10 +10,15 @@ import {
 } from "./specialists";
 import type { AgentLogEntry, DesignFeedback, SiteImprovement } from "./schemas";
 import { resolveGateway, type Gateway } from "./model-config";
+import { HERO_BLOCK_ID, type BlockNode } from "@/lib/site/blocks/types";
 
 export type ChurchWebsiteBuild = GeneratedSiteConfig & {
   log: AgentLogEntry[];
   styleName: string;
+  /** How the navbar renders. Stored, so editing the direction table cannot restyle a live site. */
+  navVariant: "transparent" | "solid" | "minimal";
+  /** The stock photograph the hero ended up with, if any. */
+  heroImageUrl?: string;
   improvements: SiteImprovement[];
   designFeedback: DesignFeedback[];
   mobileFeedback: DesignFeedback[];
@@ -54,13 +59,17 @@ export type CrewProgress = (step: {
  */
 function plannedBandTypes(input: SiteGenerationInput, direction: ArtDirection): string {
   const features = input.features;
+  // Described in block-recipe terms, not the deleted section variants — the
+  // media director is being asked what photos to request, and "sermons (list)"
+  // is a real answer where "sermons (cards)" named a component that no longer
+  // exists.
   const bands = [
     "nav",
-    `hero (${direction.hero})`,
-    `welcome (${direction.welcome})`,
-    `about (${direction.about})`,
-    features?.sermons ? `sermons (${direction.sermons})` : null,
-    features?.events ? `events (${direction.events})` : null,
+    `hero (${direction.recipe.hero.archetype}, ${direction.recipe.hero.image} photo)`,
+    "welcome",
+    "about",
+    features?.sermons ? `sermons (${direction.recipe.sermons})` : null,
+    features?.events ? `events (${direction.recipe.events})` : null,
     features?.ministries ? "ministries" : null,
     features?.giving ? "giving" : null,
     features?.youtube ? "youtube" : null,
@@ -70,6 +79,32 @@ function plannedBandTypes(input: SiteGenerationInput, direction: ArtDirection): 
     "footer",
   ];
   return bands.filter(Boolean).join(", ");
+}
+
+/**
+ * The stock photograph the hero band ended up with.
+ *
+ * Read off the assembled tree rather than recomputed, so it is by construction
+ * the URL that was actually published — `pickHeroImage` is deterministic, but
+ * a hero that was never injected (a reply with no copy object) has no photo at
+ * all, and recomputing would record one the page does not show.
+ */
+function heroImageIn(blocks: BlockNode[] | undefined): string | undefined {
+  const hero = blocks?.find((node) => node.id === HERO_BLOCK_ID);
+  if (!hero) return undefined;
+  if (hero.style?.backgroundImage) return hero.style.backgroundImage;
+
+  const findImage = (nodes: BlockNode[]): string | undefined => {
+    for (const node of nodes) {
+      if (node.type === "image" && node.src) return node.src;
+      if ("children" in node && Array.isArray(node.children)) {
+        const found = findImage(node.children);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  return "children" in hero && Array.isArray(hero.children) ? findImage(hero.children) : undefined;
 }
 
 function stepIndex(id: CrewStepId): number {
@@ -102,7 +137,8 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
   async build(
     input: SiteGenerationInput,
     onProgress?: CrewProgress,
-    previousStyleName?: string
+    previousStyleName?: string,
+    previousHeroImage?: string
   ): Promise<ChurchWebsiteBuild> {
     if (!this.gateway) {
       throw new Error(
@@ -153,19 +189,21 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
 
     await report("theme-director");
     // Same object: `creativeBriefSchema` is the producer's fields plus the
-    // theme director's, so `brief` satisfies both consumers.
+    // theme director's, so `brief` satisfies both consumers. Only the QA agent
+    // reads it under this name now — the composer used to be handed it a
+    // second time as `{theme}` and read every field twice.
     const theme = brief;
     log.push({
       agent: "theme-director",
       role: "Art director",
-      summary: `${direction.name} · ${direction.hero} hero`,
+      summary: `${direction.name} · ${direction.recipe.hero.archetype} hero`,
     });
 
     // The page composer writes the homepage directly as a block tree — one
     // agent doing what used to be layout-architect + copywriter, since in a
     // generic block tree, layout and copy are the same act.
     await report("layout-architect");
-    const composed = await runComposer(agents, profile, brief, theme, direction);
+    const composed = await runComposer(agents, profile, brief, direction);
     log.push({
       agent: "layout-architect",
       role: "Page composer",
@@ -208,7 +246,7 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
         : qa.issues.slice(0, 2).join(" ") || `${qa.designFeedback.length} design notes to review`,
     });
 
-    const assembled = assembleGeneratedBlocks({ input, composed });
+    const assembled = assembleGeneratedBlocks({ input, composed, direction, previousHeroImage });
 
     const improvements: SiteImprovement[] = [...media.improvements];
     if (!improvements.some((item) => item.action === "upload_hero_photo")) {
@@ -223,6 +261,9 @@ export class ChurchWebsiteCrew implements SiteGenerationProvider {
       ...assembled,
       log,
       styleName: direction.name,
+      navVariant: direction.navbar,
+      // Persisted so the NEXT build can avoid repeating this photograph.
+      heroImageUrl: heroImageIn(assembled.blocks),
       improvements,
       designFeedback: qa.designFeedback,
       mobileFeedback: qa.mobileFeedback,

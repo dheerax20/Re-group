@@ -11,9 +11,14 @@ const textToneSchema = z.enum(["default", "muted", "inverted", "accent"]);
 const typeScaleSchema = z.enum(["display", "h1", "h2", "h3", "body", "small"]);
 const accentSchema = z.enum(["none", "line", "bordered", "numbered"]);
 const imageTreatmentSchema = z.enum(["rounded", "square", "framed", "bleed"]);
-const imageAspectSchema = z.enum(["square", "video", "portrait", "wide", "cinema"]);
+const imageAspectSchema = z.enum(["square", "video", "portrait", "wide", "cinema", "fill"]);
 const buttonEmphasisSchema = z.enum(["primary", "secondary", "outline"]);
+const buttonShapeSchema = z.enum(["default", "pill"]);
 const columnsSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
+const rowLayoutSchema = z.enum(["columns", "bar", "wide-left", "wide-right"]);
+const overlaySchema = z.enum(["none", "scrim", "dark"]);
+const minHeightSchema = z.enum(["none", "hero", "screen"]);
+const fontWeightSchema = z.enum(["regular", "semibold", "bold"]);
 
 const blockStyleSchema = z
   .object({
@@ -23,6 +28,13 @@ const blockStyleSchema = z
     width: widthSchema.optional(),
     background: surfaceSchema.optional(),
     textTone: textToneSchema.optional(),
+    /**
+     * Validated like every other URL that reaches a `src` — a stored tree is
+     * not trusted input just because a template wrote it once.
+     */
+    backgroundImage: mediaUrlSchema.optional(),
+    overlay: overlaySchema.optional(),
+    minHeight: minHeightSchema.optional(),
   })
   .optional();
 
@@ -35,6 +47,9 @@ const STYLE_FIELD_SCHEMAS = {
   width: widthSchema,
   background: surfaceSchema,
   textTone: textToneSchema,
+  backgroundImage: mediaUrlSchema,
+  overlay: overlaySchema,
+  minHeight: minHeightSchema,
 } as const;
 
 /**
@@ -80,6 +95,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       type: z.literal("row"),
       style: blockStyleSchema,
       columns: columnsSchema.optional(),
+      layout: rowLayoutSchema.optional(),
       children: z.array(blockNodeSchema).max(8),
     }),
     z.object({
@@ -94,6 +110,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       style: blockStyleSchema,
       text: z.string().trim().min(1).max(200),
       scale: typeScaleSchema.optional(),
+      weight: fontWeightSchema.optional(),
     }),
     z.object({
       id: idSchema,
@@ -126,6 +143,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       label: z.string().trim().min(1).max(60),
       href: linkTargetSchema,
       emphasis: buttonEmphasisSchema.optional(),
+      shape: buttonShapeSchema.optional(),
     }),
     z.object({
       id: idSchema,
@@ -289,17 +307,29 @@ export function looksLikeLegacySections(value: unknown): value is Array<Record<s
   );
 }
 
-/** A minimal, always-safe nav band — used both by the legacy adapter and as the composer's fallback when the model omits `id: "nav"`. */
+/**
+ * A minimal, always-safe nav band — used both by the legacy adapter and as the
+ * composer's fallback when the model omits `id: "nav"`.
+ *
+ * No `padding`: the renderer owns a pinned band's height
+ * (`pinnedBandClass` in `components/website/blocks/tokens.ts`) and ignores the
+ * token, because a band's padding scale starts at 40px a side and a navbar
+ * wants 16. The nav's own bar is rendered by `SiteHeader` rather than by this
+ * row — see `components/website/blocks/site-header.tsx`; the band survives as
+ * the marker the builder, the editor prompt and the public layout look it up
+ * by. `normalizePinnedBands` in the design pass enforces the shape on
+ * whatever the model actually emitted.
+ */
 export function defaultNavBlock(): BlockNode {
   return {
     id: "nav",
     type: "section",
-    style: { padding: "sm", background: "surface" },
+    style: { width: "wide" },
     children: [
       {
         id: "nav-row",
         type: "row",
-        columns: 2,
+        layout: "bar",
         children: [
           { id: "nav-brand", type: "brandLogo" },
           { id: "nav-links", type: "navLinks" },
@@ -314,12 +344,12 @@ export function defaultFooterBlock(): BlockNode {
   return {
     id: "footer",
     type: "section",
-    style: { padding: "md", background: "surface" },
+    style: { width: "wide" },
     children: [
       {
         id: "footer-row",
         type: "row",
-        columns: 2,
+        layout: "bar",
         children: [
           { id: "footer-copyright", type: "copyrightLine" },
           { id: "footer-links", type: "navLinks" },

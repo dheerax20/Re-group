@@ -89,13 +89,32 @@ function structuredChain<T extends z.ZodType>(
   return RunnableSequence.from([prompt, structured, (raw: unknown) => parser.parse(raw)]);
 }
 
-/** Renders a direction's locked fields as an instruction block every layout-facing agent shares. */
+/**
+ * Renders a direction as an instruction block every layout-facing agent shares.
+ *
+ * Briefed in block-recipe terms. It used to end with "Locked layout — do not
+ * deviate from these: navbar=transparent, hero=cinematic, …", naming section
+ * components that were deleted with the section layer — so the model spent
+ * instruction budget on a vocabulary that could not reach the page, and the
+ * only fields that actually landed were `mood` and `copyVoice`.
+ *
+ * What the recipe decides is stated as already-decided rather than as an
+ * instruction, because it is: `applyDesignPass` assigns it after the model
+ * replies. Telling the composer to produce it as well would only invite it to
+ * emit styling that gets discarded.
+ */
 function directionBrief(direction: ArtDirection): string {
+  const { recipe } = direction;
   return (
     `Visual direction: "${direction.name}".\n` +
     `Mood: ${direction.mood}\n` +
-    `Locked layout — do not deviate from these: navbar=${direction.navbar}, hero=${direction.hero}, ` +
-    `welcome=${direction.welcome}, about=${direction.about}, sermons=${direction.sermons}, events=${direction.events}.`
+    // No hero line. The hero band is built from the `hero` copy object by
+    // `buildHeroBand`, not composed — describing its shape here would only
+    // invite the model to build a second one.
+    `Already decided for you (do not restate or fight it): ` +
+    `${recipe.alignPolicy === "left" ? "bands ranged left throughout" : recipe.alignPolicy === "alternating" ? "alignment alternating band to band" : "a centred closing band with the rest ranged left"}, ` +
+    `sermons as a ${recipe.sermons}, events as a ${recipe.events}, ` +
+    `${recipe.eyebrows === "none" ? "no eyebrows anywhere" : "at most one eyebrow on the page"}.`
   );
 }
 
@@ -167,6 +186,9 @@ export function createChurchAgents(gateway: Gateway) {
       "reference real details from the profile (worship style, denomination, congregation size). Two " +
       "churches given the same direction should read as two different, specific answers, not the same " +
       "paragraph with the name swapped. " +
+      "Do not reach for the looks that every generated site already has: a cream ground with a " +
+      "high-contrast display serif and a terracotta accent, near-black with a single acid accent, or " +
+      "broadsheet hairline rules. Name what is specific to THIS congregation instead. " +
       "mobileNotes and gridNotes should be concrete enough that a designer could act on them without " +
       "asking a follow-up question.",
     "Direction:\n{direction}\n\nChurch profile:\n{profile}\n\n" +
@@ -182,42 +204,75 @@ export function createChurchAgents(gateway: Gateway) {
       "Block types: section (top-level band; children), stack (vertical group; children), " +
       "row (responsive multi-column group, set columns 1-4; children), spacer (size), " +
       "heading (text, scale: display/h1/h2/h3), text (text), eyebrow (text, accent: none/line/bordered/numbered), " +
-      "image (leave src/videoSrc empty — the church adds real photos later; set treatment: rounded/square/framed " +
-      "and aspect: square/video/portrait/wide/cinema so the empty slot still composes correctly), " +
+      "image (leave src/videoSrc empty — the church adds real photos later; its shape is assigned for you), " +
       "button (label, href — one of /contact /about /sermons /events /giving, emphasis: primary/secondary/outline), " +
       "stats (2-3 label/value pairs). " +
       "Data-bound blocks render REAL church data and take no text from you — use them, never invent " +
       "sermon titles, event dates, ministry names, or contact details: navLinks, brandLogo, " +
-      "sermonCollection (layout: grid/list/featured), eventCollection (layout: grid/list/calendar), " +
+      "sermonCollection, eventCollection (their layouts are assigned for you), " +
       "contactInfo, givingCta, socialLinks, copyrightLine. " +
       "ministryCollection is the one exception — ministries have no database, so YOU write its `items` " +
       "(3-4 entries of name + description) based on this church's denomination, size, and stated values; " +
       "if you genuinely cannot tell what this church runs, omit items rather than guessing at specifics. " +
-      "Every container/leaf block may carry a `style`: padding/gap (none..2xl), align (left/center/right), " +
-      "width (narrow/normal/wide/full), background (transparent/surface/primary/accent/inverted), " +
-      "textTone (default/muted/inverted/accent). Vary these deliberately band to band — the whole point is " +
-      "that this page should NOT read as one fixed template; alternate alignment, density, background, and " +
-      "eyebrow accent across bands the way the mood description calls for. " +
-      "BACKGROUNDS: never fill a band with the church's primary or secondary colour at full strength. A " +
-      "saturated brand colour behind a whole section looks cheap and makes the text inside it a contrast " +
-      "problem. Prefer the plain page background (`transparent`); where you want a band to stand apart use " +
-      "`surface` or `accent`, which render as a wash of the brand at 5-10% opacity over that same page " +
-      "background. Never set padding below `lg` on a top-level band, and never set `gap` to `none` or `xs` " +
-      "on a band or a stack — a hero whose eyebrow, headline, subhead and button touch each other is the " +
-      "most common way this page comes out wrong. " +
+      "STYLING IS NOT YOUR JOB. Band padding, background, alignment, width, the nav bar's height and " +
+      "each collection's layout are all assigned after you by the design template for this build — " +
+      "anything you set for them is discarded. Do not emit `style` at all. Spend the whole reply on the " +
+      "two things only you can decide: WHICH blocks tell this church's story, and the WORDS in them. " +
+      "THE HERO IS A THESIS. Open on the most characteristic TRUE thing about this specific church — the " +
+      "neighbourhood it sits in, what actually happens on a Sunday morning, who gathers, the year it was " +
+      "founded, what it is known for locally. A decontextualised scripture line over a stock welcome " +
+      "sentence is the answer a generator gives for every church on earth; it says nothing, and a visitor " +
+      "learns nothing from it. If the profile gives you a real detail, lead with it. " +
+      "AVOID THE HOUSE STYLE OF GENERATED SITES. Three looks read as machine-made on sight: a cream ground " +
+      "with a high-contrast display serif and a terracotta accent; near-black with one acid accent; and " +
+      "broadsheet hairline rules with square corners. Where the direction leaves something to you, do not " +
+      "spend it on one of those. " +
+      "STRUCTURE MUST CARRY INFORMATION, never decorate. Specifically: do NOT put an `eyebrow` above every " +
+      "band — the heading carries its own weight, and a small tracked-out label above each one is the " +
+      "single clearest tell that a page was assembled rather than written. At most ONE eyebrow on the " +
+      "page, and only if it says something the heading does not. `accent: \"numbered\"` only where the " +
+      "bands genuinely are a sequence the reader must follow in order. Do not use `stats` as hero " +
+      "decoration — a big number with a small label under it is a template, and invented attendance or " +
+      "founding figures are worse than no figures; use it only for numbers the profile actually gives you. " +
+      "Do not build the page out of three identical cards. " +
+      "WRITE LIKE A PERSON. Active voice, second person — talk TO the visitor. Be specific rather than " +
+      "clever. A button names the action it performs: \"Plan Your Visit\", \"Watch Sunday's Sermon\", " +
+      "\"Find a Service Time\". \"Learn More\", \"Get Involved\" and \"Discover\" are banned — they tell " +
+      "the visitor nothing about where they are going. " +
+      "THE HERO COPY IS THREE STRINGS AND EACH HAS TO EARN ITS PLACE. `headline` names something true " +
+      "about THIS church — who gathers, where, what it is like to walk in — and is NEVER a bare " +
+      "scripture quotation, which fits every church and therefore describes none. `subhead` never opens " +
+      "with \"Welcome to <church name>, where...\"; it adds a second fact, not a restatement of the " +
+      "first. `ctaLabel` names the action the visitor is about to take — \"Plan your visit\", \"Find a " +
+      "service time\", \"Meet our pastor\" — and is never \"Learn More\", \"Get Started\", " +
+      "\"Discover More\" or \"Click Here\". " +
+      "THE HERO IS NOT YOURS TO BUILD. You write it as the `hero` object — four short fields, nothing " +
+      "else — and the design template composes the band around a photograph you never see. Do NOT emit a " +
+      "hero band in `blocks`, and do NOT give any block the id \"hero\"; one will be discarded. " +
       "Structure REQUIRED: the FIRST top-level block MUST be a section block whose id is exactly \"nav\", " +
       "containing a row with a brandLogo and a navLinks block. The LAST top-level block MUST be a section " +
       "block whose id is exactly \"footer\", containing a row with a copyrightLine and a navLinks block. " +
-      "Between them: a hero band (eyebrow, heading, text, " +
-      "button, optionally stats and an image), a welcome/about band, then ONE band per feature that is ON in " +
-      "the profile (sermonCollection if sermons, eventCollection if events, ministryCollection if ministries, " +
-      "givingCta if giving, contactInfo+socialLinks if contact), then a closing cta band (heading, text, button). " +
+      "Between them, STARTING with the welcome/about band: a welcome/about band, then " +
+      "ONE band per feature that is ON in the profile (sermonCollection if sermons, eventCollection if " +
+      "events, ministryCollection if ministries, givingCta if giving, contactInfo+socialLinks if contact), " +
+      "then a closing cta band (heading, text, button). Every feature band needs its own `heading` saying " +
+      "what it is. " +
       "The feature bands are NOT optional: the site's navigation links to every one of those pages, so a " +
       "homepage that omits a band for an enabled feature is broken — the visitor is told the church has " +
       "sermons and then shown a page that never mentions them. Include every one whose flag is true. " +
-      "8-14 top-level blocks total, including nav and footer.",
-    "Direction:\n{direction}\n\nProducer brief:\n{brief}\n\nTheme:\n{theme}\n\nChurch profile:\n{profile}\n\n" +
-      "Copy voice: {copyVoice}\n\nCompose the homepage.",
+      "7-13 top-level blocks total, including nav and footer.",
+    /**
+     * `Copy voice` leads. It used to sit at the very bottom, below four blocks
+     * of context including two dense JSON blobs, which is the worst place to
+     * put the one instruction that governs every word of the reply.
+     *
+     * `Theme:` is gone: `crew.ts` sets `const theme = brief` and passed the
+     * same object into both slots, so the model read `churchArchetype`,
+     * `designGoal`, `mustInclude`, `visualLanguage`, `mobileNotes` and
+     * `gridNotes` twice — paying for the tokens and diluting both copies.
+     */
+    "Copy voice: {copyVoice}\n\nDirection:\n{direction}\n\nBrief:\n{brief}\n\n" +
+      "Church profile:\n{profile}\n\nCompose the homepage.",
     // Recursive block-tree schema with optional fields — see `structuredChain`.
     false,
     // ...and read the reply back leniently — see `pageComposerResponseSchema`.
@@ -247,9 +302,12 @@ export function createChurchAgents(gateway: Gateway) {
     mediaLlm,
     mediaPlanSchema,
     "church_media_director",
-    "You are media director. Do NOT generate or invent images. " +
-      "Photo slots stay empty until the church uploads their own photos. " +
-      "Write a clear checklist of improvements asking them to provide real images " +
+    "You are media director. Do NOT generate or invent images, and never write an image URL. " +
+      "The hero ALREADY shows a stock photograph, and so may the welcome band — your job is asking the " +
+      "church to replace them with their own. Say what makes a good replacement (a wide crop, taken in " +
+      "daylight, people visible, their actual building or congregation) rather than just \"upload a " +
+      "photo\". Every other photo slot stays empty until they upload something. " +
+      "Write a clear checklist of improvements " +
       "(always include upload_hero_photo; also welcome/about/event photos when relevant). " +
       "Include at least one mobile-related action " +
       "(fix_mobile_hero, fix_mobile_nav, or tighten_mobile_type).",
@@ -312,17 +370,20 @@ export async function runCreativeDirector(
   }) as Promise<CreativeBrief>;
 }
 
+/**
+ * No `theme` parameter: `crew.ts` set `const theme = brief` and passed the same
+ * object twice, so the composer read every field of the creative brief in two
+ * places — paying for the tokens and diluting both copies.
+ */
 export async function runComposer(
   agents: ChurchAgents,
   profile: string,
-  brief: ProducerBrief,
-  theme: ThemeBrief,
+  brief: CreativeBrief,
   direction: ArtDirection
 ): Promise<PageComposerOutput> {
   return agents.composer.invoke({
     profile,
     brief: JSON.stringify(brief),
-    theme: JSON.stringify(theme),
     direction: directionForPrompt(direction),
     copyVoice: direction.copyVoice,
   }) as Promise<PageComposerOutput>;

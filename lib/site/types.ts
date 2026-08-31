@@ -91,6 +91,9 @@ export interface SectionProps {
   content: SiteContent;
 }
 
+/** The three navbar treatments a design direction may choose. */
+export type NavVariant = "transparent" | "solid" | "minimal";
+
 export interface SiteConfig {
   site: {
     id: string;
@@ -138,4 +141,6 @@ export interface SiteConfig {
   mobileFeedback?: import("@/lib/site/story").DesignFeedback[];
   agentLog?: Array<{ agent: string; role: string; summary: string }>;
   styleName?: string;
+  /** How the navbar renders — see `components/website/blocks/site-header.tsx`. */
+  navVariant?: NavVariant;
 }

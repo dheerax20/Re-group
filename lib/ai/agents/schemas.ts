@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sectionTypes } from "@/lib/site/types";
 import { ensureBlockIds, pageBlocksSchema, repairBlocks } from "@/lib/site/blocks/schema";
 import type { BlockNode } from "@/lib/site/blocks/types";
+import type { HeroCopy } from "@/lib/site/blocks/hero";
 
 export const AI_GENERATED_TEMPLATE_ID = "ai-generated";
 export const AI_GENERATED_TEMPLATE_VERSION = 1;
@@ -100,12 +101,49 @@ export const pageComposerSchema = z.object({
   rationale: z.string().min(12).max(280),
   seoTitle: z.string().min(8).max(80),
   seoDescription: z.string().min(40).max(180),
+  /**
+   * The hero, as three strings rather than a block tree.
+   *
+   * The band itself is built by `buildHeroBand` from the design template: the
+   * block vocabulary cannot express text over a photograph, and the model has
+   * no photograph to place. So the model writes only the part that has to be
+   * true about this specific church, and the template does the composition.
+   */
+  hero: z.object({
+    headline: z.string().min(8).max(70),
+    subhead: z.string().min(12).max(120),
+    ctaLabel: z.string().min(2).max(24),
+    ctaHref: z.enum(["/about", "/contact", "/events"]),
+  }),
   blocks: pageBlocksSchema,
 });
 
 /** Trims to a max length, tolerating a missing or non-string value. */
 function looseText(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+/**
+ * The hero copy, read as leniently as everything else here.
+ *
+ * Every field is optional on the way out and `resolveHeroCopy` fills what is
+ * missing from the church's own words. The object itself may be absent
+ * entirely — but note that an absent object is NOT the same as an empty one
+ * downstream: `applyDesignPass` gates hero injection on its presence, so a
+ * reply with no `hero` key produces a page with no hero rather than a
+ * headline nobody wrote.
+ */
+function looseHero(value: unknown): Partial<HeroCopy> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const raw = value as Record<string, unknown>;
+  const href = raw.ctaHref;
+  return {
+    headline: looseText(raw.headline, 70) || undefined,
+    subhead: looseText(raw.subhead, 120) || undefined,
+    ctaLabel: looseText(raw.ctaLabel, 24) || undefined,
+    ctaHref:
+      href === "/about" || href === "/contact" || href === "/events" ? href : undefined,
+  };
 }
 
 /**
@@ -135,6 +173,7 @@ export const pageComposerResponseSchema = z.unknown().transform((raw): {
   rationale: string;
   seoTitle: string;
   seoDescription: string;
+  hero: Partial<HeroCopy>;
   blocks: BlockNode[];
 } => {
   const reply = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -142,6 +181,7 @@ export const pageComposerResponseSchema = z.unknown().transform((raw): {
     rationale: looseText(reply.rationale, 280),
     seoTitle: looseText(reply.seoTitle, 80),
     seoDescription: looseText(reply.seoDescription, 180),
+    hero: looseHero(reply.hero),
     blocks: repairBlocks(ensureBlockIds(reply.blocks)),
   };
 });

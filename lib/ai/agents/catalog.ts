@@ -1,6 +1,7 @@
 import { sectionVariantOptions } from "@/lib/site/section-variants";
 import { sectionTypes, type SectionType } from "@/lib/site/types";
 import type { FeatureConfig } from "@/lib/features/types";
+import type { DesignRecipe } from "@/lib/site/blocks/design-pass";
 import type { LayoutTraits } from "./schemas";
 
 export function variantCatalogForPrompt(): string {
@@ -67,17 +68,38 @@ export function sanitizeTraits(traits: LayoutTraits | undefined): SanitizedTrait
 export type ArtDirection = {
   id: string;
   name: string;
+
+  /**
+   * LEGACY section variants. These name components that no longer exist in the
+   * block renderer — `components/website/renderer/section-registry.ts` was
+   * deleted with the section layer. They survive for exactly two callers, both
+   * on the legacy `sectionConfig` path: `layoutFromFeatures` below and the
+   * fallback branch of `lib/ai/agents/assemble.ts`.
+   *
+   * They must NOT be briefed to the page composer. Doing so is what produced
+   * "Locked layout — do not deviate from these: navbar=transparent,
+   * hero=cinematic" in a prompt whose renderer implements no such thing: the
+   * model spent its instruction budget on a vocabulary that could not reach
+   * the page, and the only fields that actually landed were `mood` and
+   * `copyVoice`. The block-level recipe below is what replaced them.
+   */
   navbar: "transparent" | "solid" | "minimal";
   hero: "split" | "centered" | "fullscreen" | "cinematic";
   welcome: "centered" | "split";
   about: "image-left" | "image-right";
   sermons: "cards" | "featured" | "list";
   events: "grid" | "list" | "calendar";
-  /** Fed to the producer and theme director — the visual/typographic mood. */
+
+  /** Fed to the creative director and composer — the visual/typographic mood. */
   mood: string;
-  /** Fed to the copywriter — the voice this direction should read in. */
+  /** Fed to the composer — the voice this direction should read in. */
   copyVoice: string;
+
+  /** The block-level recipe. See `DesignRecipe`. */
+  recipe: DesignRecipe;
 };
+
+export type { DesignRecipe };
 
 export const ART_DIRECTIONS: ArtDirection[] = [
   {
@@ -90,11 +112,30 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     sermons: "featured",
     events: "calendar",
     mood:
-      "Full-bleed, dramatic, high-contrast. Bold serif display headlines over deep gradient " +
-      "overlays. Generous negative space between sections. Feels like a film's opening frame.",
+      "One dark band carries the page. The hero is quiet and wide, then the room drops to the " +
+      "church's own ink for a single section that holds the weight — a sermon, a gathering, one " +
+      "sentence. Everything else stays out of its way. Scale does the work, not decoration.",
     copyVoice:
       "Short, declarative lines. Present tense. Let one striking sentence carry the hero " +
       "instead of three ordinary ones.",
+    recipe: {
+      bandRhythm: ["transparent", "inverted", "transparent", "surface"],
+      bandPadding: { hero: "2xl", body: "xl", closing: "2xl" },
+      alignPolicy: "centered-close",
+      width: "wide",
+      hero: {
+        archetype: "overlay",
+        image: "overlay",
+        overlay: "scrim",
+        align: "left",
+        copyWidth: "wide",
+      },
+      welcomeImage: "widescreen",
+      sermons: "featured",
+      events: "calendar",
+      image: { treatment: "bleed", aspect: "cinema" },
+      eyebrows: "none",
+    },
   },
   {
     id: "modern-minimal",
@@ -106,10 +147,30 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     sermons: "list",
     events: "list",
     mood:
-      "Quiet confidence. Wide margins, restrained color, sans-serif type doing the work " +
-      "without shouting. Centered compositions with a single clear focal point per section.",
+      "A narrow, ranged-left column, read top to bottom like a letter rather than scanned like " +
+      "a landing page. Almost no background changes; the rhythm comes from the space between " +
+      "bands and from lists that stay lists instead of becoming cards.",
     copyVoice:
       "Plain, warm, unhurried. No exclamation points. Trust the reader — say less, mean more.",
+    recipe: {
+      bandRhythm: ["transparent", "transparent", "surface", "transparent"],
+      bandPadding: { hero: "xl", body: "lg", closing: "xl" },
+      alignPolicy: "left",
+      width: "normal",
+      hero: {
+        archetype: "stacked",
+        image: "widescreen",
+        copyWidth: "narrow",
+        photoWidth: "full",
+        treatment: "square",
+        aspect: "cinema",
+      },
+      welcomeImage: "vertical",
+      sermons: "list",
+      events: "list",
+      image: { treatment: "square", aspect: "wide" },
+      eyebrows: "none",
+    },
   },
   {
     id: "warm-editorial",
@@ -120,12 +181,31 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     about: "image-left",
     sermons: "cards",
     events: "grid",
+    /**
+     * Deliberately steered off the cream-ground / high-contrast-serif /
+     * terracotta-accent combination. That trio is one of the three looks that
+     * read as machine-generated on sight, and it is what this direction used
+     * to brief for almost word for word.
+     */
     mood:
-      "Magazine layout logic — asymmetric splits, photography paired with a pull-quote feel, " +
-      "warm neutral tones. Reads like a feature story, not a landing page.",
+      "Magazine layout logic: asymmetric two-column splits, a portrait held in a frame beside " +
+      "the text rather than behind it, and headings ranged left against a hard column edge. " +
+      "The page is built from the grid, not from a cream background and a display serif.",
     copyVoice:
       "Narrative and specific. Name real details of this church's life — a street, a Sunday " +
       "ritual, a founding story — rather than generic churchy language.",
+    recipe: {
+      bandRhythm: ["transparent", "surface", "transparent", "primary"],
+      bandPadding: { hero: "xl", body: "xl", closing: "lg" },
+      alignPolicy: "left",
+      width: "wide",
+      hero: { archetype: "split", image: "vertical", split: "wide-left" },
+      welcomeImage: "widescreen",
+      sermons: "grid",
+      events: "grid",
+      image: { treatment: "framed", aspect: "portrait" },
+      eyebrows: "hero-only",
+    },
   },
   {
     id: "bright-welcoming",
@@ -137,27 +217,66 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     sermons: "cards",
     events: "grid",
     mood:
-      "Energetic and photo-forward. Big friendly type, optimistic color use, sections that feel " +
-      "like an invitation rather than an announcement. Community over ceremony.",
+      "Photo-forward and centred, built around an invitation rather than an announcement. The " +
+      "brand accent appears once, as a full band about a third of the way down, and nowhere " +
+      "else. Big friendly type; community over ceremony.",
     copyVoice:
       "Second person, direct, upbeat. Talk TO the visitor ('you'), not about the church in the " +
       "third person.",
+    recipe: {
+      bandRhythm: ["transparent", "accent", "transparent", "surface"],
+      bandPadding: { hero: "2xl", body: "lg", closing: "xl" },
+      alignPolicy: "centered-close",
+      width: "wide",
+      hero: {
+        archetype: "stacked",
+        image: "widescreen",
+        copyWidth: "normal",
+        photoWidth: "normal",
+        treatment: "rounded",
+        aspect: "wide",
+      },
+      welcomeImage: "vertical",
+      sermons: "grid",
+      events: "grid",
+      image: { treatment: "rounded", aspect: "video" },
+      eyebrows: "hero-only",
+    },
   },
   {
     id: "traditional-reverent",
     name: "Traditional & Reverent",
-    navbar: "solid",
+    navbar: "transparent",
     hero: "split",
     welcome: "centered",
     about: "image-right",
     sermons: "list",
     events: "calendar",
     mood:
-      "Timeless and measured. Classical serif headlines, symmetrical balance, unhurried pacing. " +
-      "Dignity over trend — this should still look right in ten years.",
+      "Measured and symmetrical. A narrow column, bands that alternate their alignment so the " +
+      "page reads as a series of considered pages rather than one scroll, and dates and times " +
+      "given plainly. Dignity over trend — this should still look right in ten years.",
     copyVoice:
       "Formal but never cold. Rooted in continuity — heritage, steadiness, belonging across " +
       "generations — without sounding like a museum plaque.",
+    recipe: {
+      bandRhythm: ["transparent", "surface", "transparent", "surface"],
+      bandPadding: { hero: "xl", body: "lg", closing: "lg" },
+      alignPolicy: "alternating",
+      width: "normal",
+      hero: {
+        archetype: "overlay",
+        image: "overlay",
+        overlay: "dark",
+        align: "center",
+        copyWidth: "narrow",
+      },
+      welcomeImage: "vertical",
+      sermons: "list",
+      events: "calendar",
+      image: { treatment: "square", aspect: "portrait" },
+      eyebrows: "none",
+    },
   },
   {
     id: "community-forward",
@@ -169,13 +288,27 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     sermons: "cards",
     events: "grid",
     mood:
-      "People-first. Sections built around faces and gathering rather than architecture. " +
-      "Balanced two-column rhythm throughout — nothing overwhelms the page.",
+      "People-first and ranged left. Sections built around faces and gathering rather than " +
+      "architecture, square portraits at a consistent size, and a two-column rhythm that never " +
+      "lets one band overwhelm the page.",
     copyVoice:
       "Conversational, specific about who gathers here — families, students, neighbors — and " +
       "what a first visit actually feels like.",
+    recipe: {
+      bandRhythm: ["transparent", "surface", "accent", "transparent"],
+      bandPadding: { hero: "xl", body: "lg", closing: "xl" },
+      alignPolicy: "left",
+      width: "wide",
+      hero: { archetype: "split", image: "vertical", split: "wide-right" },
+      welcomeImage: "widescreen",
+      sermons: "grid",
+      events: "list",
+      image: { treatment: "rounded", aspect: "square" },
+      eyebrows: "none",
+    },
   },
 ];
+
 
 /** A tasteful pick, steered away from whatever was used last time. */
 export function pickArtDirection(avoidId?: string): ArtDirection {

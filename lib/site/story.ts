@@ -142,3 +142,25 @@ export function parseStyleName(value: unknown): string | undefined {
   const style = (value as Record<string, unknown>).styleName;
   return typeof style === "string" && style.trim() ? style.trim() : undefined;
 }
+
+/**
+ * The navbar treatment the build's design direction chose.
+ *
+ * Stored rather than re-derived from `styleName` through the direction table:
+ * editing that table would otherwise restyle the nav of every published church
+ * sharing a direction name, silently and with no rebuild.
+ *
+ * Falls back to `solid`, the treatment that works over any hero.
+ */
+export function parseNavVariant(value: unknown): "transparent" | "solid" | "minimal" {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "solid";
+  const variant = (value as Record<string, unknown>).navVariant;
+  return variant === "transparent" || variant === "minimal" ? variant : "solid";
+}
+
+/** The stock photograph seeded into the hero, so the next build can avoid repeating it. */
+export function parseHeroImage(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const url = (value as Record<string, unknown>).heroImageUrl;
+  return typeof url === "string" && url.trim() ? url.trim() : undefined;
+}
