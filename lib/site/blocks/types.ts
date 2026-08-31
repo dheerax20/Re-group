@@ -11,7 +11,13 @@
 
 export type SpacingToken = "none" | "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
 export type AlignToken = "left" | "center" | "right";
-export type WidthToken = "narrow" | "normal" | "wide" | "full";
+/**
+ * `full` is gutter-only — the full-bleed tier the navbar shares, and what puts
+ * a hero headline on the nav's axis. `bleed` is edge to edge with NO inset at
+ * all, for a band whose own children carry the gutter: a photograph that must
+ * run into the corner of the viewport cannot do so through a padded parent.
+ */
+export type WidthToken = "narrow" | "normal" | "wide" | "full" | "bleed";
 export type SurfaceToken = "transparent" | "surface" | "primary" | "accent" | "inverted";
 export type TextToneToken = "default" | "muted" | "inverted" | "accent";
 export type TypeScaleToken = "display" | "h1" | "h2" | "h3" | "body" | "small";
@@ -20,8 +26,17 @@ export type ImageTreatmentToken = "rounded" | "square" | "framed" | "bleed";
 /** `fill` has no ratio box — the image takes the height of whatever sits beside it. */
 export type ImageAspectToken = "square" | "video" | "portrait" | "wide" | "cinema" | "fill";
 export type ButtonEmphasisToken = "primary" | "secondary" | "outline";
-/** A button's corner. Template-only — the composer never emits it. */
-export type ButtonShapeToken = "default" | "pill";
+/**
+ * Which of the church's two brand faces a piece of text is set in.
+ *
+ * Template-only. It exists because `app/globals.css` forces every heading
+ * inside `.theme-root` to `font-family: inherit`, which resolves to
+ * `--font-primary` — so before this, `--font-secondary` was picked in
+ * onboarding, stored on the brand, and then used by NOTHING on a published
+ * page. The hero's serif subhead against its sans headline is the first thing
+ * to actually spend it.
+ */
+export type FontFamilyToken = "primary" | "secondary";
 export type ColumnsToken = 1 | 2 | 3 | 4;
 
 /**
@@ -91,6 +106,8 @@ export type HeadingBlock = BaseBlock & {
   scale?: TypeScaleToken;
   /** Template-only. Defaults to the weight `scale` implies. */
   weight?: FontWeightToken;
+  /** Template-only. Defaults to the church's primary face. */
+  font?: FontFamilyToken;
 };
 /**
  * `scale` is the same `TypeScaleToken` a heading takes, read as a paragraph
@@ -106,13 +123,20 @@ export type ImageBlock = BaseBlock & {
   alt?: string;
   treatment?: ImageTreatmentToken;
   aspect?: ImageAspectToken;
+  /**
+   * Load this one eagerly. Template-only, and true for exactly one image on a
+   * page: the hero's. Every other block image is below the fold and a block
+   * tree cannot tell the renderer which band it sits in.
+   */
+  priority?: boolean;
 };
 export type ButtonBlock = BaseBlock & {
   type: "button";
   label: string;
   href: string;
   emphasis?: ButtonEmphasisToken;
-  shape?: ButtonShapeToken;
+  /** Template-only. Defaults to the church's primary face. */
+  font?: FontFamilyToken;
 };
 export type StatsBlock = BaseBlock & {
   type: "stats";

@@ -24,6 +24,8 @@ import {
 } from "@/lib/site/service";
 import { getSiteContent } from "@/lib/site/get-site-content";
 import { updatePageBlocks, UneditablePageError } from "@/lib/site/blocks/manual-edit";
+import { SITE_TEMPLATE_IDS } from "@/lib/site/templates";
+import { applyTemplateToSite } from "@/lib/site/templates/apply";
 
 const siteInput = z.object({ siteId: z.string().min(1) });
 
@@ -103,6 +105,21 @@ export const siteRouter = router({
   updateSections: paidSiteProcedure
     .input(siteInput.extend({ data: sectionConfigSchema }))
     .mutation(async ({ input }) => updateSections(input.siteId, input.data)),
+
+  /**
+   * Builds the site from a pre-built template. Free, synchronous, no AI.
+   *
+   * `paidSiteProcedure` because it is a site mutation like any other, but
+   * deliberately NOT in the AI router and deliberately without
+   * `assertAiBudget`: there is no provider call to pay for. It is in the site
+   * router for the same reason `updateBlocks` is — cost, not subject matter,
+   * is what separates the two.
+   *
+   * Overwrites every stored page, so the client confirms first.
+   */
+  applyTemplate: paidSiteProcedure
+    .input(siteInput.extend({ templateId: z.enum(SITE_TEMPLATE_IDS) }))
+    .mutation(async ({ input }) => applyTemplateToSite(input.siteId, input.templateId)),
 
   /**
    * Direct block edits from the editor's outline panel — reordering bands and

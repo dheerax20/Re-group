@@ -10,7 +10,7 @@ import {
 } from "./specialists";
 import type { AgentLogEntry, DesignFeedback, SiteImprovement } from "./schemas";
 import { resolveGateway, type Gateway } from "./model-config";
-import { HERO_BLOCK_ID, type BlockNode } from "@/lib/site/blocks/types";
+import { heroImageIn } from "@/lib/site/blocks/hero";
 
 export type ChurchWebsiteBuild = GeneratedSiteConfig & {
   log: AgentLogEntry[];
@@ -79,32 +79,6 @@ function plannedBandTypes(input: SiteGenerationInput, direction: ArtDirection): 
     "footer",
   ];
   return bands.filter(Boolean).join(", ");
-}
-
-/**
- * The stock photograph the hero band ended up with.
- *
- * Read off the assembled tree rather than recomputed, so it is by construction
- * the URL that was actually published — `pickHeroImage` is deterministic, but
- * a hero that was never injected (a reply with no copy object) has no photo at
- * all, and recomputing would record one the page does not show.
- */
-function heroImageIn(blocks: BlockNode[] | undefined): string | undefined {
-  const hero = blocks?.find((node) => node.id === HERO_BLOCK_ID);
-  if (!hero) return undefined;
-  if (hero.style?.backgroundImage) return hero.style.backgroundImage;
-
-  const findImage = (nodes: BlockNode[]): string | undefined => {
-    for (const node of nodes) {
-      if (node.type === "image" && node.src) return node.src;
-      if ("children" in node && Array.isArray(node.children)) {
-        const found = findImage(node.children);
-        if (found) return found;
-      }
-    }
-    return undefined;
-  };
-  return "children" in hero && Array.isArray(hero.children) ? findImage(hero.children) : undefined;
 }
 
 function stepIndex(id: CrewStepId): number {

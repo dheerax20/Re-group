@@ -143,4 +143,12 @@ export interface SiteConfig {
   styleName?: string;
   /** How the navbar renders — see `components/website/blocks/site-header.tsx`. */
   navVariant?: NavVariant;
+  /**
+   * The stock photograph the current design put in the hero.
+   *
+   * Read so the design picker can offer a DIFFERENT one for every other
+   * template — the same `avoid` the apply path passes, so each card shows the
+   * picture that template would actually produce.
+   */
+  heroImageUrl?: string;
 }
