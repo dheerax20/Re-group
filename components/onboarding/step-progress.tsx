@@ -13,7 +13,7 @@ const statusCopy: Record<string, string> = {
   social: "Mapping community links into navigation and footer.",
   brand: "Building your design tokens from colors and type.",
   features: "Scoping modules the AI crew will include.",
-  templates: "AI crew is inventing layout, copy, and imagery…",
+  templates: "Pick a design, or have the AI crew invent one.",
   publish: "Validating slug, SEO basics, and publish readiness.",
 };
 

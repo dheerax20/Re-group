@@ -5,7 +5,7 @@ import type { SectionInstance } from "@/lib/site/types";
 
 const spacingSchema = z.enum(["none", "xs", "sm", "md", "lg", "xl", "2xl"]);
 const alignSchema = z.enum(["left", "center", "right"]);
-const widthSchema = z.enum(["narrow", "normal", "wide", "full"]);
+const widthSchema = z.enum(["narrow", "normal", "wide", "full", "bleed"]);
 const surfaceSchema = z.enum(["transparent", "surface", "primary", "accent", "inverted"]);
 const textToneSchema = z.enum(["default", "muted", "inverted", "accent"]);
 const typeScaleSchema = z.enum(["display", "h1", "h2", "h3", "body", "small"]);
@@ -13,7 +13,7 @@ const accentSchema = z.enum(["none", "line", "bordered", "numbered"]);
 const imageTreatmentSchema = z.enum(["rounded", "square", "framed", "bleed"]);
 const imageAspectSchema = z.enum(["square", "video", "portrait", "wide", "cinema", "fill"]);
 const buttonEmphasisSchema = z.enum(["primary", "secondary", "outline"]);
-const buttonShapeSchema = z.enum(["default", "pill"]);
+const fontFamilySchema = z.enum(["primary", "secondary"]);
 const columnsSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
 const rowLayoutSchema = z.enum(["columns", "bar", "wide-left", "wide-right"]);
 const overlaySchema = z.enum(["none", "scrim", "dark"]);
@@ -111,6 +111,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       text: z.string().trim().min(1).max(200),
       scale: typeScaleSchema.optional(),
       weight: fontWeightSchema.optional(),
+      font: fontFamilySchema.optional(),
     }),
     z.object({
       id: idSchema,
@@ -135,6 +136,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       alt: z.string().max(200).optional(),
       treatment: imageTreatmentSchema.optional(),
       aspect: imageAspectSchema.optional(),
+      priority: z.boolean().optional(),
     }),
     z.object({
       id: idSchema,
@@ -143,7 +145,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       label: z.string().trim().min(1).max(60),
       href: linkTargetSchema,
       emphasis: buttonEmphasisSchema.optional(),
-      shape: buttonShapeSchema.optional(),
+      font: fontFamilySchema.optional(),
     }),
     z.object({
       id: idSchema,

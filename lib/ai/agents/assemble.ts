@@ -285,11 +285,19 @@ export function assembleGeneratedBlocks(args: {
       churchName: input.churchName,
       story: input.story,
       tagline: input.tagline,
-      // The hero band is BUILT here rather than composed: the block vocabulary
-      // cannot express text over a photograph, and the model has no photograph
-      // to place. Its presence is also what gates injection — a reply with no
-      // hero copy produces a page with no hero, rather than a headline nobody
-      // wrote. See `injectHero`.
+      /**
+       * The hero band is BUILT here rather than composed: the block vocabulary
+       * cannot express text over a photograph, and the model has no photograph
+       * to place.
+       *
+       * Always an object, even when the model returned no `hero` key at all —
+       * `looseHero` degrades to `{}` and `resolveHeroCopy` fills every slot
+       * from the church's own words. So a fresh build ALWAYS gets a hero and
+       * always gets a photograph. The gate in `injectHero` is about the other
+       * caller: `scripts/backfill-design-pass.ts` passes no context, so a page
+       * built before heroes existed is left alone rather than having one
+       * grafted onto a live homepage.
+       */
       hero: composed.hero,
       siteId: input.siteId,
       previousHeroImage,

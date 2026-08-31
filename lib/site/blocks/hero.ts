@@ -1,4 +1,4 @@
-import type { BlockNode } from "./types";
+import type { BlockNode, SpacingToken, WidthToken } from "./types";
 import { HERO_BLOCK_ID } from "./types";
 import type { HeroRecipe } from "./design-pass";
 
@@ -99,7 +99,7 @@ export type HeroFallbackContext = {
 };
 
 /** The first sentence of a paragraph, for a subhead that must not run long. */
-function firstSentence(text: string | undefined): string | undefined {
+export function firstSentence(text: string | undefined): string | undefined {
   const trimmed = text?.trim();
   if (!trimmed) return undefined;
   const match = trimmed.match(/^.*?[.!?](?=\s|$)/);
@@ -144,23 +144,25 @@ export function resolveHeroCopy(
 /**
  * The copy stack, shared by all three archetypes.
  *
- * The subhead is a `heading` at `h3`, not a `text` node, and that is the single
- * detail that most separates the reference designs from the old output:
- * headings read `--font-secondary` while `text` reads `--font-primary`, so
- * this is what sets the subhead in the display face. `weight: "regular"` keeps
- * it from competing with the headline, and `textTone: "accent"` is what makes
- * it the church's colour rather than muted grey. No new font field, and
- * typography stays out of the model's hands at every layer.
+ * Every reference pairs a sans headline with a SERIF subhead, and that
+ * pairing is the single detail that most separates them from a default stack
+ * of bold-heading-over-grey-paragraph. It takes an explicit
+ * `font: "secondary"`: `app/globals.css` pins every heading inside
+ * `.theme-root` to `font-family: inherit`, i.e. the primary face, so a
+ * `heading` does NOT pick up the church's second face on its own.
+ *
+ * `weight: "regular"` keeps the subhead from competing with the headline, and
+ * `textTone` gives it the church's accent on a light ground. Typography stays
+ * out of the model's hands at every layer — it writes the words, the template
+ * sets them.
  */
 function copyStack(
   copy: HeroCopy,
   opts: {
     align: "left" | "center";
-    width?: "narrow" | "normal" | "wide" | "full";
+    width?: WidthToken;
     inverted?: boolean;
-    padding?: "2xl";
-    /** Archetype C's compact pill, against the square corners A and B use. */
-    pill?: boolean;
+    padding?: SpacingToken;
   }
 ): BlockNode {
   const children: BlockNode[] = [
@@ -173,8 +175,15 @@ function copyStack(
       type: "heading",
       scale: "h3",
       weight: "regular",
+      font: "secondary",
       text: copy.subhead,
-      style: { textTone: "accent" },
+      /**
+       * Accent on a light ground, plain inverted over a photograph. The
+       * references show a terracotta subhead on cream but a WHITE one over the
+       * scrim — an accent colour that reads beautifully on paper can fall
+       * under the contrast floor once it is sitting on a photograph.
+       */
+      style: { textTone: opts.inverted ? "inverted" : "accent" },
     } as BlockNode);
   }
 
@@ -184,13 +193,15 @@ function copyStack(
    * is a spacer rather than a second gap token.
    */
   children.push({ id: "hero-cta-space", type: "spacer", size: "sm" } as BlockNode);
+  // The references set the button label in the second face too, which is what
+  // stops the CTA reading as a form control dropped onto a designed page.
   children.push({
     id: "hero-cta",
     type: "button",
     label: copy.ctaLabel,
     href: copy.ctaHref,
     emphasis: "primary",
-    ...(opts.pill ? { shape: "pill" } : {}),
+    font: "secondary",
   } as BlockNode);
 
   return {
@@ -243,11 +254,10 @@ export function buildHeroBand(
         align: recipe.align,
       },
       children: [
-        copyStack(copy, {
-          align: recipe.align,
-          width: recipe.copyWidth,
-          inverted: true,
-        }),
+        // No `width`: the section already sits at the page gutter, which is
+        // the axis the nav logo is on, and a second gutter would push the
+        // headline off it. The measure comes from the display scale itself.
+        copyStack(copy, { align: recipe.align, inverted: true }),
       ],
     } as BlockNode;
   }
@@ -266,7 +276,7 @@ export function buildHeroBand(
      * photograph before any words — so `wide-right` mirrors with CSS `order`
      * inside `rowLayoutClass`, never by reordering the children here.
      */
-    const text = copyStack(copy, { align: "left", padding: "2xl" });
+    const text = copyStack(copy, { align: "left", padding: "2xl", width: "full" });
     const image = {
       id: "hero-photo",
       type: "image",
@@ -279,7 +289,10 @@ export function buildHeroBand(
     return {
       id: HERO_BLOCK_ID,
       type: "section",
-      style: { background: "surface", padding: "none", width: "full", minHeight: "hero" },
+      // `bleed`, not `full`: the photograph has to reach the viewport edge,
+      // and it cannot do that through a band that carries the gutter itself.
+      // The text column carries it instead — see `copyStack` below.
+      style: { background: "surface", padding: "none", width: "bleed", minHeight: "hero" },
       children: [
         {
           id: "hero-row",
@@ -296,10 +309,10 @@ export function buildHeroBand(
   return {
     id: HERO_BLOCK_ID,
     type: "section",
-    style: { background: "surface", padding: "2xl", align: "center", width: "wide" },
+    style: { background: "surface", padding: "2xl", align: "center", width: "bleed" },
     children: [
-      copyStack(copy, { align: "center", width: recipe.copyWidth, pill: true }),
-      { id: "hero-photo-space", type: "spacer", size: "lg" } as BlockNode,
+      copyStack(copy, { align: "center", width: recipe.copyWidth }),
+      { id: "hero-photo-space", type: "spacer", size: "xl" } as BlockNode,
       {
         id: "hero-photo",
         type: "image",
@@ -307,8 +320,41 @@ export function buildHeroBand(
         alt: "",
         aspect: recipe.aspect,
         treatment: recipe.treatment,
+        priority: true,
         style: { width: recipe.photoWidth },
       } as BlockNode,
     ],
   } as BlockNode;
+}
+
+/**
+ * The photograph a built page ended up with.
+ *
+ * Stored as `storyConfig.heroImageUrl` so the NEXT build — or the next
+ * template applied — can pass it as `avoid` and pick a different frame. Lives
+ * here rather than beside either caller because both the AI crew and the
+ * template apply path need it and neither owns it.
+ *
+ * Checks the band's own background first (archetype A paints the photo there),
+ * then walks for the first `image` node (B and C hold it as a child).
+ */
+export function heroImageIn(blocks: BlockNode[] | undefined): string | undefined {
+  const hero = blocks?.find((node) => node.id === HERO_BLOCK_ID);
+  if (!hero) return undefined;
+  if (hero.style?.backgroundImage) return hero.style.backgroundImage;
+
+  const findImage = (nodes: BlockNode[]): string | undefined => {
+    for (const node of nodes) {
+      if (node.type === "image" && node.src) return node.src;
+      if ("children" in node && Array.isArray(node.children)) {
+        const found = findImage(node.children);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  return "children" in hero && Array.isArray(hero.children)
+    ? findImage(hero.children)
+    : undefined;
 }
