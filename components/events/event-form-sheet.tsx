@@ -6,6 +6,7 @@ import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -319,19 +320,21 @@ export function EventFormSheet({
             <FormSection title="Date & location">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field htmlFor="event-start" label="Starts">
-                  <Input
+                  {/*
+                    The trigger is a button, so the `required` this field used
+                    to carry cannot apply. `eventInputSchema` rejects an empty
+                    `startAt` and the error line below renders the refusal.
+                  */}
+                  <DateTimePicker
                     id="event-start"
-                    onChange={(e) => set("startAt", e.target.value)}
-                    required
-                    type="datetime-local"
+                    onChange={(next) => set("startAt", next)}
                     value={form.startAt}
                   />
                 </Field>
                 <Field htmlFor="event-end" label="Ends">
-                  <Input
+                  <DateTimePicker
                     id="event-end"
-                    onChange={(e) => set("endAt", e.target.value)}
-                    type="datetime-local"
+                    onChange={(next) => set("endAt", next)}
                     value={form.endAt}
                   />
                 </Field>
@@ -412,10 +415,9 @@ export function EventFormSheet({
                       />
                     </Field>
                     <Field htmlFor="event-deadline" label="Registration deadline">
-                      <Input
+                      <DateTimePicker
                         id="event-deadline"
-                        onChange={(e) => set("registrationDeadline", e.target.value)}
-                        type="datetime-local"
+                        onChange={(next) => set("registrationDeadline", next)}
                         value={form.registrationDeadline}
                       />
                     </Field>
