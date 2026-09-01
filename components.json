@@ -17,5 +17,8 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "iconLibrary": "lucide"
+  "iconLibrary": "lucide",
+  "registries": {
+    "@ss-components": "https://shadcnstudio.com/r/components/new-york-v4/{name}.json"
+  }
 }

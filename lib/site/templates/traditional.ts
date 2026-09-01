@@ -38,7 +38,13 @@ const VOICE: PageVoice = {
 export const traditionalTemplate: SiteTemplate = {
   id: "traditional",
   name: "Traditional",
-  version: 1,
+  /**
+   * 2: the hero moved from the dark-overlay archetype to the stacked one in
+   * `design-references/Hero3.png`. `applyTemplateToSite` snapshots the
+   * finished trees, so a site applied at version 1 keeps the old hero until
+   * the template is re-applied — this is what records that they differ.
+   */
+  version: 2,
   tagline: "A narrow, symmetrical page that gives the times and the welcome plainly.",
   navVariant,
   recipe,
