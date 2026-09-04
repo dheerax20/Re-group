@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CreditCard, LogOut, PanelsTopLeft, UserRound } from "lucide-react";
+import { Church, CreditCard, LogOut, PanelsTopLeft, UserRound } from "lucide-react";
 import { syncCurrentUser } from "@/lib/auth/session";
 import { DataList, DataListRow, RowIcon } from "@/components/layout/data-list";
 import { PageHeader } from "@/components/layout/page-header";
@@ -102,6 +102,25 @@ export default async function SettingsPage() {
                   </Badge>
                 ) : null
               }
+            />
+            {/*
+              Without this row the church-details tabs are reachable only by
+              someone who already opened Profile looking for their account —
+              which is not where anyone goes to change a logo.
+            */}
+            <DataListRow
+              actions={
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/dashboard/profile?tab=church">Edit</Link>
+                </Button>
+              }
+              description="Name, story, contact, logo, favicon and social links."
+              leading={
+                <RowIcon>
+                  <Church />
+                </RowIcon>
+              }
+              title="Church details"
             />
           </DataList>
         </Section>

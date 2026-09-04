@@ -54,6 +54,13 @@ export interface GivingConfig {
 }
 
 export interface ContactInfo {
+  /**
+   * The named person, not the church. `Site.primaryContactName` has been
+   * written since the wizard existed and read by nothing, so every save of the
+   * church form blanked it — harmless while the form was only ever filled in
+   * once, silent data loss the moment it became editable from Profile.
+   */
+  name?: string;
   email?: string;
   phone?: string;
   address?: string;

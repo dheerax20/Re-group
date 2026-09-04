@@ -45,7 +45,7 @@ export function ChurchForm({
       name: defaultValues.site.name === "Untitled Church" ? "" : defaultValues.site.name,
       denomination: defaultValues.site.denomination ?? "",
       congregationSize: defaultValues.site.congregationSize,
-      primaryContactName: "",
+      primaryContactName: defaultValues.contact?.name ?? "",
       primaryContactEmail: defaultValues.contact?.email ?? "",
       primaryContactPhone: defaultValues.contact?.phone ?? "",
       tagline: defaultValues.brand.tagline ?? "",

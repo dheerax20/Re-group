@@ -148,6 +148,7 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
   const sections = coerceSections(site.sectionConfig) as SectionInstance[];
 
   const contact: ContactInfo = {
+    name: site.primaryContactName ?? undefined,
     email: site.primaryContactEmail ?? undefined,
     phone: site.primaryContactPhone ?? undefined,
   };
