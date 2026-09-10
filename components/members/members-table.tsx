@@ -1,8 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, UserRound, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  Check,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  Users,
+} from "lucide-react";
 
+import { trpc } from "@/lib/trpc/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/toast";
 import {
   Table,
   TableBody,
@@ -26,39 +38,46 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
-  { value: "visitor", label: "First-time visitor" },
-  { value: "regular", label: "Regular attender" },
-  { value: "member", label: "Member" },
+  { value: "VISITOR", label: "First-time visitor" },
+  { value: "REGULAR", label: "Regular attender" },
+  { value: "MEMBER", label: "Member" },
 ] as const;
 
 type MemberStatus = (typeof STATUS_OPTIONS)[number]["value"];
+type SyncStatus = "PENDING" | "SYNCED" | "FAILED" | "SKIPPED";
 
-type Member = {
+/** The row shape the server page passes down — a Prisma `Member`. */
+export type MemberRecord = {
   id: string;
   firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
   status: MemberStatus;
-  notes: string;
-  addedAt: Date;
+  notes: string | null;
+  ghlContactId: string | null;
+  syncStatus: SyncStatus;
+  syncError: string | null;
+  syncedAt: Date | null;
+  createdAt: Date;
 };
 
 const STATUS_BADGE: Record<MemberStatus, React.ComponentProps<typeof Badge>["variant"]> = {
-  visitor: "info",
-  regular: "secondary",
-  member: "success",
+  VISITOR: "info",
+  REGULAR: "secondary",
+  MEMBER: "success",
 };
 
 function statusLabel(status: MemberStatus) {
   return STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
 }
 
-function initials(firstName: string, lastName: string) {
-  return `${firstName.trim()[0] ?? ""}${lastName.trim()[0] ?? ""}`.toUpperCase() || "?";
+function initials(firstName: string, lastName: string | null) {
+  return (
+    `${firstName.trim()[0] ?? ""}${(lastName ?? "").trim()[0] ?? ""}`.toUpperCase() || "?"
+  );
 }
 
 const EMPTY_FORM = {
@@ -66,54 +85,174 @@ const EMPTY_FORM = {
   lastName: "",
   email: "",
   phone: "",
-  status: "visitor" as MemberStatus,
+  status: "VISITOR" as MemberStatus,
   notes: "",
 };
 
 /**
- * Create-member form and the directory table.
+ * What the last column says, per sync state.
  *
- * Every row added here is local UI state only — nothing is persisted, and
- * nothing syncs anywhere yet. The "Not synced" badge is a placeholder for
- * the eventual contacts push, not a working sync — wiring that up is a
- * separate change.
+ * SKIPPED is not styled as a failure — it is what a member with no email or
+ * phone gets, and the copy asks for the missing detail rather than implying
+ * something broke. Only FAILED offers the retry, because it is the only state
+ * a retry can change.
  */
-export function MembersTable() {
-  const [members, setMembers] = React.useState<Member[]>([]);
+function SyncCell({
+  member,
+  onResync,
+  busy,
+}: {
+  member: MemberRecord;
+  onResync: () => void;
+  busy: boolean;
+}) {
+  if (busy) {
+    return (
+      <Badge className="gap-1" variant="outline">
+        <Loader2 className="size-3 animate-spin" />
+        Syncing…
+      </Badge>
+    );
+  }
+
+  switch (member.syncStatus) {
+    case "SYNCED":
+      return (
+        <Badge className="gap-1" variant="success">
+          <Check className="size-3" />
+          In contacts
+        </Badge>
+      );
+    case "FAILED":
+      return (
+        <div className="flex items-center gap-2">
+          <Badge className="gap-1" title={member.syncError ?? undefined} variant="destructive">
+            <AlertCircle className="size-3" />
+            Sync failed
+          </Badge>
+          <Button onClick={onResync} size="sm" variant="ghost">
+            <RefreshCw className="size-3" />
+            Retry
+          </Button>
+        </div>
+      );
+    case "SKIPPED":
+      // Several things land here — no email or phone, sync switched off for
+      // the deployment — so the recorded reason is the copy.
+      return (
+        <span className="text-[13px] text-muted">
+          {member.syncError ?? "Not synced"}
+        </span>
+      );
+    default:
+      return (
+        <Badge className="gap-1" variant="outline">
+          <Loader2 className="size-3 animate-spin" />
+          Syncing…
+        </Badge>
+      );
+  }
+}
+
+export function MembersTable({
+  siteId,
+  members,
+  syncEnabled,
+}: {
+  siteId: string;
+  members: MemberRecord[];
+  /** False when the deployment has no GoHighLevel configured — hides the column. */
+  syncEnabled: boolean;
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+
   const [query, setQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(EMPTY_FORM);
+  const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = React.useState<MemberRecord | null>(null);
+
+  const createMember = trpc.members.create.useMutation();
+  const resyncMember = trpc.members.resync.useMutation();
+  const removeMember = trpc.members.remove.useMutation();
+
+  const columnCount = syncEnabled ? 7 : 6;
 
   const visible = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return members;
     return members.filter((member) =>
-      [member.firstName, member.lastName, member.email, member.phone]
+      [member.firstName, member.lastName ?? "", member.email ?? "", member.phone ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(q)
     );
   }, [members, query]);
 
-  function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.firstName.trim() || !form.email.trim()) return;
+    if (!form.firstName.trim()) return;
 
-    setMembers((prev) => [
-      {
-        id: crypto.randomUUID(),
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        status: form.status,
-        notes: form.notes.trim(),
-        addedAt: new Date(),
-      },
-      ...prev,
-    ]);
-    setForm(EMPTY_FORM);
-    setOpen(false);
+    try {
+      await createMember.mutateAsync({ siteId, data: form });
+      setForm(EMPTY_FORM);
+      setOpen(false);
+      toast({
+        title: "Member added",
+        description: syncEnabled
+          ? `${form.firstName} was added and sent to your contacts.`
+          : `${form.firstName} was added to your directory.`,
+      });
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Could not add member",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "error",
+      });
+    }
+  }
+
+  async function handleResync(member: MemberRecord) {
+    setBusyId(member.id);
+    try {
+      await resyncMember.mutateAsync({ siteId, memberId: member.id });
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Could not sync",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "error",
+      });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete() {
+    const member = confirmDelete;
+    if (!member) return;
+    setBusyId(member.id);
+    try {
+      await removeMember.mutateAsync({ siteId, memberId: member.id });
+      setConfirmDelete(null);
+      toast({
+        title: "Member removed",
+        description: syncEnabled
+          ? "They were removed from your directory. Their contact in GoHighLevel is left as it is."
+          : "They were removed from your directory.",
+      });
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Could not remove",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "error",
+      });
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -141,8 +280,9 @@ export function MembersTable() {
               <DialogHeader>
                 <DialogTitle>Create member</DialogTitle>
                 <DialogDescription>
-                  Add a household or visitor to your directory. Contacts sync is
-                  coming soon — nothing is sent anywhere yet.
+                  {syncEnabled
+                    ? "Add a household or visitor to your directory. They are added to your contacts automatically."
+                    : "Add a household or visitor to your directory."}
                 </DialogDescription>
               </DialogHeader>
 
@@ -175,7 +315,6 @@ export function MembersTable() {
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, email: event.target.value }))
                     }
-                    required
                     type="email"
                     value={form.email}
                   />
@@ -224,14 +363,19 @@ export function MembersTable() {
               </div>
 
               <DialogFooter className="mt-5">
-                <Button
-                  onClick={() => setOpen(false)}
-                  type="button"
-                  variant="outline"
-                >
+                <Button onClick={() => setOpen(false)} type="button" variant="outline">
                   Cancel
                 </Button>
-                <Button type="submit">Create member</Button>
+                <Button disabled={createMember.isPending} type="submit">
+                  {createMember.isPending ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Adding…
+                    </>
+                  ) : (
+                    "Create member"
+                  )}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -247,13 +391,17 @@ export function MembersTable() {
               <TableHead>Phone</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Added</TableHead>
-              <TableHead>Contacts sync</TableHead>
+              {syncEnabled ? <TableHead>Contacts sync</TableHead> : null}
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {visible.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell className="py-10 text-center text-[13px] text-muted" colSpan={6}>
+                <TableCell
+                  className="py-10 text-center text-[13px] text-muted"
+                  colSpan={columnCount}
+                >
                   <div className="flex flex-col items-center gap-2">
                     <span className="flex size-9 items-center justify-center rounded-lg bg-surface-muted text-muted">
                       <Users className="size-4" />
@@ -273,11 +421,11 @@ export function MembersTable() {
                         {initials(member.firstName, member.lastName)}
                       </span>
                       <span className="font-medium text-foreground">
-                        {member.firstName} {member.lastName}
+                        {member.firstName} {member.lastName ?? ""}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted">{member.email}</TableCell>
+                  <TableCell className="text-muted">{member.email || "—"}</TableCell>
                   <TableCell className="text-muted">{member.phone || "—"}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_BADGE[member.status]}>
@@ -285,20 +433,30 @@ export function MembersTable() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted">
-                    {member.addedAt.toLocaleDateString(undefined, {
+                    {member.createdAt.toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
                     })}
                   </TableCell>
+                  {syncEnabled ? (
+                    <TableCell>
+                      <SyncCell
+                        busy={busyId === member.id && resyncMember.isPending}
+                        member={member}
+                        onResync={() => handleResync(member)}
+                      />
+                    </TableCell>
+                  ) : null}
                   <TableCell>
-                    <Badge
-                      className={cn("gap-1")}
-                      variant="outline"
+                    <Button
+                      aria-label={`Remove ${member.firstName}`}
+                      onClick={() => setConfirmDelete(member)}
+                      size="icon"
+                      variant="ghost"
                     >
-                      <UserRound className="size-3" />
-                      Not synced
-                    </Badge>
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -306,6 +464,44 @@ export function MembersTable() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        onOpenChange={(next) => !next && setConfirmDelete(null)}
+        open={Boolean(confirmDelete)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove member?</DialogTitle>
+            <DialogDescription>
+              {confirmDelete
+                ? `${confirmDelete.firstName} ${confirmDelete.lastName ?? ""} will be removed from your directory.`
+                : ""}
+              {syncEnabled
+                ? " Their contact in GoHighLevel is left as it is — it may hold conversations and course history this app did not create."
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-5">
+            <Button onClick={() => setConfirmDelete(null)} type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button
+              disabled={removeMember.isPending}
+              onClick={handleDelete}
+              variant="destructive"
+            >
+              {removeMember.isPending ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Removing…
+                </>
+              ) : (
+                "Remove"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

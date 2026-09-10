@@ -17,20 +17,36 @@ import { describe, expect, it } from "vitest";
  * `lib/theme/fonts` holding the `next/font` calls.
  *
  * Loading these under vitest is the same test: no Next compilation either.
+ *
+ * Each case carries an explicit timeout. These are the only tests in the suite
+ * whose work IS a cold module graph — dispatch pulls in LangChain and the
+ * whole AI edit path — so on a cold vitest cache they transform hundreds of
+ * files and blow the 5s default, failing as a timeout that says nothing about
+ * the boundary they exist to protect. The number is a ceiling on transform
+ * time, not an assertion about the import.
  */
+const COLD_IMPORT_TIMEOUT_MS = 30_000;
 describe("task import boundary", () => {
-  it("loads the Slack dispatcher outside a Next.js build", async () => {
-    const mod = await import("@/lib/slack/dispatch");
+  it(
+    "loads the Slack dispatcher outside a Next.js build",
+    async () => {
+      const mod = await import("@/lib/slack/dispatch");
 
-    expect(typeof mod.handlePrompt).toBe("function");
-    expect(typeof mod.buildStatus).toBe("function");
-  });
+      expect(typeof mod.handlePrompt).toBe("function");
+      expect(typeof mod.buildStatus).toBe("function");
+    },
+    COLD_IMPORT_TIMEOUT_MS
+  );
 
-  it("loads the shared AI edit run outside a Next.js build", async () => {
-    const mod = await import("@/lib/ai/editor-prompt-run");
+  it(
+    "loads the shared AI edit run outside a Next.js build",
+    async () => {
+      const mod = await import("@/lib/ai/editor-prompt-run");
 
-    expect(typeof mod.runEditorPromptJob).toBe("function");
-  });
+      expect(typeof mod.runEditorPromptJob).toBe("function");
+    },
+    COLD_IMPORT_TIMEOUT_MS
+  );
 
   it("resolves a site config without loading any font", async () => {
     // The specific chain that used to reach `next/font`.

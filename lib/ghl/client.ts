@@ -1,9 +1,14 @@
 import { GHL_API_BASE, GHL_API_VERSION, type GhlConfig } from "./config";
 
 /**
- * The two GoHighLevel calls this app makes, per `ghl.md`:
- * `POST /locations/` (create a sub-account) and `POST /users/` (create the
- * matching user inside it).
+ * The GoHighLevel calls this app makes.
+ *
+ * Agency-scoped, per `ghl.md`: `POST /locations/` (create a sub-account) and
+ * `POST /users/` (create the matching user inside it). Both accept the agency
+ * token directly.
+ *
+ * Location-scoped: `POST /contacts/upsert`, which does NOT — it needs a
+ * sub-account token, minted by `lib/ghl/oauth.ts` and passed in.
  *
  * Written directly against `fetch` rather than pulling in
  * `@gohighlevel/api-client` — two request shapes do not justify a dependency,
@@ -63,16 +68,22 @@ async function get<T>(config: GhlConfig, path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * `token` overrides `config.apiToken` for location-scoped endpoints, which the
+ * agency token cannot reach. `version` likewise, because the contact endpoints
+ * answer to the dated version while the two create endpoints require `v3`.
+ */
 async function post<T>(
   config: GhlConfig,
   endpoint: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  options: { token?: string; version?: string } = {}
 ): Promise<T> {
   const response = await fetch(`${GHL_API_BASE}${endpoint}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${config.apiToken}`,
-      Version: GHL_API_VERSION,
+      Authorization: `Bearer ${options.token ?? config.apiToken}`,
+      Version: options.version ?? GHL_API_VERSION,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
@@ -259,11 +270,61 @@ export function isAlreadyExistsError(error: unknown): boolean {
   );
 }
 
+export type UpsertContactInput = {
+  locationId: string;
+  firstName: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  tags?: string[];
+};
+
+/**
+ * Creates or updates the contact, keyed by email/phone within the location.
+ *
+ * `/contacts/upsert` rather than `/contacts/`: plain create answers a
+ * duplicate with `400 duplicated contacts` instead of returning the existing
+ * row, which would make every re-sync of an existing person an error to
+ * special-case. Upsert matches and returns the id either way, so the sync is
+ * idempotent for free.
+ */
+export async function upsertContact(
+  config: GhlConfig,
+  locationToken: string,
+  input: UpsertContactInput
+): Promise<string> {
+  const result = await post<{ contact?: { id?: string }; id?: string }>(
+    config,
+    "/contacts/upsert",
+    {
+      locationId: input.locationId,
+      firstName: input.firstName,
+      ...(input.lastName ? { lastName: input.lastName } : {}),
+      ...(input.email ? { email: input.email } : {}),
+      ...(input.phone ? { phone: input.phone } : {}),
+      ...(input.tags?.length ? { tags: input.tags } : {}),
+    },
+    { token: locationToken, version: GHL_SEARCH_VERSION }
+  );
+
+  // The upsert response nests the contact; some GHL responses return it flat.
+  const contactId = result.contact?.id ?? result.id;
+  if (!contactId) {
+    throw new GhlApiError(
+      "GHL upserted a contact but returned no id",
+      502,
+      "/contacts/upsert"
+    );
+  }
+  return contactId;
+}
+
 export type GhlClient = {
   createLocation: typeof createLocation;
   createUser: typeof createUser;
   findLocationByEmail: typeof findLocationByEmail;
   findUserByEmail: typeof findUserByEmail;
+  upsertContact: typeof upsertContact;
 };
 
 /** The real client. Swapped for a fake in tests so no live sub-accounts are created. */
@@ -272,4 +333,5 @@ export const ghlClient: GhlClient = {
   createUser,
   findLocationByEmail,
   findUserByEmail,
+  upsertContact,
 };
