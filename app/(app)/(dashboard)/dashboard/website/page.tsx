@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { getSlackConnectionState } from "@/lib/slack/actions";
 import { availableSitePages } from "@/lib/site/pages";
+import { isSiteTemplateId, templateCards } from "@/lib/site/templates";
+import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
+import { TemplatePicker } from "@/components/onboarding/template-picker";
 import { DataList, DataListRow, RowIcon } from "@/components/layout/data-list";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -153,6 +156,44 @@ export default async function WebsiteBuilderPage() {
             </div>
           </Card>
         </Section>
+
+        {config ? (
+          <Section
+            title="Design"
+            description={
+              config.styleName
+                ? `Your site is using ${config.styleName}. Switching rebuilds every page from your church details — instantly, and at no cost.`
+                : "Pick a design and every page is rebuilt from your church details."
+            }
+          >
+            {/*
+              The same picker the onboarding wizard shows, which is what makes
+              the snapshot the apply path takes safe: a template's pages are
+              frozen at apply time, so re-applying is how a church picks up a
+              change to their own details afterwards.
+            */}
+            <TemplatePicker
+              siteId={active.id}
+              templates={templateCards(active.id, {
+                currentTemplateId: config.template.id,
+                previousHeroImage: config.heroImageUrl,
+              })}
+              swatches={[
+                config.brand.colors.primary,
+                config.brand.colors.secondary,
+                config.brand.colors.accent,
+              ]}
+              currentTemplateId={config.template.id}
+              // Always confirm here. Unlike the wizard, every site reaching
+              // this screen already has a design and may have edited it.
+              hasDesign={
+                config.template.id === AI_GENERATED_TEMPLATE_ID ||
+                isSiteTemplateId(config.template.id)
+              }
+              aiHref={`/builder/templates?siteId=${active.id}&mode=ai`}
+            />
+          </Section>
+        ) : null}
 
         <Section
           title="Pages"

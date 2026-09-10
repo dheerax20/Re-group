@@ -31,6 +31,16 @@ import type { Prisma } from "@prisma/client";
  * Trigger.dev task acting on a job that was authorized when it was queued.
  */
 
+/**
+ * A draft that has not chosen a design yet.
+ *
+ * Was the literal `"modern-church"`, a name left over from a stock-template
+ * registry that no longer exists — it referred to nothing, and
+ * `validateSiteForPublish` rejected it without saying why. Naming the state
+ * makes "no design yet" something the picker and `resumeHref` can read.
+ */
+export const UNSET_TEMPLATE_ID = "unset";
+
 /** Prisma's Json columns want InputJsonValue; our domain types are plain
  * serializable objects/arrays, so this cast is safe at every call site. */
 function toJson(value: unknown): Prisma.InputJsonValue {
@@ -54,7 +64,7 @@ export async function createDraftSite(userId: string, existingSiteId?: string) {
         sectionConfig: toJson([]),
         seoConfig: toJson({ title: "", description: "" }),
         storyConfig: toJson({}),
-        templateId: "modern-church",
+        templateId: UNSET_TEMPLATE_ID,
         templateVersion: 1,
       },
     });
@@ -82,11 +92,28 @@ export async function createDraftSite(userId: string, existingSiteId?: string) {
 export async function resumeHref(siteId: string): Promise<string> {
   const site = await prisma.site.findUnique({
     where: { id: siteId },
-    select: { status: true, sectionConfig: true, blockConfig: true },
+    select: {
+      status: true,
+      sectionConfig: true,
+      blockConfig: true,
+      generationJobs: {
+        where: { kind: "full_build", status: { in: ["QUEUED", "RUNNING"] } },
+        select: { id: true },
+        take: 1,
+      },
+    },
   });
   if (!site) return "/builder";
 
   if (site.status === "PUBLISHED") return "/dashboard";
+
+  /**
+   * A church that closed the tab mid-build comes back to the build, not to the
+   * picker. The design step now shows a chooser by default, and dropping
+   * someone onto it while their paid-for build is still running reads as the
+   * build having been lost.
+   */
+  if (site.generationJobs.length > 0) return `${wizardHref("templates", siteId)}&mode=ai`;
 
   const sections = Array.isArray(site.sectionConfig) ? site.sectionConfig : [];
   const blocks = Array.isArray(site.blockConfig) ? site.blockConfig : [];
@@ -162,6 +189,16 @@ export async function resolveActiveSite(user: {
 
 export async function updateChurchInfo(siteId: string, input: unknown) {
   const data = churchInfoSchema.parse(input);
+
+  const current = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: { storyConfig: true },
+  });
+  const existingStory =
+    current?.storyConfig && typeof current.storyConfig === "object" && !Array.isArray(current.storyConfig)
+      ? (current.storyConfig as Record<string, unknown>)
+      : {};
+
   await prisma.site.update({
     where: { id: siteId },
     data: {
@@ -172,7 +209,19 @@ export async function updateChurchInfo(siteId: string, input: unknown) {
       primaryContactEmail: data.primaryContactEmail || null,
       primaryContactPhone: data.primaryContactPhone || null,
       tagline: data.tagline || null,
+      /**
+       * Merged over whatever the column already holds, not written over it.
+       *
+       * `storyConfig` is a flat bag: the six church-story keys share it with
+       * `styleName`, `navVariant`, `heroImageUrl` and the AI feedback lists.
+       * Replacing the object wholesale dropped all of them, so a church that
+       * edited their info after their site was designed silently lost the
+       * navbar treatment their design had chosen — `parseNavVariant` fell back
+       * to `solid` and the transparent-over-photo header turned opaque. Same
+       * bug `withStoryFeedback` was written to fix on the edit paths.
+       */
       storyConfig: toJson({
+        ...(existingStory ?? {}),
         city: data.city || "",
         worshipStyle: data.worshipStyle || "",
         serviceTimes: data.serviceTimes || "",

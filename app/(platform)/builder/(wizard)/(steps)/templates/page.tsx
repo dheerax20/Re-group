@@ -6,8 +6,10 @@ import { WizardStepHeader } from "@/components/onboarding/wizard-step-header";
 import { AiWebsiteStudio } from "@/components/onboarding/ai-website-studio";
 import { RebuildButton } from "@/components/onboarding/rebuild-button";
 import { GenerationPreview } from "@/components/onboarding/generation-preview";
+import { TemplatePicker } from "@/components/onboarding/template-picker";
 import { Button } from "@/components/ui/button";
 import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
+import { isSiteTemplateId, templateCards } from "@/lib/site/templates";
 import { sectionTypeLabels } from "@/lib/site/section-variants";
 import { Camera, ImagePlus, Smartphone, Sparkles, Video } from "lucide-react";
 
@@ -25,12 +27,23 @@ const ACTION_HINT: Record<string, string> = {
   tighten_mobile_type: "Shorten headlines for small screens",
 };
 
+/**
+ * The design step: three states on one route.
+ *
+ * It used to have one — it auto-started an AI build on arrival, which spent a
+ * monthly build credit and ninety seconds before the church had said they
+ * wanted one. Now a design is chosen: three pre-built templates that apply
+ * instantly and cost nothing, or the crew, behind a deliberate click.
+ *
+ * Which state renders is decided here rather than in the client, so a reload
+ * mid-build lands back on the build and not on the picker.
+ */
 export default async function TemplatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ siteId?: string }>;
+  searchParams: Promise<{ siteId?: string; mode?: string; change?: string }>;
 }) {
-  const { siteId } = await searchParams;
+  const { siteId, mode, change } = await searchParams;
   if (!siteId) redirect("/builder");
 
   const trpc = await api();
@@ -43,12 +56,22 @@ export default async function TemplatesPage({
   const status = await trpc.ai.buildStatus({ siteId });
   const job = status?.job ?? null;
   const building = job?.status === "QUEUED" || job?.status === "RUNNING";
+
+  const isAiDesign = site.template.id === AI_GENERATED_TEMPLATE_ID;
+  const hasDesign = isAiDesign || isSiteTemplateId(site.template.id);
   // The crew writes a block tree now; a site built before that still only has
   // sections, so either one counts as "there is a design here".
-  const ready =
-    !building &&
-    site.template.id === AI_GENERATED_TEMPLATE_ID &&
-    (site.blocks.length > 0 || site.sections.length > 0);
+  const ready = !building && hasDesign && (site.blocks.length > 0 || site.sections.length > 0);
+
+  /**
+   * `?mode=ai` means "the church clicked Generate with AI", which the studio
+   * turns into a `startBuild`. It stops meaning that once the build it asked
+   * for has landed — otherwise the success screen would never appear.
+   */
+  const aiLanded = job?.status === "SUCCEEDED" && isAiDesign;
+  const showStudio = building || (mode === "ai" && !aiLanded);
+  const showPicker = !showStudio && (!ready || change === "1");
+
   const improvements = site.improvements ?? [];
   const designFeedback = site.designFeedback ?? [];
   const mobileFeedback = site.mobileFeedback ?? [];
@@ -60,193 +83,245 @@ export default async function TemplatesPage({
     redirect(wizardHref("publish", siteId!));
   }
 
-  return (
-    <div>
-      <WizardStepHeader
-        title={
-          ready
-            ? `${site.site.name}${styleName ? ` · ${styleName}` : ""}`
-            : `Designing ${site.site.name}`
-        }
-        description={
-          ready
-            ? "AI built layout and copy. Add your church photos before you publish."
-            : "LangChain crew invents layout + copy. You’ll provide photos next."
-        }
-      />
-
-      {!ready ? (
+  if (showStudio) {
+    return (
+      <div>
+        <WizardStepHeader
+          title={`Designing ${site.site.name}`}
+          description="LangChain crew invents layout + copy. You’ll provide photos next."
+        />
         <AiWebsiteStudio
           siteId={siteId}
           initialJob={job}
           initialToken={status?.publicAccessToken ?? null}
         />
-      ) : (
-        <div className="space-y-6">
-          <div className="flex flex-wrap gap-2">
-            {site.sections
-              .filter((section) => section.enabled)
-              .map((section) => (
-                <span
-                  key={section.id}
-                  className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium"
-                >
-                  {sectionTypeLabels[section.type] ?? section.type}
-                  {section.variant ? (
-                    <span className="text-muted"> · {section.variant}</span>
-                  ) : null}
-                </span>
-              ))}
-          </div>
+      </div>
+    );
+  }
 
-          <div className="rounded-panel border border-brand/30 bg-brand-soft/40 p-5 shadow-[var(--shadow-soft)]">
-            <div className="flex items-start gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
-                <Camera className="size-4" />
+  if (showPicker) {
+    const colors = site.brand.colors;
+
+    return (
+      <div>
+        <WizardStepHeader
+          title={ready ? "Change your design" : `Choose a design for ${site.site.name}`}
+          description={
+            ready
+              ? "Applying a design rebuilds every page from your church details. It costs nothing and is instant."
+              : "Pick one and your whole site is built from the details you just gave us — instantly, with no AI. Or have the crew invent one."
+          }
+        />
+
+        <TemplatePicker
+          siteId={siteId}
+          templates={templateCards(siteId, {
+            currentTemplateId: site.template.id,
+            previousHeroImage: site.heroImageUrl,
+          })}
+          swatches={[colors.primary, colors.secondary, colors.accent]}
+          currentTemplateId={site.template.id}
+          hasDesign={ready}
+          aiHref={`${wizardHref("templates", siteId)}&mode=ai`}
+        />
+
+        {ready ? (
+          <Link
+            href={wizardHref("templates", siteId)}
+            className="mt-6 inline-block text-sm text-muted hover:text-foreground"
+          >
+            ← Keep my current design
+          </Link>
+        ) : (
+          <Link
+            href={wizardHref("features", siteId)}
+            className="mt-6 inline-block text-sm text-muted hover:text-foreground"
+          >
+            ← Back to features
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <WizardStepHeader
+        title={`${site.site.name}${styleName ? ` · ${styleName}` : ""}`}
+        description={
+          isAiDesign
+            ? "AI built layout and copy. Add your church photos before you publish."
+            : "Built from your church details. Add your own photos before you publish."
+        }
+      />
+
+      <div className="space-y-6">
+        <div className="flex flex-wrap gap-2">
+          {site.sections
+            .filter((section) => section.enabled)
+            .map((section) => (
+              <span
+                key={section.id}
+                className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium"
+              >
+                {sectionTypeLabels[section.type] ?? section.type}
+                {section.variant ? <span className="text-muted"> · {section.variant}</span> : null}
               </span>
-              <div>
-                <h2 className="font-semibold tracking-tight">Provide your images</h2>
-                <p className="mt-1 text-sm text-muted">
-                  Hero, welcome, about, and CTA photo slots are empty on purpose. Open the editor and
-                  paste image URLs (or upload later) so the site uses your real church photos.
-                </p>
-                <div className="mt-3">
-                  <Link href="/dashboard/builder">
-                    <Button size="sm" className="bg-brand text-brand-foreground hover:bg-brand/90">
-                      Add photos in editor
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
+            ))}
+        </div>
 
-          <GenerationPreview site={site} />
-
-          {(mobileFeedback.length > 0 || designFeedback.length > 0) && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {mobileFeedback.length > 0 ? (
-                <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="size-4 text-brand" />
-                    <h2 className="font-semibold">Mobile improvements</h2>
-                  </div>
-                  <ul className="mt-3 space-y-2">
-                    {mobileFeedback.map((item) => (
-                      <li
-                        key={`m-${item.title}`}
-                        className="rounded-xl border border-border bg-background px-3 py-2.5"
-                      >
-                        <p className="text-sm font-medium">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {designFeedback.length > 0 ? (
-                <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="size-4 text-accent" />
-                    <h2 className="font-semibold">Design feedback</h2>
-                  </div>
-                  <ul className="mt-3 space-y-2">
-                    {designFeedback.map((item) => (
-                      <li
-                        key={`d-${item.title}`}
-                        className="rounded-xl border border-border bg-background px-3 py-2.5"
-                      >
-                        <p className="text-sm font-medium">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
-                        <p className="mt-1 text-[10px] uppercase tracking-wider text-muted">
-                          {item.area}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {improvements.length > 0 ? (
-            <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-strong">
-                  <ImagePlus className="size-4" />
-                </span>
-                <div>
-                  <h2 className="font-semibold tracking-tight">Photo & media checklist</h2>
-                  <p className="mt-1 text-sm text-muted">
-                    Provide these from your church — no AI-generated images for now.
-                  </p>
-                </div>
-              </div>
-              <ul className="mt-4 space-y-2">
-                {improvements.map((item) => (
-                  <li
-                    key={`${item.action}-${item.title}`}
-                    className="rounded-xl border border-border bg-background px-4 py-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      {item.action.includes("video") || item.action.includes("youtube") ? (
-                        <Video className="mt-0.5 size-4 shrink-0 text-brand" />
-                      ) : (
-                        <Camera className="mt-0.5 size-4 shrink-0 text-brand" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
-                        <p className="mt-1 text-[11px] font-medium text-brand">
-                          {ACTION_HINT[item.action] ?? "Open website editor"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4">
+        <div className="rounded-panel border border-brand/30 bg-brand-soft/40 p-5 shadow-[var(--shadow-soft)]">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
+              <Camera className="size-4" />
+            </span>
+            <div>
+              <h2 className="font-semibold tracking-tight">Provide your images</h2>
+              <p className="mt-1 text-sm text-muted">
+                Your site is using stock photography for now. Open the editor and paste image
+                URLs (or upload later) so it uses your real church photos.
+              </p>
+              <div className="mt-3">
                 <Link href="/dashboard/builder">
-                  <Button variant="outline" size="sm">
-                    Open editor
+                  <Button size="sm" className="bg-brand text-brand-foreground hover:bg-brand/90">
+                    Add photos in editor
                   </Button>
                 </Link>
               </div>
             </div>
-          ) : null}
-
-          {agentLog.length > 0 ? (
-            <details className="rounded-panel border border-border bg-background px-4 py-3">
-              <summary className="cursor-pointer text-sm font-medium">Agent run log</summary>
-              <ul className="mt-3 space-y-2 border-t border-border pt-3">
-                {agentLog.map((entry) => (
-                  <li key={`${entry.agent}-${entry.summary}`} className="text-xs text-muted">
-                    <span className="font-medium text-foreground">{entry.role}</span>
-                    {" — "}
-                    {entry.summary}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <form action={acceptWebsite} className="sm:flex-1">
-              <Button type="submit" className="w-full">
-                Use this website
-              </Button>
-            </form>
-            <RebuildButton siteId={siteId} />
           </div>
-
-          <Link
-            href={wizardHref("features", siteId)}
-            className="text-sm text-muted hover:text-foreground"
-          >
-            ← Back to features
-          </Link>
         </div>
-      )}
+
+        <GenerationPreview site={site} />
+
+        {(mobileFeedback.length > 0 || designFeedback.length > 0) && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {mobileFeedback.length > 0 ? (
+              <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="size-4 text-brand" />
+                  <h2 className="font-semibold">Mobile improvements</h2>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {mobileFeedback.map((item) => (
+                    <li
+                      key={`m-${item.title}`}
+                      className="rounded-xl border border-border bg-background px-3 py-2.5"
+                    >
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {designFeedback.length > 0 ? (
+              <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-accent" />
+                  <h2 className="font-semibold">Design feedback</h2>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {designFeedback.map((item) => (
+                    <li
+                      key={`d-${item.title}`}
+                      className="rounded-xl border border-border bg-background px-3 py-2.5"
+                    >
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-wider text-muted">
+                        {item.area}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {improvements.length > 0 ? (
+          <div className="rounded-panel border border-border bg-surface p-5 shadow-[var(--shadow-soft)]">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-strong">
+                <ImagePlus className="size-4" />
+              </span>
+              <div>
+                <h2 className="font-semibold tracking-tight">Photo &amp; media checklist</h2>
+                <p className="mt-1 text-sm text-muted">
+                  Provide these from your church — no AI-generated images for now.
+                </p>
+              </div>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {improvements.map((item) => (
+                <li
+                  key={`${item.action}-${item.title}`}
+                  className="rounded-xl border border-border bg-background px-4 py-3"
+                >
+                  <div className="flex items-start gap-3">
+                    {item.action.includes("video") || item.action.includes("youtube") ? (
+                      <Video className="mt-0.5 size-4 shrink-0 text-brand" />
+                    ) : (
+                      <Camera className="mt-0.5 size-4 shrink-0 text-brand" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                      <p className="mt-1 text-[11px] font-medium text-brand">
+                        {ACTION_HINT[item.action] ?? "Open website editor"}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4">
+              <Link href="/dashboard/builder">
+                <Button variant="outline" size="sm">
+                  Open editor
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {agentLog.length > 0 ? (
+          <details className="rounded-panel border border-border bg-background px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium">Agent run log</summary>
+            <ul className="mt-3 space-y-2 border-t border-border pt-3">
+              {agentLog.map((entry) => (
+                <li key={`${entry.agent}-${entry.summary}`} className="text-xs text-muted">
+                  <span className="font-medium text-foreground">{entry.role}</span>
+                  {" — "}
+                  {entry.summary}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <form action={acceptWebsite} className="sm:flex-1">
+            <Button type="submit" className="w-full">
+              Use this website
+            </Button>
+          </form>
+          <Link href={`${wizardHref("templates", siteId)}&change=1`}>
+            <Button type="button" variant="outline">
+              Try a different design
+            </Button>
+          </Link>
+          <RebuildButton siteId={siteId} />
+        </div>
+
+        <Link
+          href={wizardHref("features", siteId)}
+          className="text-sm text-muted hover:text-foreground"
+        >
+          ← Back to features
+        </Link>
+      </div>
     </div>
   );
 }

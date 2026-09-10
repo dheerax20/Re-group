@@ -7,6 +7,7 @@ import { applyDesignPass } from "@/lib/site/blocks/design-pass";
 import { defaultNavBlock, defaultFooterBlock } from "@/lib/site/blocks/schema";
 import type { PageBlocks } from "@/lib/site/blocks/types";
 import { defaultBrandConfig } from "@/lib/validation/brand";
+import { SITE_TEMPLATES, type TemplateProfile } from "@/lib/site/templates";
 import type { SiteConfig, SiteContent } from "@/lib/site/types";
 
 /**
@@ -19,10 +20,23 @@ import type { SiteConfig, SiteContent } from "@/lib/site/types";
  * network and no site row — and compared side by side, which is the only way
  * to see whether six directions actually read as six decisions.
  *
- * Dev-only. It exposes no data and takes no input, but it is scaffolding and
- * has no business answering on a production domain.
+ * Off by default, including in development. It renders only fixtures and
+ * takes no input, but it is scaffolding and should not answer on a production
+ * domain by accident — set `DESIGN_PREVIEW=1` to open it. An env flag rather
+ * than a `NODE_ENV` check because the sites being compared against it are
+ * deployed, and a visual check that cannot run where the sites are is not a
+ * check.
  */
-export const dynamic = "force-static";
+/**
+ * Rendered per request, not prerendered.
+ *
+ * `force-static` baked the `DESIGN_PREVIEW` check in at build time, so setting
+ * the variable on a deployed environment did nothing — the page had already
+ * decided to 404. The whole point of the env flag is to open this where the
+ * sites being compared against it actually live, so the check has to run when
+ * someone asks for the page.
+ */
+export const dynamic = "force-dynamic";
 
 const COPY: HeroCopy = {
   headline: "A church on the corner of Ashfield and Vine",
@@ -33,6 +47,17 @@ const COPY: HeroCopy = {
 
 const CONTENT: SiteContent = { sermons: [], events: [] };
 
+const FIXTURE_FEATURES = {
+  sermons: true,
+  sermonSearch: false,
+  events: true,
+  ministries: false,
+  giving: true,
+  contact: true,
+  youtube: false,
+  podcast: false,
+};
+
 function fixtureSite(navVariant: SiteConfig["navVariant"]): SiteConfig {
   return {
     site: {
@@ -42,15 +67,7 @@ function fixtureSite(navVariant: SiteConfig["navVariant"]): SiteConfig {
       status: "PUBLISHED",
     },
     brand: defaultBrandConfig as SiteConfig["brand"],
-    features: {
-      sermons: true,
-      events: true,
-      ministries: false,
-      giving: true,
-      contact: true,
-      youtube: false,
-      podcast: false,
-    } as SiteConfig["features"],
+    features: FIXTURE_FEATURES as SiteConfig["features"],
     template: { id: "ai-generated", version: 1 },
     navigation: [
       { label: "Home", href: "/" },
@@ -104,7 +121,7 @@ function composedBody(): PageBlocks {
 }
 
 export default function DesignPreviewPage() {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (process.env.DESIGN_PREVIEW !== "1") notFound();
 
   return (
     <main className="bg-neutral-100 py-10">
@@ -116,6 +133,53 @@ export default function DesignPreviewPage() {
           390px and 1440px; the frames are full-bleed, so the viewport is the breakpoint.
         </p>
       </div>
+
+      {/*
+        The three pre-built templates, rendered from the same fixture as the
+        six AI directions below. A template is a pure function of the church
+        profile, so this is the real page a church would get — and the only
+        way to check the three read as three decisions rather than one layout
+        with three sets of words.
+      */}
+      {SITE_TEMPLATES.map((template) => {
+        const profile: TemplateProfile = {
+          siteId: template.id,
+          churchName: "Hail Mary Community",
+          tagline: COPY.headline,
+          story: {
+            city: "Ashfield",
+            serviceTimes: "Sundays at 9am and 11am.",
+            mission:
+              "We exist to know God and to make him known on our own street. Everything else follows from that.",
+            values: "Hospitality, honesty, and showing up for each other.",
+            pastorName: "Rev. Marta Oyelaran",
+          },
+          features: FIXTURE_FEATURES as TemplateProfile["features"],
+          brand: defaultBrandConfig as TemplateProfile["brand"],
+        };
+
+        const blocks = template.buildHome(profile);
+        const site = { ...fixtureSite(template.navVariant), blocks };
+
+        return (
+          <section key={`template-${template.id}`} className="mb-12">
+            <header className="mx-auto mb-3 max-w-5xl px-6">
+              <h2 className="text-lg font-semibold">
+                {template.name}{" "}
+                <span className="font-normal text-neutral-500">· template, no AI</span>
+              </h2>
+              <p className="text-sm text-neutral-600">{template.tagline}</p>
+            </header>
+            <div className="overflow-hidden border-y border-neutral-300 bg-white">
+              <ThemeProvider brand={site.brand}>
+                <div className="relative flex flex-col">
+                  <BlockTree nodes={blocks} site={site} content={CONTENT} />
+                </div>
+              </ThemeProvider>
+            </div>
+          </section>
+        );
+      })}
 
       {ART_DIRECTIONS.map((direction) => {
         const blocks = applyDesignPass(

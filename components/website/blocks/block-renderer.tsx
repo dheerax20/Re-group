@@ -26,12 +26,12 @@ import {
   overlayClass,
   minHeightClass,
   fontWeightClass,
+  fontFamilyClass,
   pinnedBandClass,
   imageTreatmentClass,
   imageAspectClass,
   buttonEmphasisVariant,
   blockButtonSizeClass,
-  buttonShapeClass,
   focusRingClass,
 } from "./tokens";
 
@@ -264,9 +264,27 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
      * `w-full divide-y`). These two are the generic containers the AI actually
      * composes with, and they were the ones missing it.
      */
+    /**
+     * `padding` and `width` are honoured here as well as on `section`.
+     *
+     * They used to be silently dropped, which made a stack the one container
+     * whose style was partly decorative — and the hero's split archetype
+     * depends on both: its text column carries the page gutter so that the
+     * photograph beside it can bleed to the viewport edge through an unpadded
+     * band. Unlike `section` there is no fallback padding: a stack with no
+     * `padding` is an ordinary group and must stay flush.
+     */
     case "stack":
       return (
-        <div className={cn("flex w-full flex-col", node.style?.gap ? stackGapClass[node.style.gap] : "gap-4", alignItemsClass[node.style?.align ?? "left"])}>
+        <div
+          className={cn(
+            "flex w-full flex-col",
+            node.style?.padding ? paddingClass[node.style.padding] : "",
+            node.style?.width ? widthClass[node.style.width] : "",
+            node.style?.gap ? stackGapClass[node.style.gap] : "gap-4",
+            alignItemsClass[node.style?.align ?? "left"]
+          )}
+        >
           <BlockTree nodes={node.children} site={site} content={content} annotate={annotate} />
         </div>
       );
@@ -304,10 +322,12 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
         <Tag
           className={cn(
             headingScaleClass[scale],
-            // Overrides the weight baked into the scale — the hero subhead is
-            // a heading (for the display face) that has to read at regular
-            // weight while `h3` elsewhere stays semibold.
+            // Both override what the scale (and the base layer) imply. The
+            // hero subhead is a heading that has to read at regular weight in
+            // the church's SECOND face, while `h3` everywhere else stays
+            // semibold in the first.
             node.weight ? fontWeightClass[node.weight] : "",
+            node.font ? fontFamilyClass[node.font] : "",
             node.style?.textTone ? textToneClass[node.style.textTone] : ""
           )}
         >
@@ -358,8 +378,22 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
           />
         );
       }
+      /**
+       * `width` is honoured here as well as on `section`, for the same reason
+       * `stack` honours it: the hero's stacked archetype contains its
+       * photograph at a measure while the band around it bleeds, and without
+       * this that measure was silently dropped and the photo ran corner to
+       * corner.
+       */
       return (
-        <div className={cn("relative overflow-hidden", treatment, aspect, "w-full")}>
+        <div
+          className={cn(
+            "relative overflow-hidden",
+            treatment,
+            aspect,
+            node.style?.width ? widthClass[node.style.width] : "w-full"
+          )}
+        >
           {embed ? (
             <iframe
               src={embed}
@@ -375,9 +409,11 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
              * browser has no ratio to reserve before the bytes arrive and the
              * whole page below shifts when a church's photo loads.
              *
-             * `loading="lazy"` on every block image: only the hero is above
-             * the fold, and a block tree cannot tell the renderer which band
-             * it is in.
+             * Lazy unless the template marked it `priority`. A block tree
+             * cannot tell the renderer which band an image is in, so the one
+             * image that is above the fold has to say so — and the stacked
+             * hero's photograph starts inside the first viewport at 1440px,
+             * where lazy-loading it costs the largest contentful paint.
              */
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -385,7 +421,8 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
               alt={node.alt ?? ""}
               width={1600}
               height={1200}
-              loading="lazy"
+              loading={node.priority ? "eager" : "lazy"}
+              fetchPriority={node.priority ? "high" : undefined}
               decoding="async"
               className="absolute inset-0 h-full w-full object-cover"
             />
@@ -415,7 +452,7 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
             // After `buttonVariants`, so the block scale wins over the shared
             // app-chrome one.
             blockButtonSizeClass,
-            buttonShapeClass[node.shape ?? "default"],
+            node.font ? fontFamilyClass[node.font] : "",
             focusRingClass
           )}
         >

@@ -210,7 +210,11 @@ export const ART_DIRECTIONS: ArtDirection[] = [
   {
     id: "bright-welcoming",
     name: "Bright & Welcoming",
-    navbar: "solid",
+    /**
+     * Transparent, because this direction's hero is now `overlay` — the bar
+     * has to sit over the photograph rather than start a white strip above it.
+     */
+    navbar: "transparent",
     hero: "fullscreen",
     welcome: "centered",
     about: "image-right",
@@ -228,13 +232,19 @@ export const ART_DIRECTIONS: ArtDirection[] = [
       bandPadding: { hero: "2xl", body: "lg", closing: "xl" },
       alignPolicy: "centered-close",
       width: "wide",
+      /**
+       * It took the dark-overlay hero when Traditional & Reverent moved to
+       * `stacked`, and it is the better home for it: this direction's mood is
+       * already "photo-forward and centred", which is a description of exactly
+       * this archetype. It also keeps the six directions at two per archetype,
+       * which is what stops regenerating a site producing the same page twice.
+       */
       hero: {
-        archetype: "stacked",
-        image: "widescreen",
-        copyWidth: "normal",
-        photoWidth: "normal",
-        treatment: "rounded",
-        aspect: "wide",
+        archetype: "overlay",
+        image: "overlay",
+        overlay: "dark",
+        align: "center",
+        copyWidth: "narrow",
       },
       welcomeImage: "vertical",
       sermons: "grid",
@@ -246,7 +256,13 @@ export const ART_DIRECTIONS: ArtDirection[] = [
   {
     id: "traditional-reverent",
     name: "Traditional & Reverent",
-    navbar: "transparent",
+    /**
+     * Solid, not transparent. This direction's hero is `stacked` — the
+     * photograph sits BELOW the copy — so there is nothing up here for an
+     * inverted bar to be read against, and a transparent one would render
+     * white links on the hero's warm tint.
+     */
+    navbar: "solid",
     hero: "split",
     welcome: "centered",
     about: "image-right",
@@ -264,12 +280,25 @@ export const ART_DIRECTIONS: ArtDirection[] = [
       bandPadding: { hero: "xl", body: "lg", closing: "lg" },
       alignPolicy: "alternating",
       width: "normal",
+      /**
+       * `design-references/Hero3.png`: centred copy on the warm tint, then a
+       * contained widescreen photograph beneath it with square corners.
+       *
+       * The measures come off the reference — the headline wraps at ~895px,
+       * which is `normal` (max-w-4xl), and the photograph runs to ~1017px,
+       * which `wide` (max-w-6xl) is the closest token to since there is no
+       * max-w-5xl. `video` rather than `cinema` because the reference is
+       * clipped by the bottom of the mock and 16/9 is the reading that renders
+       * as a photograph rather than a letterbox strip; it also keeps this
+       * distinct from the two stacked heroes that already exist.
+       */
       hero: {
-        archetype: "overlay",
-        image: "overlay",
-        overlay: "dark",
-        align: "center",
-        copyWidth: "narrow",
+        archetype: "stacked",
+        image: "widescreen",
+        copyWidth: "normal",
+        photoWidth: "wide",
+        treatment: "square",
+        aspect: "video",
       },
       welcomeImage: "vertical",
       sermons: "list",

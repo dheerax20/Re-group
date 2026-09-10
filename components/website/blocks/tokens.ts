@@ -3,7 +3,7 @@ import type {
   ButtonEmphasisToken,
   ColumnsToken,
   FontWeightToken,
-  ButtonShapeToken,
+  FontFamilyToken,
   ImageAspectToken,
   ImageTreatmentToken,
   MinHeightToken,
@@ -169,6 +169,24 @@ export const fontWeightClass: Record<FontWeightToken, string> = {
 };
 
 /**
+ * The church's two brand faces.
+ *
+ * Both utilities come from `--font-site-primary` / `--font-site-secondary` in
+ * `app/globals.css`'s `@theme inline` block, so nothing new has to be declared
+ * for them to exist.
+ *
+ * A class is required rather than left to inheritance because
+ * `.theme-root :is(h1..h6) { font-family: inherit }` in `@layer base` pins
+ * every heading to the primary face. A utility sits in a later cascade layer
+ * and wins — which is the whole reason `--font-secondary` can finally reach a
+ * published page at all.
+ */
+export const fontFamilyClass: Record<FontFamilyToken, string> = {
+  primary: "font-site-primary",
+  secondary: "font-site-secondary",
+};
+
+/**
  * The one horizontal inset on a published page.
  *
  * The navbar, the footer and any `width: "full"` band all sit at exactly this
@@ -196,6 +214,12 @@ export const widthClass: Record<WidthToken, string> = {
   wide: "mx-auto w-full max-w-6xl px-6 lg:px-14",
   /** Gutter only — no measure. The full-bleed tier the nav shares. */
   full: "w-full px-6 lg:px-14",
+  /**
+   * No inset whatever. Only for a band whose children carry their own gutter —
+   * a photograph bleeding into the corner of the viewport cannot do it through
+   * a padded parent.
+   */
+  bleed: "w-full",
 };
 
 /**
@@ -329,11 +353,6 @@ export const buttonEmphasisVariant: Record<ButtonEmphasisToken, "site" | "outlin
  */
 export const blockButtonSizeClass = "h-11 px-8 text-base";
 
-/** A pill is a deliberate archetype choice, not a default. */
-export const buttonShapeClass: Record<ButtonShapeToken, string> = {
-  default: "",
-  pill: "rounded-full",
-};
 
 /**
  * The keyboard focus ring for every link a published page renders.

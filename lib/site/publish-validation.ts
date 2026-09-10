@@ -1,4 +1,5 @@
 import { AI_GENERATED_TEMPLATE_ID } from "@/lib/ai/agents/schemas";
+import { isSiteTemplateId } from "@/lib/site/templates";
 import { validateFeatureDependencies } from "@/lib/features/validate";
 import { sectionTypes, type SiteConfig } from "./types";
 import { slugSchema } from "@/lib/validation/slug";
@@ -52,13 +53,16 @@ export function validateSiteForPublish(
     });
   }
 
-  // Every site is composed by the AI crew now; the stock-template registry
-  // (and the "does this template id exist / is its version supported" check
-  // that went with it) is gone, so anything else is a stale record.
-  if (site.template.id !== AI_GENERATED_TEMPLATE_ID) {
+  // A site's design comes from one of two places: the AI crew, or one of the
+  // pre-built templates in `lib/site/templates`. Anything else is a stale
+  // record — a draft that never chose a design, or a row from before the
+  // builder existed — and must not be published as-is.
+  const hasDesign =
+    site.template.id === AI_GENERATED_TEMPLATE_ID || isSiteTemplateId(site.template.id);
+  if (!hasDesign) {
     errors.push({
       field: "template.id",
-      message: "This site predates the AI builder. Rebuild it before publishing.",
+      message: "Choose a design for this site before publishing it.",
     });
   }
 

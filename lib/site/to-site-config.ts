@@ -25,6 +25,7 @@ import {
   parseAgentLog,
   parseStyleName,
   parseNavVariant,
+  parseHeroImage,
 } from "./story";
 
 type SiteWithRelations = Site & {
@@ -226,5 +227,6 @@ export function toSiteConfig(site: SiteWithRelations): SiteConfig {
     agentLog: parseAgentLog(site.storyConfig),
     styleName: parseStyleName(site.storyConfig),
     navVariant: parseNavVariant(site.storyConfig),
+    heroImageUrl: parseHeroImage(site.storyConfig),
   };
 }

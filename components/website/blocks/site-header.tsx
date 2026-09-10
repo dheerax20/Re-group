@@ -3,12 +3,19 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import type { SiteConfig } from "@/lib/site/types";
 import type { NavVariant } from "@/lib/site/types";
 import { cn } from "@/lib/utils";
 import { PAGE_GUTTER, focusRingClass } from "./tokens";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 /**
  * The published site's navigation bar.
@@ -173,27 +180,26 @@ export function SiteHeader({
  * 390px, where the bar covers most of the photograph anyway — and an
  * `absolute` bar scrolls away and takes the menu button with it, which is the
  * one failure that would strand a visitor mid-page with no navigation.
+ *
+ * The panel is a `Sheet` (Radix Dialog) opening from the top rather than the
+ * hand-rolled grid-rows drawer this replaced. Radix owns the focus trap, the
+ * Escape handler, the click-outside, the body scroll lock and the enter/exit
+ * animation — five things that were previously four `useEffect`s and an
+ * arbitrary-value transition, each with its own way to be subtly wrong.
  */
 function MobileHeader({ site }: { site: SiteConfig }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  const close = useCallback(() => setOpen(false), []);
 
   /**
-   * Close on navigation.
-   *
-   * A tap on a link navigates without unmounting this component, so the drawer
-   * would otherwise stay open over the page the visitor just asked for. Each
-   * link's `onClick` covers the common path; this covers back/forward and any
-   * programmatic navigation.
+   * Close on navigation — the one behaviour Radix does not cover, because a
+   * client-side route change unmounts nothing.
    *
    * Adjusted during render rather than in an effect. Calling `setOpen` from an
    * effect keyed on `pathname` renders the open drawer once against the new
    * page and then immediately re-renders it closed — a visible flash, and the
-   * cascading-render pattern React tells you not to write.
+   * cascading-render pattern React (and this repo's lint) tells you not to
+   * write.
    */
   const [pathWhenRendered, setPathWhenRendered] = useState(pathname);
   if (pathname !== pathWhenRendered) {
@@ -201,131 +207,76 @@ function MobileHeader({ site }: { site: SiteConfig }) {
     if (open) setOpen(false);
   }
 
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setOpen(false);
-        triggerRef.current?.focus();
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      // Focus trap: the drawer covers the page, so tabbing out of it lands on
-      // controls the visitor cannot see.
-      const focusable = panelRef.current?.querySelectorAll<HTMLElement>("a[href], button");
-      if (!focusable || focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-
-      if (event.shiftKey && (active === first || active === triggerRef.current)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        triggerRef.current?.focus();
-      }
-    };
-
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
   return (
-    <header className="fixed inset-x-0 top-0 z-30 sm:hidden">
-      <div className="flex h-20 items-center justify-between bg-site-background px-6">
-        <BrandLogo site={site} />
-        <button
-          ref={triggerRef}
-          type="button"
-          // A real 44px tap target. `-mr-3` pulls its optical edge back to the
-          // gutter, so the icon lines up with the page rather than the
-          // button's padding box.
-          className={cn(
-            "-mr-3 flex h-11 w-11 items-center justify-center rounded-lg text-site-foreground",
-            focusRingClass
-          )}
-          aria-expanded={open}
-          aria-controls="site-nav-drawer"
-          aria-label={open ? "Close menu" : "Open menu"}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X className="size-6" aria-hidden="true" /> : <Menu className="size-6" aria-hidden="true" />}
-        </button>
-      </div>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <header className="fixed inset-x-0 top-0 z-30 sm:hidden">
+        <div className="flex h-20 items-center justify-between bg-site-background px-6">
+          <BrandLogo site={site} />
+          <SheetTrigger
+            // A real 44px tap target. `-mr-3` pulls its optical edge back to
+            // the gutter, so the icon lines up with the page rather than the
+            // button's padding box.
+            className={cn(
+              "-mr-3 flex h-11 w-11 items-center justify-center rounded-lg text-site-foreground",
+              focusRingClass
+            )}
+            aria-label="Open menu"
+          >
+            <Menu className="size-6" aria-hidden="true" />
+          </SheetTrigger>
+        </div>
+      </header>
 
       {/**
-       * `grid-rows-[0fr] → [1fr]`, not a `max-height` transition.
+       * Site tokens, not the product chrome's `bg-background`. The panel
+       * resolves its OWN surface and text tone rather than inheriting the
+       * bar's: under the two `transparent` directions the bar's links are
+       * white, and white links on an opaque panel are invisible.
        *
-       * A max-height animation needs a magic number that has to exceed the real
-       * content height, and it breaks the moment a church enables a sixth nav
-       * link. The grid technique animates to the content's actual height with
-       * no number to maintain. Both values are literal strings, so Tailwind's
-       * scanner sees them. The inner element needs `min-h-0` or the row will
-       * not collapse.
-       *
-       * `absolute top-full` so the panel overlays the page: animating the bar's
-       * own height would reflow every band beneath it on each frame.
+       * `showCloseButton={false}` because the built-in one is styled for the
+       * dashboard and sits in the corner — the X here has to land exactly
+       * where the hamburger was, so the control reads as one button changing
+       * state rather than two buttons in different places.
        */}
-      <div
-        id="site-nav-drawer"
-        className={cn(
-          "absolute inset-x-0 top-full grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none",
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
+      <SheetContent
+        side="top"
+        showCloseButton={false}
+        className="z-40 gap-0 border-b border-site-muted/15 bg-site-background p-0 text-site-foreground sm:hidden"
       >
-        <div ref={panelRef} className="min-h-0 overflow-hidden">
-          {/**
-           * The drawer resolves its OWN surface and text tone rather than
-           * inheriting the bar's. Under a transparent direction the bar's links
-           * are white, and white links on an opaque panel are invisible.
-           */}
-          <nav
-            aria-label="Site"
-            className="border-t border-site-muted/15 bg-site-background px-6 pb-8 pt-2 text-site-foreground shadow-lg"
+        <SheetTitle className="sr-only">Site navigation</SheetTitle>
+
+        <div className="flex h-20 shrink-0 items-center justify-between px-6">
+          <BrandLogo site={site} />
+          <SheetClose
+            className={cn(
+              "-mr-3 flex h-11 w-11 items-center justify-center rounded-lg text-site-foreground",
+              focusRingClass
+            )}
+            aria-label="Close menu"
           >
-            <ul className="flex flex-col">
-              {site.navigation.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    // `tabIndex={-1}` while closed: a collapsed grid row is
-                    // still in the accessibility tree, so without this the
-                    // first Tab on a phone lands inside a drawer nobody opened.
-                    tabIndex={open ? undefined : -1}
-                    aria-hidden={open ? undefined : true}
-                    className={cn(
-                      "block rounded-lg py-3 text-lg font-medium hover:text-site-accent",
-                      focusRingClass
-                    )}
-                    onClick={close}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+            <X className="size-6" aria-hidden="true" />
+          </SheetClose>
         </div>
-      </div>
-    </header>
+
+        <nav aria-label="Site" className="px-6 pb-8">
+          <ul className="flex flex-col">
+            {site.navigation.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "block rounded-lg py-3 text-lg font-medium hover:text-site-accent",
+                    focusRingClass
+                  )}
+                  onClick={() => setOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </SheetContent>
+    </Sheet>
   );
 }
