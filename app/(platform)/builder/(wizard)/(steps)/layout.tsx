@@ -19,7 +19,11 @@ export default async function WizardLayout({
         <BlueprintGrid className="text-border opacity-60" />
 
         <div className="relative">
-          <StepProgress />
+          <StepProgress
+            userEmail={user.email}
+            userName={user.name}
+            userPicture={user.picture}
+          />
           <main className="mx-auto max-w-5xl px-6 py-10">
             <div className="relative overflow-hidden rounded-panel border border-border bg-surface/95 p-6 shadow-[var(--shadow-lift)] backdrop-blur-sm sm:p-8">
               {children}

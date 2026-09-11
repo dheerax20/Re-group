@@ -26,7 +26,7 @@ export default async function CoursesPage() {
     const result = await ensureGhlAccount(user.id);
     if (!result.ok && !result.skipped) {
       // Don't dump them at an SSO page that cannot sign them in.
-      console.error(`[courses] GHL not ready for user ${user.id}: ${result.reason}`);
+      console.error(`[courses]  not ready for user ${user.id}: ${result.reason}`);
     }
   }
 

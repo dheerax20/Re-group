@@ -7,9 +7,10 @@
  * validates configuration, makes one READ-ONLY call to confirm the token and
  * company id are real, and reports the provisioning state of recent users.
  *
- * It never calls `POST /locations/` or `POST /users/` — those create billable
- * sub-accounts, so proving the write path works means letting a real
- * subscription (or a Courses click) do it, then re-running this.
+ * It never calls `POST /locations/`, `POST /users/`, or `POST /contacts/upsert`.
+ * The first two create billable sub-accounts, so proving the write path works
+ * means letting a real subscription (or a Courses click) do it, then re-running
+ * this. Minting a location token in step 3 creates nothing and is safe here.
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -84,7 +85,53 @@ async function main() {
     fail(`could not reach GHL: ${error instanceof Error ? error.message : "unknown"}`);
   }
 
-  console.log("\n3. Provisioning state (5 most recent users)");
+  console.log("\n3. Contact sync (OAuth chain)");
+  const { getOAuthConnectionStatus, getLocationAccessToken, isGhlOAuthConfigured } =
+    await import("../lib/ghl/oauth");
+
+  if (!isGhlOAuthConfigured()) {
+    fail(
+      "GHL_OAUTH_CLIENT_ID / GHL_OAUTH_CLIENT_SECRET are not set.\n" +
+        "      The agency PIT above cannot reach /contacts/* or /oauth/locationToken\n" +
+        "      (both answer 401 'not authorized for this scope'), so member sync needs\n" +
+        "      an OAuth app: Target User Agency, Who can install Agency Only."
+    );
+  } else {
+    const status = await getOAuthConnectionStatus();
+    if (!status.connected) {
+      fail(
+        "the OAuth app is configured but has never been installed.\n" +
+          "      Sign in as a GHL_ADMIN_EMAILS user and open /api/ghl/oauth/start."
+      );
+    } else {
+      pass(
+        `agency token stored for ${status.companyId} (expires ${status.expiresAt?.toISOString()}), ` +
+          `${status.locationTokens} location token(s) cached`
+      );
+
+      const anyLocation = await prisma.ghlAccount.findFirst({
+        where: { locationId: { not: null } },
+        select: { locationId: true },
+      });
+
+      if (!anyLocation?.locationId) {
+        console.log("  (no provisioned location to mint against yet)");
+      } else {
+        // Read-only in the sense that matters: minting a token creates no
+        // billable object and touches no church's data.
+        try {
+          await getLocationAccessToken(anyLocation.locationId);
+          pass(`minted a location token for ${anyLocation.locationId} — member sync will work`);
+        } catch (error) {
+          fail(
+            `could not mint a location token: ${error instanceof Error ? error.message : "unknown"}`
+          );
+        }
+      }
+    }
+  }
+
+  console.log("\n4. Provisioning state (5 most recent users)");
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
     take: 5,
@@ -117,6 +164,27 @@ async function main() {
   const active = await prisma.ghlAccount.count({ where: { status: "ACTIVE" } });
   const failed = await prisma.ghlAccount.count({ where: { status: "FAILED" } });
   console.log(`\n  totals: ${active} active, ${failed} failed, ${await prisma.ghlAccount.count()} rows`);
+
+  console.log("\n5. Member contact sync");
+  const bySync = await prisma.member.groupBy({
+    by: ["syncStatus"],
+    _count: { _all: true },
+  });
+  if (bySync.length === 0) {
+    console.log("  (no members yet)");
+  } else {
+    for (const row of bySync) {
+      console.log(`  · ${row.syncStatus}: ${row._count._all}`);
+    }
+    const stuck = await prisma.member.findMany({
+      where: { syncStatus: "FAILED" },
+      select: { syncError: true },
+      take: 3,
+    });
+    for (const row of stuck) {
+      if (row.syncError) console.log(`      ↳ ${row.syncError}`);
+    }
+  }
 
   console.log(
     problems === 0

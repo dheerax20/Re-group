@@ -11,6 +11,7 @@ import {
   PanelsTopLeft,
   PencilRuler,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import { syncCurrentUser } from "@/lib/auth/session";
 import { DataList, DataListRow, RowIcon } from "@/components/layout/data-list";
@@ -191,6 +192,30 @@ export default async function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <Card
+        variant="feature"
+        className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3"
+      >
+        <RowIcon tone="brand">
+          <Zap />
+        </RowIcon>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            Activate church automation
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">
+            Keep contacts, courses, and conversations in sync with your
+            congregation automatically.
+          </p>
+        </div>
+        <Button asChild size="sm">
+          <Link href="/courses" rel="noopener noreferrer" target="_blank">
+            Activate
+            <ExternalLink className="size-3.5" />
+          </Link>
+        </Button>
+      </Card>
 
       <PageSections>
         <Section title="Website">

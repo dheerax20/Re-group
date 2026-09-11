@@ -1,8 +1,9 @@
 import { syncCurrentUser } from "@/lib/auth/session";
-import { api } from "@/server/trpc/caller";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
-import { ProfileTabs } from "./profile-tabs";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "Profile — Regroup" };
 
@@ -34,9 +35,9 @@ export default async function ProfilePage({
         title="Profile"
         description="Your account, and the church details your website is built from."
         actions={
-          <Button asChild variant="outline">
-            <a href="/auth/logout">Log out</a>
-          </Button>
+          <LogoutButton className={buttonVariants({ variant: "outline" })}>
+            Log out
+          </LogoutButton>
         }
       />
 

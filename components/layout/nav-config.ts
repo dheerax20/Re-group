@@ -4,6 +4,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   type LucideIcon,
+  MessageCircle,
   Mic2,
   PanelsTopLeft,
   Settings,
@@ -36,8 +37,9 @@ export type NavLeaf = {
   match?: "exact" | "prefix";
   soon?: boolean;
   /**
-   * Opens in a new tab. Used for hand-offs to another product (Courses lives
-   * in GoHighLevel), so the user keeps their Regroup work in the current tab.
+   * Opens in a new tab. Used for hand-offs to another product (Courses and
+   * Conversations both live in GoHighLevel), so the user keeps their Regroup
+   * work in the current tab.
    * The href stays internal — the route itself owns the redirect.
    */
   newTab?: boolean;
@@ -82,8 +84,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Congregation",
     items: [
-      { href: "/members", label: "Members", icon: Users, soon: true },
+      { href: "/members", label: "Members", icon: Users },
       { href: "/courses", label: "Courses", icon: GraduationCap, newTab: true },
+      {
+        href: "/conversations",
+        label: "Conversations",
+        icon: MessageCircle,
+        newTab: true,
+      },
     ],
   },
   {

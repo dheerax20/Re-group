@@ -4,6 +4,7 @@ import { contentRouter } from "./content";
 import { aiRouter } from "./ai";
 import { domainsRouter } from "./domains";
 import { mediaRouter } from "./media";
+import { membersRouter } from "./members";
 
 /**
  * The whole API. One surface, one type.
@@ -20,6 +21,7 @@ export const appRouter = router({
   ai: aiRouter,
   domains: domainsRouter,
   media: mediaRouter,
+  members: membersRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1,63 +1,65 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
-import { PageHeader } from "@/components/layout/page-header";
+
+import { api } from "@/server/trpc/caller";
+import { isGhlConfigured } from "@/lib/ghl/config";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { MembersTable, type MemberRecord } from "@/components/members/members-table";
 
 export const metadata = { title: "Members — Regroup" };
 
 /**
- * Members is not built yet.
+ * The congregation directory.
  *
- * This screen used to render `demoMembers` — invented names and email addresses,
- * with working search over them — behind the paywall. A church would reasonably
- * read that as their own directory failing to load, or worse, as real data. An
- * honest empty state is the better product and the honest one.
+ * `syncEnabled` is resolved HERE rather than in the client component because
+ * `isGhlConfigured()` reads server-only env vars. When it is false the whole
+ * contacts column disappears instead of showing every member as unsynced —
+ * the same "an unconfigured integration vanishes from the UI" posture as the
+ * Courses handoff.
  */
-const PLANNED = [
-  {
-    title: "One directory",
-    detail: "Households, contact details, and who is new — kept in one place.",
-  },
-  {
-    title: "Groups and serving teams",
-    detail: "Track who is in which small group, team, or ministry.",
-  },
-  {
-    title: "Follow-up that does not get lost",
-    detail: "See first-time visitors and who has reached out to them.",
-  },
-];
+export default async function MembersPage() {
+  const trpc = await api();
+  const site = await trpc.site.mine();
 
-export default function MembersPage() {
+  if (!site) {
+    return (
+      <>
+        <PageHeader
+          eyebrow="Congregation"
+          title="Members"
+          description="A directory for your congregation — visitors and members."
+        />
+        <EmptyState
+          action={
+            <Button asChild>
+              <Link href="/builder">Build my website</Link>
+            </Button>
+          }
+          description="Your directory belongs to a site. Once yours exists, everyone you add here is kept with it."
+          icon={Users}
+          title="Build your website first"
+        />
+      </>
+    );
+  }
+
+  const members = (await trpc.members.list({ siteId: site.id })) as MemberRecord[];
+  const syncEnabled = isGhlConfigured();
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <>
       <PageHeader
+        eyebrow="Congregation"
         title="Members"
-        description="A directory for your congregation."
+        description={
+          syncEnabled
+            ? "A directory for your congregation — everyone you add is synced to your contacts."
+            : "A directory for your congregation — visitors and members."
+        }
       />
-
-      <EmptyState
-        icon={Users}
-        title="Members is coming soon"
-        description="We are building this next. Nothing is stored here yet, so there is nothing to set up — your website and content are unaffected."
-      />
-
-      <Card variant="flat" className="mt-4">
-        <CardTitle className="text-sm">What it will do</CardTitle>
-        <CardDescription className="text-xs">
-          Planned for the members release.
-        </CardDescription>
-        <ul className="mt-4 space-y-3">
-          {PLANNED.map((item) => (
-            <li key={item.title}>
-              <p className="text-sm font-medium">{item.title}</p>
-              <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </div>
+      <MembersTable members={members} siteId={site.id} syncEnabled={syncEnabled} />
+    </>
   );
 }

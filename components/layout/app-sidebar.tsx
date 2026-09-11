@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import * as React from "react";
 import {
   ChevronDown,
@@ -222,6 +223,8 @@ function AccountMenu({
   userName?: string | null;
   userPicture?: string | null;
 }) {
+  const { signOut } = useClerk();
+
   const initial = (
     userName?.trim()?.[0] ??
     userEmail?.trim()?.[0] ??
@@ -302,11 +305,12 @@ function AccountMenu({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild variant="destructive">
-              <a href="/auth/logout">
-                <LogOut />
-                Log out
-              </a>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => signOut({ redirectUrl: "/login" })}
+            >
+              <LogOut />
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

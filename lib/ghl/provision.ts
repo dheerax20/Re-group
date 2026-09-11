@@ -39,7 +39,7 @@ function bootstrapPassword(): string {
  * outside that set becomes a space rather than being deleted, so
  * "ann_marie" reads as "ann marie" instead of "annmarie".
  */
-function sanitizeNamePart(value: string): string {
+export function sanitizeNamePart(value: string): string {
   return value
     .normalize("NFC")
     .replace(/[^\p{L}\p{M}\p{N} '.-]/gu, " ")

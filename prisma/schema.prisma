@@ -82,6 +82,52 @@ model GhlAccount {
   @@map("ghl_accounts")
 }
 
+/**
+ * GoHighLevel OAuth credentials.
+ *
+ * Two kinds of row, distinguished by `locationId`:
+ *
+ *   - `locationId = null` — the AGENCY (company) token, obtained once by
+ *     installing the marketplace app on the agency with `user_type=Company`.
+ *     Exactly one of these, guaranteed by writing it under the deterministic
+ *     id `agency:<companyId>` rather than relying on the unique constraint,
+ *     which Postgres does not enforce across NULLs.
+ *   - `locationId` set — a SUB-ACCOUNT token, minted from the agency token via
+ *     `POST /oauth/locationToken`. One per church, refreshed on expiry.
+ *
+ * This model exists because the agency Private Integration Token cannot reach
+ * location-scoped endpoints: `/contacts/*` and `/oauth/locationToken` both
+ * answer it with `401 The token is not authorized for this scope`, verified
+ * against the live API. The PIT is still what `GHL_TOKEN` holds and still what
+ * creates sub-accounts and users — see `lib/ghl/oauth.ts` for which credential
+ * does what.
+ *
+ * Both tokens are encrypted at rest (`lib/ghl/crypto.ts`). GHL rotates the
+ * refresh token on every use, so a row is rewritten on each refresh rather
+ * than appended to.
+ */
+model GhlOAuthToken {
+  id String @id
+
+  companyId  String
+  /// Null for the agency-level token; set for a sub-account token.
+  locationId String?
+
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+
+  scope    String?
+  userType String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, locationId])
+  @@index([companyId])
+  @@map("ghl_oauth_tokens")
+}
+
 model Site {
   id               String  @id @default(cuid())
   name             String
@@ -135,6 +181,7 @@ model Site {
   generationJobs  SiteGenerationJob[]
   chatMessages    ChatMessage[]
   slackConnection SlackConnection?
+  members         Member[]
 
   @@index([status])
 }
@@ -678,4 +725,65 @@ model ProcessedStripeEvent {
 
   @@index([processedAt])
   @@map("processed_stripe_events")
+}
+
+enum MemberStatus {
+  VISITOR
+  REGULAR
+  MEMBER
+}
+
+/**
+ * How far a member has got towards being a GoHighLevel contact.
+ *
+ * SKIPPED is not a failure and must not read as one: it is what a deployment
+ * with no `GHL_TOKEN` records, and what a member with neither an email nor a
+ * phone records, since GHL rejects a contact with no way to reach it. Only
+ * FAILED means "we tried and GHL said no", which is the only state worth
+ * offering a retry for.
+ */
+enum MemberSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  SKIPPED
+}
+
+/**
+ * One person in a church's directory, mirrored into that church's GoHighLevel
+ * sub-account as a Contact (`lib/ghl/contacts.ts`).
+ *
+ * Scoped to the SITE, not the user, because the directory belongs to the
+ * church rather than to whichever admin happens to be signed in — the same
+ * shape `Event` and `Registration` already use. The GHL Location is then
+ * reached through `Site.userId -> User.ghlAccount.locationId`.
+ *
+ * `ghlContactId` is what makes the sync idempotent: a resync updates that
+ * contact instead of creating a second one. It stays null while the
+ * integration is off, which is the normal state for a deployment that does not
+ * use GoHighLevel at all.
+ */
+model Member {
+  id        String       @id @default(cuid())
+  siteId    String
+  firstName String
+  lastName  String?
+  email     String?
+  phone     String?
+  status    MemberStatus @default(VISITOR)
+  notes     String?
+
+  ghlContactId String?
+  syncStatus   MemberSyncStatus @default(PENDING)
+  /// Last failure message, kept for the retry button's tooltip.
+  syncError    String?
+  syncedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@index([siteId, syncStatus])
 }
