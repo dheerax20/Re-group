@@ -1,9 +1,9 @@
 import { syncCurrentUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { api } from "@/server/trpc/caller";
+import { ProfileTabs } from "./profile-tabs";
 
 export const metadata = { title: "Profile — Regroup" };
 
