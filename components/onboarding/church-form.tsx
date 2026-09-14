@@ -8,6 +8,7 @@ import { churchInfoSchema, type ChurchInfoInput } from "@/lib/validation/church"
 import { trpc } from "@/lib/trpc/client";
 import { SiteConfig } from "@/lib/site/types";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
@@ -149,11 +150,12 @@ export function ChurchForm({
         </div>
         <Field>
           <Label htmlFor="mission">Mission</Label>
-          <Input
+          <Textarea
             id="mission"
             {...register("mission")}
             placeholder="Helping people know God and find family"
           />
+          <FieldHint>Explain in about 100 words for the site visitors.</FieldHint>
         </Field>
         <Field>
           <Label htmlFor="values">Values</Label>

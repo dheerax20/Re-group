@@ -4,8 +4,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { api } from "@/server/trpc/caller";
 import { ProfileTabs } from "./profile-tabs";
+import { Metadata } from "next";
 
-export const metadata = { title: "Profile — Regroup" };
+export const metadata: Metadata = { title: "Profile — Regroup" };
 
 /**
  * The account, and the church details the website is built from.

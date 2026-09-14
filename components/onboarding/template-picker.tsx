@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, Eye, Loader2, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,19 @@ export type TemplateCard = {
   previewImage: string;
 };
 
+/**
+ * Full-page screenshots for the "View" preview dialog.
+ *
+ * Static, one per template — unlike `previewImage` above, this isn't
+ * per-church, so it's a plain client-side map rather than something
+ * `templateCards()` needs to resolve server-side.
+ */
+const TEMPLATE_PREVIEW_IMAGES: Record<string, string> = {
+  cinematic: "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdlYr3pYBp6ThcFqLC342H7YMAtufd9gQVsRkr",
+  traditional: "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDd6wpiYxDgM1qBkvXJI3Lxapn7KTDweOFfjo2l",
+  "warm-editorial": "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdULLe6AT3RvmNSgqyoFWsfx1ujzI8cJZPBrTO",
+};
+
 export function TemplatePicker({
   siteId,
   templates,
@@ -51,6 +64,7 @@ export function TemplatePicker({
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<TemplateCard | null>(null);
+  const [previewing, setPreviewing] = useState<TemplateCard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const applyTemplate = trpc.site.applyTemplate.useMutation({
@@ -122,6 +136,14 @@ export function TemplatePicker({
                     In use
                   </span>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={() => setPreviewing(template)}
+                  className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                >
+                  <Eye className="size-3" />
+                  View
+                </button>
               </div>
 
               <div className="flex flex-1 flex-col gap-3 p-4">
@@ -194,6 +216,23 @@ export function TemplatePicker({
               Apply {confirming?.name}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(previewing)} onOpenChange={(open) => !open && setPreviewing(null)}>
+        <DialogContent
+          showCloseButton
+          className="max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto p-0 sm:max-w-3xl"
+        >
+          <DialogTitle className="sr-only">{previewing?.name} preview</DialogTitle>
+          {previewing ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={TEMPLATE_PREVIEW_IMAGES[previewing.id]}
+              alt={`Full page preview of the ${previewing.name} template`}
+              className="w-full"
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

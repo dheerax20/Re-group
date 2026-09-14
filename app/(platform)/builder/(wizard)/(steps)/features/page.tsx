@@ -24,8 +24,8 @@ export default async function FeaturesPage({
       <FeaturesForm
         siteId={siteId}
         defaultValues={site.features}
-        backHref={wizardHref("brand", siteId)}
-        nextHref={wizardHref("templates", siteId)}
+        backHref={wizardHref("social", siteId)}
+        nextHref={wizardHref("brand", siteId)}
       />
     </div>
   );

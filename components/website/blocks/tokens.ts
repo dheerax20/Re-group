@@ -304,7 +304,7 @@ export const textScaleClass: Record<TypeScaleToken, string> = {
   h1: "text-pretty max-w-[30ch] text-3xl leading-snug sm:text-4xl",
   h2: "text-pretty max-w-[38ch] text-2xl leading-snug sm:text-3xl",
   h3: "text-pretty max-w-[48ch] text-xl leading-relaxed sm:text-2xl",
-  body: "text-pretty max-w-[68ch] text-base leading-relaxed sm:text-lg",
+  body: "text-pretty max-w-[80vw] text-base leading-relaxed sm:text-lg",
   small: "text-pretty max-w-[72ch] text-base leading-relaxed",
 };
 

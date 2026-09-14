@@ -19,7 +19,27 @@ export type FontKey =
   | "dm-sans"
   | "playfair-display"
   | "cormorant-garamond"
-  | "montserrat";
+  | "montserrat"
+  | "lato"
+  | "roboto"
+  | "poppins"
+  | "merriweather"
+  | "georgia"
+  | "helvetica";
+
+type LoadedFontEntry = { label: string; cssVar: string };
+/**
+ * A font with no Google Fonts entry (Georgia, Helvetica). `next/font` has
+ * nothing to load, so this carries a fixed, code-authored font stack instead
+ * of a CSS variable — never a value that came from user input, which is the
+ * same property the registry restriction below exists to protect.
+ */
+type StaticFontEntry = { label: string; stack: string };
+type FontEntry = LoadedFontEntry | StaticFontEntry;
+
+function isLoadedFont(entry: FontEntry): entry is LoadedFontEntry {
+  return "cssVar" in entry;
+}
 
 /**
  * The only fonts a brand config may reference. A fixed registry rather than
@@ -27,7 +47,7 @@ export type FontKey =
  * public page: it avoids uncontrolled third-party asset loading and keeps
  * Next.js font optimization working.
  */
-export const fontRegistry: Record<FontKey, { label: string; cssVar: string }> = {
+export const fontRegistry: Record<FontKey, FontEntry> = {
   inter: { label: "Inter", cssVar: "--font-inter" },
   "dm-sans": { label: "DM Sans", cssVar: "--font-dm-sans" },
   "playfair-display": { label: "Playfair Display", cssVar: "--font-playfair-display" },
@@ -36,6 +56,12 @@ export const fontRegistry: Record<FontKey, { label: string; cssVar: string }> = 
     cssVar: "--font-cormorant-garamond",
   },
   montserrat: { label: "Montserrat", cssVar: "--font-montserrat" },
+  lato: { label: "Lato", cssVar: "--font-lato" },
+  roboto: { label: "Roboto", cssVar: "--font-roboto" },
+  poppins: { label: "Poppins", cssVar: "--font-poppins" },
+  merriweather: { label: "Merriweather", cssVar: "--font-merriweather" },
+  georgia: { label: "Georgia", stack: "Georgia, 'Times New Roman', serif" },
+  helvetica: { label: "Helvetica", stack: "'Helvetica Neue', Helvetica, Arial, sans-serif" },
 };
 
 export function isValidFontKey(value: string): value is FontKey {
@@ -44,6 +70,11 @@ export function isValidFontKey(value: string): value is FontKey {
 
 /** Falls back to Inter rather than emitting an undefined custom property. */
 export function fontKeyToCssVar(key: string): string {
-  if (isValidFontKey(key)) return `var(${fontRegistry[key].cssVar})`;
-  return `var(${fontRegistry.inter.cssVar})`;
+  const entry = isValidFontKey(key) ? fontRegistry[key] : fontRegistry.inter;
+  return isLoadedFont(entry) ? `var(${entry.cssVar})` : entry.stack;
+}
+
+/** Whether a key resolves to a fixed literal stack rather than a next/font variable. */
+export function isStaticFontKey(key: string): boolean {
+  return isValidFontKey(key) && !isLoadedFont(fontRegistry[key]);
 }
