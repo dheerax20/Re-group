@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { Control } from "react-hook-form";
@@ -15,7 +15,9 @@ import {
 import { trpc } from "@/lib/trpc/client";
 import { fontRegistry } from "@/lib/theme/font-registry";
 import { generateThemeStyle } from "@/lib/theme/generate-theme";
+import { brandCombinations, type BrandCombination } from "@/lib/theme/brand-combinations";
 import type { BrandConfig } from "@/lib/theme/types";
+import { BrandCombinationCarousel } from "@/components/onboarding/brand-combination-carousel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -140,6 +142,35 @@ export function BrandForm({
   // render, which makes the whole component unmemoizable by the React Compiler.
   const values = useWatch({ control }) as unknown as BrandConfig;
 
+  // Derived, not separate state: a combo card can never drift from the actual
+  // form values (e.g. picking one, then hand-editing a hex un-highlights it).
+  const activeCombinationId = useMemo(() => {
+    const primary = values?.colors?.primary?.toUpperCase();
+    const secondary = values?.colors?.secondary?.toUpperCase();
+    return (
+      brandCombinations.find(
+        (combo) =>
+          combo.colors.primary.toUpperCase() === primary &&
+          combo.colors.secondary.toUpperCase() === secondary &&
+          combo.typography.primaryFont === values?.typography?.primaryFont &&
+          combo.typography.secondaryFont === values?.typography?.secondaryFont
+      )?.id ?? null
+    );
+  }, [values]);
+
+  function applyCombination(combo: BrandCombination) {
+    setValue("colors.primary", combo.colors.primary, { shouldDirty: true, shouldValidate: true });
+    setValue("colors.secondary", combo.colors.secondary, { shouldDirty: true, shouldValidate: true });
+    setValue("typography.primaryFont", combo.typography.primaryFont, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setValue("typography.secondaryFont", combo.typography.secondaryFont, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }
+
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -191,6 +222,18 @@ export function BrandForm({
 
       <FieldGroup
         index={1}
+        title="Widely used combinations"
+        description="Start from a color and font pairing that already works, then tune it below."
+      >
+        <BrandCombinationCarousel
+          combinations={brandCombinations}
+          activeId={activeCombinationId}
+          onSelect={applyCombination}
+        />
+      </FieldGroup>
+
+      <FieldGroup
+        index={2}
         title="Colors"
         description="These become CSS tokens across every template."
       >
@@ -202,7 +245,7 @@ export function BrandForm({
         </div>
       </FieldGroup>
 
-      <FieldGroup index={2} title="Typography" description="Approved font registry only.">
+      <FieldGroup index={3} title="Typography" description="Approved font registry only.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <Label htmlFor="primaryFont">Heading / body primary</Label>
@@ -227,7 +270,7 @@ export function BrandForm({
         </div>
       </FieldGroup>
 
-      <FieldGroup index={3} title="Assets" description="Optional now — templates still look polished without them.">
+      <FieldGroup index={4} title="Assets" description="Optional now — templates still look polished without them.">
         {/*
           Stacked rather than the two-column grid the other groups use: the
           favicon needs an explainer image, and beside a bare Upload button in
@@ -275,7 +318,16 @@ export function BrandForm({
             />
             <FieldHint>
               The small square icon in a browser tab, beside your church&rsquo;s
-              name. A square image works best.
+              name.{" "}
+              <a
+                href="https://cloudconvert.com/png-to-ico"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-brand hover:underline"
+              >
+                Convert to .ico here
+              </a>
+              .
             </FieldHint>
             <input
               id="favicon"

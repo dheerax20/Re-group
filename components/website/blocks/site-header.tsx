@@ -241,7 +241,7 @@ function MobileHeader({ site }: { site: SiteConfig }) {
       <SheetContent
         side="top"
         showCloseButton={false}
-        className="z-40 gap-0 border-b border-site-muted/15 bg-site-background p-0 text-site-foreground sm:hidden"
+        className="gap-0 border-b border-site-muted/15 bg-site-background p-0 text-site-foreground sm:hidden"
       >
         <SheetTitle className="sr-only">Site navigation</SheetTitle>
 

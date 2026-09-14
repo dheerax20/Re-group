@@ -134,10 +134,10 @@ export default async function TemplatesPage({
           </Link>
         ) : (
           <Link
-            href={wizardHref("features", siteId)}
+            href={wizardHref("brand", siteId)}
             className="mt-6 inline-block text-sm text-muted hover:text-foreground"
           >
-            ← Back to features
+            ← Back to brand
           </Link>
         )}
       </div>
@@ -316,10 +316,10 @@ export default async function TemplatesPage({
         </div>
 
         <Link
-          href={wizardHref("features", siteId)}
+          href={wizardHref("brand", siteId)}
           className="text-sm text-muted hover:text-foreground"
         >
-          ← Back to features
+          ← Back to brand
         </Link>
       </div>
     </div>
