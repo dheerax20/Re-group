@@ -216,11 +216,6 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
             node.style,
             cn(
               minHeightClass[minHeight],
-              // A ceiling on every content band: taller content scrolls
-              // within the section instead of pushing the page past one
-              // screen. `svh`, not `screen`, for the same mobile-Safari
-              // reason `minHeightClass` avoids `100vh`.
-              "max-h-svh overflow-y-auto",
               // A band with a floor centres its copy on the optical centre
               // line; without this the text pins to the top of a 78vh box.
               minHeight === "none" ? "" : "flex flex-col justify-center",
@@ -390,10 +385,22 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
        * this that measure was silently dropped and the photo ran corner to
        * corner.
        */
+      /**
+       * The ratio box is capped in height as well as shaped.
+       *
+       * An `aspect-*` box takes its height from its width, and nothing else:
+       * a `portrait` (4/5) photo in a `max-w-6xl` band renders 1440px tall,
+       * and at `width: "bleed"` it is half again bigger — a single image
+       * twice the height of a laptop screen. The cap is safe here in a way
+       * a cap on the *band* is not, because the `<img>` below is already
+       * `object-cover`, so this crops the photograph rather than hiding any
+       * copy. The ratio still reserves the box before the bytes arrive, so
+       * nothing shifts on load.
+       */
       return (
         <div
           className={cn(
-            "relative overflow-hidden",
+            "relative max-h-[70svh] overflow-hidden",
             treatment,
             aspect,
             node.style?.width ? widthClass[node.style.width] : "w-full"

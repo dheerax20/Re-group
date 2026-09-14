@@ -147,11 +147,16 @@ export function BrandForm({
   const activeCombinationId = useMemo(() => {
     const primary = values?.colors?.primary?.toUpperCase();
     const secondary = values?.colors?.secondary?.toUpperCase();
+    const accent = values?.colors?.accent?.toUpperCase();
     return (
       brandCombinations.find(
         (combo) =>
           combo.colors.primary.toUpperCase() === primary &&
           combo.colors.secondary.toUpperCase() === secondary &&
+          // Accent is part of what a preset applies, so it is part of what
+          // makes one "in use" — otherwise a site carrying a stale accent
+          // would show the card as applied while its buttons disagreed.
+          combo.colors.secondary.toUpperCase() === accent &&
           combo.typography.primaryFont === values?.typography?.primaryFont &&
           combo.typography.secondaryFont === values?.typography?.secondaryFont
       )?.id ?? null
@@ -161,6 +166,17 @@ export function BrandForm({
   function applyCombination(combo: BrandCombination) {
     setValue("colors.primary", combo.colors.primary, { shouldDirty: true, shouldValidate: true });
     setValue("colors.secondary", combo.colors.secondary, { shouldDirty: true, shouldValidate: true });
+    /**
+     * Accent follows secondary, exactly as `defaultBrandConfig` pairs them.
+     * `--color-secondary` only ever paints a 10%-opacity placeholder, while
+     * `--color-accent` is what buttons, links and focus rings actually use —
+     * so a preset that set only the first two left every CTA on the previous
+     * accent, and the applied site did not match the two swatches on the card.
+     */
+    setValue("colors.accent", combo.colors.secondary, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
     setValue("typography.primaryFont", combo.typography.primaryFont, {
       shouldDirty: true,
       shouldValidate: true,

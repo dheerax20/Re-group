@@ -156,6 +156,7 @@ export function ChurchForm({
             placeholder="Helping people know God and find family"
           />
           <FieldHint>Explain in about 100 words for the site visitors.</FieldHint>
+          <FieldError>{errors.mission?.message}</FieldError>
         </Field>
         <Field>
           <Label htmlFor="values">Values</Label>
