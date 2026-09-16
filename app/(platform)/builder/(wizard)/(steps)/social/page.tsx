@@ -25,7 +25,7 @@ export default async function SocialPage({
         siteId={siteId}
         defaultValues={site.socialLinks}
         backHref={wizardHref("church", siteId)}
-        nextHref={wizardHref("brand", siteId)}
+        nextHref={wizardHref("features", siteId)}
       />
     </div>
   );

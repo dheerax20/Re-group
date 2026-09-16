@@ -4,6 +4,10 @@ import {
   Playfair_Display,
   Cormorant_Garamond,
   Montserrat,
+  Lato,
+  Roboto,
+  Poppins,
+  Merriweather,
 } from "next/font/google";
 
 /**
@@ -34,6 +38,26 @@ const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-montserrat",
 });
+const lato = Lato({
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+  variable: "--font-lato",
+});
+const roboto = Roboto({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+  variable: "--font-roboto",
+});
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["300", "400", "600", "700"],
+  variable: "--font-poppins",
+});
+const merriweather = Merriweather({
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+  variable: "--font-merriweather",
+});
 
 export const fontVariables = [
   inter.variable,
@@ -41,4 +65,8 @@ export const fontVariables = [
   playfairDisplay.variable,
   cormorantGaramond.variable,
   montserrat.variable,
+  lato.variable,
+  roboto.variable,
+  poppins.variable,
+  merriweather.variable,
 ].join(" ");

@@ -58,17 +58,19 @@ export function BrandPreview({
    * before the font file has loaded, and without it the text would briefly
    * fall back to the UA default and shift.
    */
-  const displayFont = secondaryFont && isValidFontKey(secondaryFont)
-    ? fontRegistry[secondaryFont].cssVar
-    : undefined;
-  const bodyFont = primaryFont && isValidFontKey(primaryFont)
-    ? fontRegistry[primaryFont].cssVar
-    : undefined;
-  const displayStack = displayFont
-    ? `var(${displayFont}, Georgia, serif)`
+  const secondaryEntry =
+    secondaryFont && isValidFontKey(secondaryFont) ? fontRegistry[secondaryFont] : undefined;
+  const primaryEntry =
+    primaryFont && isValidFontKey(primaryFont) ? fontRegistry[primaryFont] : undefined;
+  const displayStack = secondaryEntry
+    ? "cssVar" in secondaryEntry
+      ? `var(${secondaryEntry.cssVar}, Georgia, serif)`
+      : secondaryEntry.stack
     : "Georgia, 'Times New Roman', serif";
-  const bodyStack = bodyFont
-    ? `var(${bodyFont}, system-ui, sans-serif)`
+  const bodyStack = primaryEntry
+    ? "cssVar" in primaryEntry
+      ? `var(${primaryEntry.cssVar}, system-ui, sans-serif)`
+      : primaryEntry.stack
     : "system-ui, sans-serif";
 
   // Long church names overflow a 320-unit canvas; trimming here keeps the

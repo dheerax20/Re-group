@@ -216,6 +216,11 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
             node.style,
             cn(
               minHeightClass[minHeight],
+              // A ceiling on every content band: taller content scrolls
+              // within the section instead of pushing the page past one
+              // screen. `svh`, not `screen`, for the same mobile-Safari
+              // reason `minHeightClass` avoids `100vh`.
+              "max-h-svh overflow-y-auto",
               // A band with a floor centres its copy on the optical centre
               // line; without this the text pins to the top of a 78vh box.
               minHeight === "none" ? "" : "flex flex-col justify-center",

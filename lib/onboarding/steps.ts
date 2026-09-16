@@ -1,8 +1,8 @@
 export const wizardSteps = [
   { key: "church", label: "Church Info", path: "church" },
   { key: "social", label: "Social Media", path: "social" },
-  { key: "brand", label: "Brand", path: "brand" },
   { key: "features", label: "Features", path: "features" },
+  { key: "brand", label: "Brand", path: "brand" },
   { key: "templates", label: "Design", path: "templates" },
   { key: "publish", label: "Publish", path: "publish" },
 ] as const;
