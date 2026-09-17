@@ -3,7 +3,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    // `.tsx` too: the block renderer's own markup is asserted by rendering it.
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     setupFiles: ["tests/setup.ts"],
     // Env vars a few modules read at import time. Set here so a developer's
     // real .env cannot change what the suite asserts.

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { getCachedSermons, filterSermons, type CachedSermon } from "@/lib/site/get-site-sermons";
 import { headingScaleClass, widthClass } from "@/components/website/blocks/tokens";
+import { EmptyState } from "@/components/website/blocks/shared";
 import { cn } from "@/lib/utils";
 
 function SermonCard({ sermon }: { sermon: CachedSermon }) {
@@ -104,10 +105,20 @@ export default async function SermonsPage({
         ) : null}
       </div>
 
-      {sermons.length === 0 ? (
-        <p className="mt-16 text-lg text-site-muted">
-          {q ? "No sermons match your search." : "No sermons have been added yet."}
-        </p>
+      {/**
+       * Two different situations, deliberately not one component.
+       *
+       * A search that matched nothing is a RESULT — this church may have fifty
+       * sermons — so it stays a plain line that answers the query. Only the
+       * no-content case is the empty state the homepage shows, and it shares
+       * that component so the two pages cannot drift apart.
+       */}
+      {sermons.length === 0 && q ? (
+        <p className="mt-16 text-lg text-site-muted">No sermons match your search.</p>
+      ) : sermons.length === 0 ? (
+        <div className="mt-16">
+          <EmptyState kind="sermon" />
+        </div>
       ) : (
         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {sermons.map((sermon) => (

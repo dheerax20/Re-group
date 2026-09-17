@@ -156,7 +156,7 @@ export function SiteHeader({
         )}
       >
         <div className={cn("w-full", PAGE_GUTTER)}>
-          <div className="flex h-20 items-center justify-between gap-8 lg:h-24">
+          <div className="flex h-20 items-center justify-between gap-8">
             <BrandLogo site={site} />
             <DesktopLinks site={site} small={variant === "minimal"} dark={overlaying} />
           </div>

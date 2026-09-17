@@ -25,7 +25,13 @@ import type { BrandConfig } from "@/lib/theme/types";
  * what it looks like. A template must not emit `padding`, `background`,
  * `align` or `width` — the same rule the composer prompt puts on the model.
  */
-export type SiteTemplateId = "cinematic" | "traditional" | "warm-editorial";
+export type SiteTemplateId =
+  | "cinematic"
+  | "traditional"
+  | "warm-editorial"
+  | "modern-minimal"
+  | "bright-welcoming"
+  | "community-forward";
 
 /**
  * Everything a template is allowed to read about a church.

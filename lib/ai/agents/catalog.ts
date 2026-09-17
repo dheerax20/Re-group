@@ -112,14 +112,29 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     sermons: "featured",
     events: "calendar",
     mood:
-      "One dark band carries the page. The hero is quiet and wide, then the room drops to the " +
-      "church's own ink for a single section that holds the weight — a sermon, a gathering, one " +
-      "sentence. Everything else stays out of its way. Scale does the work, not decoration.",
+      "One photograph carries the page. The hero is quiet and wide, then a single section lifts " +
+      "to the church's own colour and holds the weight — a sermon, a gathering, one sentence. " +
+      "Everything else stays out of its way. Scale does the work, not decoration.",
     copyVoice:
       "Short, declarative lines. Present tense. Let one striking sentence carry the hero " +
       "instead of three ordinary ones.",
     recipe: {
-      bandRhythm: ["transparent", "inverted", "transparent", "surface"],
+      /**
+       * Was `["transparent", "inverted", "transparent", "surface"]`.
+       *
+       * `backgroundClass.inverted` resolves to the church's own `foreground`,
+       * and nothing validates that it is dark — so "the room drops to the
+       * church's ink" produced a pale band with white type on a live site.
+       * No rhythm commits to `inverted` any more; it stays a device the editor
+       * can reach for deliberately.
+       *
+       * `primary` rather than a new `secondary` surface because
+       * `components/onboarding/brand-form.tsx` sets `accent` from a preset's
+       * secondary, so for most churches a secondary wash would be the same
+       * pixel as an accent one — and four of the eight presets have a
+       * near-white secondary, which is no band at all over a white page.
+       */
+      bandRhythm: ["transparent", "primary", "transparent", "surface"],
       bandPadding: { hero: "2xl", body: "xl", closing: "2xl" },
       alignPolicy: "centered-close",
       width: "wide",
@@ -140,32 +155,54 @@ export const ART_DIRECTIONS: ArtDirection[] = [
   {
     id: "modern-minimal",
     name: "Modern Minimal",
-    navbar: "minimal",
+    /**
+     * Solid, not minimal. `DesktopLinks` renders `text-sm` for `minimal` and
+     * `text-base` otherwise, and all three reference comps are `text-base`.
+     */
+    navbar: "solid",
     hero: "centered",
     welcome: "centered",
     about: "image-right",
     sermons: "list",
     events: "list",
     mood:
-      "A narrow, ranged-left column, read top to bottom like a letter rather than scanned like " +
-      "a landing page. Almost no background changes; the rhythm comes from the space between " +
-      "bands and from lists that stay lists instead of becoming cards.",
+      "A near-white page. The hero is one photograph shot up into the sky with the headline " +
+      "sitting in the empty part of the frame; below it the page returns to a ranged-left " +
+      "column read top to bottom like a letter. No cards, no coloured bands, lists that stay " +
+      "lists. The rhythm is the space between things.",
     copyVoice:
       "Plain, warm, unhurried. No exclamation points. Trust the reader — say less, mean more.",
     recipe: {
-      bandRhythm: ["transparent", "transparent", "surface", "transparent"],
-      bandPadding: { hero: "xl", body: "lg", closing: "xl" },
+      /**
+       * The one direction that repeats a background on purpose — its identity
+       * is the ABSENCE of an alternation, and the dedup used to rewrite this
+       * into the same `t s t s t s t` every other direction gets. `body: "xl"`
+       * is what pays for the separation the alternation used to provide.
+       */
+      bandRhythm: ["transparent", "transparent", "transparent", "surface"],
+      allowRepeatBands: true,
+      bandPadding: { hero: "xl", body: "xl", closing: "xl" },
       alignPolicy: "left",
       width: "normal",
+      /**
+       * `copyWidth: "normal"`, not `narrow`. `headingScaleClass.display`
+       * already carries its own `max-w-2xl`, which is what wraps the headline
+       * to two lines; a `narrow` stack would clamp the subhead and button
+       * tighter than the headline and break the centred axis.
+       */
       hero: {
-        archetype: "stacked",
-        image: "widescreen",
-        copyWidth: "narrow",
-        photoWidth: "full",
-        treatment: "square",
-        aspect: "cinema",
+        archetype: "veil",
+        image: "light",
+        align: "center",
+        copyWidth: "normal",
       },
-      welcomeImage: "vertical",
+      /**
+       * Was `vertical`, which put a portrait photograph in this direction's
+       * `wide` box. `widescreen` agrees with `image.aspect` under
+       * `STOCK_IMAGE_ASPECT`, crops far less, and carries the hero's wide sky
+       * frame down the page instead of fighting it.
+       */
+      welcomeImage: "widescreen",
       sermons: "list",
       events: "list",
       image: { treatment: "square", aspect: "wide" },
@@ -211,19 +248,22 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     id: "bright-welcoming",
     name: "Bright & Welcoming",
     /**
-     * Transparent, because this direction's hero is now `overlay` — the bar
-     * has to sit over the photograph rather than start a white strip above it.
+     * Solid, not transparent. Structural, not cosmetic: a `transparent` bar is
+     * absolute and renders white links, which is right over a full-bleed
+     * photograph and wrong here — this direction's hero is an INSET card, so
+     * the frame has a top edge and the bar sits on the white page above it.
      */
-    navbar: "transparent",
+    navbar: "solid",
     hero: "fullscreen",
     welcome: "centered",
     about: "image-right",
     sermons: "cards",
     events: "grid",
     mood:
-      "Photo-forward and centred, built around an invitation rather than an announcement. The " +
-      "brand accent appears once, as a full band about a third of the way down, and nowhere " +
-      "else. Big friendly type; community over ceremony.",
+      "Photo-forward and built around an invitation rather than an announcement. The hero is one " +
+      "photograph held as a rounded card inset from the page, with the welcome on its bottom edge " +
+      "and the invitation opposite. Soft corners throughout; the brand accent appears as a full " +
+      "band once or twice and nowhere else. Big friendly type; community over ceremony.",
     copyVoice:
       "Second person, direct, upbeat. Talk TO the visitor ('you'), not about the church in the " +
       "third person.",
@@ -233,20 +273,27 @@ export const ART_DIRECTIONS: ArtDirection[] = [
       alignPolicy: "centered-close",
       width: "wide",
       /**
-       * It took the dark-overlay hero when Traditional & Reverent moved to
-       * `stacked`, and it is the better home for it: this direction's mood is
-       * already "photo-forward and centred", which is a description of exactly
-       * this archetype. It also keeps the six directions at two per archetype,
-       * which is what stops regenerating a site producing the same page twice.
+       * The same dark frames Cinematic uses, held completely differently: inset
+       * from every viewport edge with a 24px radius, copy on the frame's
+       * bottom-left and the call to action opposite it. That containment is the
+       * whole difference between the two directions, and it is why `radius` had
+       * to become a token rather than stay an image treatment.
        */
       hero: {
-        archetype: "overlay",
+        archetype: "card",
         image: "overlay",
-        overlay: "dark",
-        align: "center",
-        copyWidth: "narrow",
+        overlay: "base",
+        inset: "md",
+        radius: "xl",
+        verticalAlign: "bottom",
       },
-      welcomeImage: "vertical",
+      /**
+       * Was `vertical`, which maps to a `portrait` box under
+       * `STOCK_IMAGE_ASPECT` — at `width: "wide"` that is a 1300px image the
+       * content ceiling then crops by well over half. `widescreen` also echoes
+       * the hero's landscape frame instead of fighting it.
+       */
+      welcomeImage: "widescreen",
       sermons: "grid",
       events: "grid",
       image: { treatment: "rounded", aspect: "video" },
@@ -310,16 +357,18 @@ export const ART_DIRECTIONS: ArtDirection[] = [
   {
     id: "community-forward",
     name: "Community Forward",
-    navbar: "minimal",
+    /** `text-base` links, matching the reference. `minimal` renders `text-sm`. */
+    navbar: "solid",
     hero: "split",
     welcome: "split",
     about: "image-left",
     sermons: "cards",
     events: "grid",
     mood:
-      "People-first and ranged left. Sections built around faces and gathering rather than " +
-      "architecture, square portraits at a consistent size, and a two-column rhythm that never " +
-      "lets one band overwhelm the page.",
+      "People-first and ranged left. The hero is a grid of photographs beside the words rather " +
+      "than one establishing shot behind them — a set of glimpses of a congregation. Sections " +
+      "built around faces and gathering rather than architecture, and a two-column rhythm that " +
+      "never lets one band overwhelm the page.",
     copyVoice:
       "Conversational, specific about who gathers here — families, students, neighbors — and " +
       "what a first visit actually feels like.",
@@ -328,7 +377,18 @@ export const ART_DIRECTIONS: ArtDirection[] = [
       bandPadding: { hero: "xl", body: "lg", closing: "xl" },
       alignPolicy: "left",
       width: "wide",
-      hero: { archetype: "split", image: "vertical", split: "wide-right" },
+      /**
+       * `wide-left` — copy first, gallery right, matching the reference. The
+       * grid is what separates this from `split`: one bleeding photograph is an
+       * establishing shot of a building, and this direction is about the people
+       * inside it.
+       */
+      hero: {
+        archetype: "gallery",
+        image: "widescreen",
+        split: "wide-left",
+        grid: "feature-pair",
+      },
       welcomeImage: "widescreen",
       sermons: "grid",
       events: "list",

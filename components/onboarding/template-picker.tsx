@@ -37,6 +37,13 @@ export type TemplateCard = {
  * Static, one per template — unlike `previewImage` above, this isn't
  * per-church, so it's a plain client-side map rather than something
  * `templateCards()` needs to resolve server-side.
+ *
+ * A template with no entry here simply does not get a View button: the map is
+ * hand-maintained and a new design lands in the registry before someone has
+ * screenshotted it, so an ungated button opens a dialog with `src={undefined}`.
+ * The card still shows the real per-church hero photograph either way, which is
+ * why hiding the button reads as a design with no walkthrough rather than as a
+ * broken one. Adding a screenshot here is the only step needed to turn it on.
  */
 const TEMPLATE_PREVIEW_IMAGES: Record<string, string> = {
   cinematic: "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdlYr3pYBp6ThcFqLC342H7YMAtufd9gQVsRkr",
@@ -59,7 +66,14 @@ export function TemplatePicker({
   currentTemplateId: string;
   /** Whether applying would overwrite something the church already has. */
   hasDesign: boolean;
-  aiHref: string;
+  /**
+   * Where "Generate with AI instead" goes, or omitted to hide that panel
+   * entirely. The Brand step omits it: there the AI exit is a button in the
+   * brand form, so that the church's colours are SAVED before a build starts —
+   * a link out of this panel navigated away without submitting the form, which
+   * is how the crew ended up designing against a stale brand.
+   */
+  aiHref?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
@@ -136,14 +150,16 @@ export function TemplatePicker({
                     In use
                   </span>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => setPreviewing(template)}
-                  className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/75"
-                >
-                  <Eye className="size-3" />
-                  View
-                </button>
+                {TEMPLATE_PREVIEW_IMAGES[template.id] ? (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewing(template)}
+                    className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                  >
+                    <Eye className="size-3" />
+                    View
+                  </button>
+                ) : null}
               </div>
 
               <div className="flex flex-1 flex-col gap-3 p-4">
@@ -177,25 +193,32 @@ export function TemplatePicker({
         })}
       </div>
 
-      <div className="rounded-panel border border-accent/30 bg-accent-soft/40 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-              <Sparkles className="size-4" />
-            </span>
-            <div>
-              <h3 className="font-semibold tracking-tight">Generate with AI instead</h3>
-              <p className="mt-1 max-w-xl text-sm text-muted">
-                Six specialists invent a layout and write the copy for your church
-                specifically. Takes about a minute, and uses one of your monthly builds.
-              </p>
+      {aiHref ? (
+        <div className="rounded-panel border border-accent/30 bg-accent-soft/40 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                <Sparkles className="size-4" />
+              </span>
+              <div>
+                <h3 className="font-semibold tracking-tight">Generate with AI instead</h3>
+                <p className="mt-1 max-w-xl text-sm text-muted">
+                  Six specialists invent a layout and write the copy for your church
+                  specifically. Takes about a minute, and uses one of your monthly builds.
+                </p>
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(aiHref)}
+              disabled={Boolean(pending)}
+            >
+              Generate with AI
+            </Button>
           </div>
-          <Button variant="outline" onClick={() => router.push(aiHref)} disabled={Boolean(pending)}>
-            Generate with AI
-          </Button>
         </div>
-      </div>
+      ) : null}
 
       <Dialog open={Boolean(confirming)} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent>
@@ -208,10 +231,15 @@ export function TemplatePicker({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirming(null)} disabled={Boolean(pending)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirming(null)}
+              disabled={Boolean(pending)}
+            >
               Cancel
             </Button>
-            <Button onClick={confirm} disabled={Boolean(pending)}>
+            <Button type="button" onClick={confirm} disabled={Boolean(pending)}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
               Apply {confirming?.name}
             </Button>

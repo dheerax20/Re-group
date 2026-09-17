@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getPublishedSiteBySlug } from "@/lib/site/get-published-site";
 import { getCachedEvents, type CachedEvent } from "@/lib/site/get-site-events";
 import { headingScaleClass, widthClass } from "@/components/website/blocks/tokens";
+import { EmptyState } from "@/components/website/blocks/shared";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +90,9 @@ export default async function EventsPage({
       <h1 className={cn(headingScaleClass.h1, "mt-2 text-site-foreground")}>Events</h1>
 
       {events.length === 0 ? (
-        <p className="mt-16 text-lg text-site-muted">No upcoming events.</p>
+        <div className="mt-16">
+          <EmptyState kind="event" />
+        </div>
       ) : (
         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((event) => (

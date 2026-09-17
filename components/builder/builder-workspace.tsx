@@ -30,10 +30,16 @@ type Tab = "assistant" | "pages";
  * the AI-composed block tree (`site.blocks`), so an editor built on section
  * instances was editing a column the renderer had stopped reading.
  *
- * What's here now is deliberately narrow: a true-to-final preview of the real
- * block tree, the navigation editor, and the AI assistant. Direct
- * block-by-block editing is not built yet — until it is, structural changes
- * come from rebuilding the site with the crew.
+ * What's here now: a true-to-final preview of the real block tree, a page
+ * selector over the editable pages, the block outline panel, the navigation
+ * editor, and the AI assistant.
+ *
+ * The outline panel is direct, non-AI editing — it reorders bands and changes
+ * their type scale through `site.updateBlocks`
+ * (`lib/site/blocks/manual-edit.ts`), costing no AI budget. What it still
+ * cannot do is ADD a band: both it and the AI patch path
+ * (`lib/site/blocks/patch.ts`) only ever target nodes that already exist, so a
+ * new band means a rebuild, applying a template, or the assistant.
  */
 export function BuilderWorkspace({
   site,

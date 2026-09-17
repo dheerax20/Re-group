@@ -38,7 +38,14 @@ const VOICE: PageVoice = {
 export const warmEditorialTemplate: SiteTemplate = {
   id: "warm-editorial",
   name: "Warm Editorial",
-  version: 1,
+  /**
+   * 2: the seeded welcome photograph moved from a `portrait` box to a `wide`
+   * one, because the recipe draws it from the WIDESCREEN stock set and the
+   * portrait box was cropping both edges off the room.
+   * `applyTemplateToSite` snapshots the finished trees, so a site applied at
+   * version 1 keeps the old crop until the template is re-applied.
+   */
+  version: 2,
   tagline: "Asymmetric columns and a portrait beside the text, read like a feature.",
   navVariant,
   recipe,

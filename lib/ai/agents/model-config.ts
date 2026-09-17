@@ -45,10 +45,15 @@ const AGENT_MAX_RETRIES = Number(process.env.AI_MAX_RETRIES) || 2;
 
 /**
  * The model name for one agent. Independently overridable per role — e.g.
- * keep five agents on the small default and give only the copywriter (the
- * one agent whose output a visitor actually reads) a stronger one:
+ * keep the rest on the small default and give only the composer (the one
+ * agent that writes both the layout and every word on it) a stronger one:
  *
- *   AI_MODEL_COPYWRITER=gpt-4o
+ *   AI_MODEL_COMPOSER=gpt-4o
+ *
+ * The env var names come from `ROLE_ENV_VAR` above, which is keyed by
+ * `AgentRole` — not by the step ids in `CREW_STEPS`. They differ
+ * (`layout-architect` is the composer's step), and an env var naming a step
+ * rather than a role is read by nothing and fails silently.
  */
 export function modelForRole(role: AgentRole): string {
   return process.env[ROLE_ENV_VAR[role]]?.trim() || DEFAULT_MODEL;

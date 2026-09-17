@@ -15,9 +15,19 @@ const imageAspectSchema = z.enum(["square", "video", "portrait", "wide", "cinema
 const buttonEmphasisSchema = z.enum(["primary", "secondary", "outline"]);
 const fontFamilySchema = z.enum(["primary", "secondary"]);
 const columnsSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
-const rowLayoutSchema = z.enum(["columns", "bar", "wide-left", "wide-right"]);
-const overlaySchema = z.enum(["none", "scrim", "dark"]);
+const rowLayoutSchema = z.enum(["columns", "bar", "bar-end", "wide-left", "wide-right"]);
+const overlaySchema = z.enum(["none", "scrim", "dark", "veil", "base"]);
+const radiusSchema = z.enum(["none", "sm", "md", "lg", "xl", "full"]);
+const insetSchema = z.enum(["none", "sm", "md", "lg"]);
+const verticalAlignSchema = z.enum(["top", "center", "bottom"]);
 const minHeightSchema = z.enum(["none", "hero", "screen"]);
+/**
+ * Not in `STYLE_FIELD_SCHEMAS` below — this is a field on the image block, not
+ * on `BlockStyle`, the way `aspect` and `treatment` are. Missing it here is a
+ * SILENT failure: `coerceBlocks` would strip the token and the hero's
+ * photograph would quietly drop to the content ceiling with no error anywhere.
+ */
+const maxHeightSchema = z.enum(["hero", "content"]);
 const fontWeightSchema = z.enum(["regular", "semibold", "bold"]);
 
 const blockStyleSchema = z
@@ -35,6 +45,9 @@ const blockStyleSchema = z
     backgroundImage: mediaUrlSchema.optional(),
     overlay: overlaySchema.optional(),
     minHeight: minHeightSchema.optional(),
+    radius: radiusSchema.optional(),
+    inset: insetSchema.optional(),
+    verticalAlign: verticalAlignSchema.optional(),
   })
   .optional();
 
@@ -50,6 +63,9 @@ const STYLE_FIELD_SCHEMAS = {
   backgroundImage: mediaUrlSchema,
   overlay: overlaySchema,
   minHeight: minHeightSchema,
+  radius: radiusSchema,
+  inset: insetSchema,
+  verticalAlign: verticalAlignSchema,
 } as const;
 
 /**
@@ -137,6 +153,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       treatment: imageTreatmentSchema.optional(),
       aspect: imageAspectSchema.optional(),
       priority: z.boolean().optional(),
+      maxHeight: maxHeightSchema.optional(),
     }),
     z.object({
       id: idSchema,

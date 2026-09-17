@@ -87,8 +87,12 @@ export default async function TemplatesPage({
     return (
       <div>
         <WizardStepHeader
-          title={`Designing ${site.site.name}`}
-          description="LangChain crew invents layout + copy. You’ll provide photos next."
+          title={building ? `Designing ${site.site.name}` : `Generate ${site.site.name}`}
+          description={
+            building
+              ? "The crew invents layout and copy. You’ll provide photos next."
+              : "Nothing has started yet. The crew reads the brand you just saved, so check it looks right before you begin — a build uses one of your monthly credits."
+          }
         />
         <AiWebsiteStudio
           siteId={siteId}

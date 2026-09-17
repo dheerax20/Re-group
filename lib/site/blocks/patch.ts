@@ -60,6 +60,13 @@ export const blockPatchSchema = z.object({
         .enum(["transparent", "surface", "primary", "accent", "inverted"])
         .optional(),
       textTone: z.enum(["default", "muted", "inverted", "accent"]).optional(),
+      /**
+       * The one new style field the editor gets. `inset` and `verticalAlign`
+       * are deliberately withheld: both only mean anything on a band the
+       * template composed as a card, and a model that sets them on an ordinary
+       * content band produces a floating lozenge nobody asked for.
+       */
+      radius: z.enum(["none", "sm", "md", "lg", "xl", "full"]).optional(),
     })
     .optional(),
   items: z
