@@ -53,11 +53,57 @@ export type ColumnsToken = 1 | 2 | 3 | 4;
  *
  * `columns` is ignored by every value but `columns`.
  */
-export type RowLayoutToken = "columns" | "bar" | "wide-left" | "wide-right";
+export type RowLayoutToken = "columns" | "bar" | "bar-end" | "wide-left" | "wide-right";
 
-/** Overlay over a section's `backgroundImage`. Meaningless without one. */
-export type OverlayToken = "none" | "scrim" | "dark";
+/**
+ * Overlay over a section's `backgroundImage`. Meaningless without one.
+ *
+ * `scrim` and `dark` DARKEN a frame so white type can sit on it. `veil` does
+ * the opposite — it lifts a high-key frame so the page's own dark type can —
+ * which is why `effectiveSurface()` reads the first two as a dark surface and
+ * deliberately does not read `veil` as one.
+ */
+export type OverlayToken = "none" | "scrim" | "dark" | "veil" | "base";
+
+/**
+ * Corner radius, as a token rather than a treatment.
+ *
+ * `imageTreatmentClass` already rounds IMAGES (`rounded` / `square` / `framed` /
+ * `bleed`), but that vocabulary is about how a photograph is presented and
+ * cannot reach a section or a button. Roundness is a house style that should run
+ * across a whole direction — sharp corners read as editorial, soft ones as
+ * friendly — so it belongs on `BlockStyle` where any block can take it.
+ */
+export type RadiusToken = "none" | "sm" | "md" | "lg" | "xl" | "full";
+
+/**
+ * How far a band is held off the viewport edge.
+ *
+ * Distinct from `width`, which resolves a MEASURE inside the page gutter. A band
+ * with an inset is a card: its background, its photograph and its rounded
+ * corners all stop short of the viewport, and the page shows around it. Only
+ * meaningful on a `section`.
+ */
+export type InsetToken = "none" | "sm" | "md" | "lg";
+
+/** Where a band's content sits when `minHeight` gives it room to move. */
+export type VerticalAlignToken = "top" | "center" | "bottom";
 export type MinHeightToken = "none" | "hero" | "screen";
+/**
+ * How much of the screen ONE photograph may take.
+ *
+ * Template-only, like `priority` and `font`. An `aspect-*` box takes its height
+ * from its width and nothing else, so a ratio alone has no upper bound — and
+ * the hero's photograph and a mid-page one are not the same job. The hero's is
+ * meant to own the first screen; a welcome band's photo is one of four
+ * children, and at the hero's ceiling the band around it runs past a viewport.
+ *
+ * Deliberately NOT keyed off `priority`. That flag is true for exactly one
+ * image per page today, so the two look interchangeable — but `priority` means
+ * "load this eagerly", and the sets come apart the moment a band holds several
+ * photographs and only the first is the largest contentful paint.
+ */
+export type MaxHeightToken = "hero" | "content";
 /**
  * A heading's weight, decoupled from its size.
  *
@@ -82,6 +128,11 @@ export type BlockStyle = {
   backgroundImage?: string;
   overlay?: OverlayToken;
   minHeight?: MinHeightToken;
+  radius?: RadiusToken;
+  /** Only meaningful on a `section` — see `InsetToken`. */
+  inset?: InsetToken;
+  /** Ignored unless `minHeight` is set: with no floor there is nothing to align within. */
+  verticalAlign?: VerticalAlignToken;
 };
 
 type BaseBlock = {
@@ -129,6 +180,11 @@ export type ImageBlock = BaseBlock & {
    * tree cannot tell the renderer which band it sits in.
    */
   priority?: boolean;
+  /**
+   * The height ceiling this photograph takes. Template-only; defaults to
+   * `content`, so only the hero has to say so. See `MaxHeightToken`.
+   */
+  maxHeight?: MaxHeightToken;
 };
 export type ButtonBlock = BaseBlock & {
   type: "button";

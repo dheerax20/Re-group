@@ -18,8 +18,8 @@ import type { SiteTemplate, TemplateProfile } from "./types";
 /**
  * Cinematic — the photograph carries the page.
  *
- * The recipe puts the headline over a full-bleed scrimmed image and drops one
- * band to the church's own ink further down, so the page needs very little
+ * The recipe puts the headline over a full-bleed scrimmed image and lifts one
+ * band to the church's own colour further down, so the page needs very little
  * else: a single statement about who gathers here, then the two things a
  * visitor came for. Short headings, because a two-word title beside a big
  * photograph reads as confidence and a seven-word one reads as a caption.
@@ -37,8 +37,21 @@ const VOICE: PageVoice = {
 export const cinematicTemplate: SiteTemplate = {
   id: "cinematic",
   name: "Cinematic",
-  version: 1,
-  tagline: "One photograph, one dark band, and as few words as the page can carry.",
+  /**
+   * 2, for two changes shipping together:
+   *
+   * - The rhythm's dark band became a `primary` wash. `inverted` painted the
+   *   church's own `foreground`, which nothing validates as dark, so the band
+   *   shipped pale with white type on at least one live site.
+   * - The seeded welcome photograph moved from a `cinema` box to a `wide` one,
+   *   to match the widescreen stock set it is actually drawn from.
+   *
+   * `applyTemplateToSite` snapshots the finished trees, so a site applied at
+   * version 1 keeps both until the template is re-applied — this is what
+   * records that they differ.
+   */
+  version: 2,
+  tagline: "One photograph, one band of colour, and as few words as the page can carry.",
   navVariant,
   recipe,
 

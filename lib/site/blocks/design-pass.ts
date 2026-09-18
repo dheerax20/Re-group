@@ -4,18 +4,23 @@ import type {
   BlockStyle,
   ImageAspectToken,
   ImageTreatmentToken,
+  InsetToken,
   PageBlocks,
+  RadiusToken,
   SpacingToken,
   SurfaceToken,
   TextToneToken,
+  VerticalAlignToken,
   WidthToken,
 } from "./types";
 import { NAV_BLOCK_ID, FOOTER_BLOCK_ID, HERO_BLOCK_ID } from "./types";
 import { coerceBlocks } from "./schema";
 import {
   buildHeroBand,
+  heroImageIn,
   pickHeroImage,
   resolveHeroCopy,
+  STOCK_IMAGE_ASPECT,
   type HeroCopy,
   type StockImageKind,
 } from "./hero";
@@ -45,11 +50,35 @@ import {
  *
  * A discriminated union rather than a bag of optional fields, so an
  * archetype cannot be paired with settings that mean nothing to it — an
- * `overlay` hero has no photo width, a `split` hero has no overlay. The three
+ * `overlay` hero has no photo width, a `split` hero has no overlay. The four
  * archetypes are: `overlay` (photograph fills the band, copy over it), `split`
- * (asymmetric columns, photo bleeding to one edge) and `stacked` (centred copy
- * over a tint, widescreen photograph beneath).
+ * (asymmetric columns, photo bleeding to one edge), `stacked` (centred copy
+ * over a tint, widescreen photograph beneath) and `veil` (dark copy over a
+ * high-key photograph lifted by a white wash).
  */
+/**
+ * The arrangements a gallery may take.
+ *
+ * Bounded and named for the same reason `ArtDirection` is: a model asked to
+ * "compose an interesting image grid" produces a different number of cells
+ * every run and no two churches get a comparable page. A direction picks one and
+ * the pass builds it, so variety is a decision made once in code rather than a
+ * sampling outcome.
+ *
+ * Cell counts are 2-4. Beyond that a hero column becomes a contact sheet.
+ */
+export type GalleryLayout =
+  /** One landscape over two portraits. */
+  | "feature-pair"
+  /** Two portraits over one landscape. */
+  | "pair-feature"
+  /** Three squares in a row. */
+  | "triptych"
+  /** Two landscapes stacked. */
+  | "duo"
+  /** Two by two squares. */
+  | "quad";
+
 export type HeroRecipe =
   | {
       archetype: "overlay";
@@ -72,6 +101,61 @@ export type HeroRecipe =
       photoWidth: WidthToken;
       treatment: ImageTreatmentToken;
       aspect: ImageAspectToken;
+    }
+  | {
+      /**
+       * Copy over a near-white photograph, lifted by a white veil rather than
+       * darkened by a scrim. The inverse of `overlay` in every respect: the
+       * frame is high-key, the wash is white, and the type is the page's own
+       * dark foreground rather than `inverted`.
+       *
+       * `image` is pinned to `"light"` and must stay pinned — nothing else in
+       * the type system stops a future recipe pairing this with the `overlay`
+       * set, which would be black type on a deliberately dark photograph.
+       */
+      archetype: "veil";
+      image: "light";
+      align: "left" | "center";
+      copyWidth: WidthToken;
+    }
+  | {
+      /**
+       * The photograph as an inset card: a dark frame held off the viewport
+       * edge with rounded corners, copy on its bottom-left and the call to
+       * action on its bottom-right. The navigation stays on the page above it
+       * rather than sitting over it, which is the structural difference from
+       * `overlay` — the frame has a top edge, so the bar has somewhere to be.
+       *
+       * Reuses the `overlay` stock set: those frames are already graded dark
+       * for white type, and nothing about being inset changes that.
+       */
+      archetype: "card";
+      image: "overlay";
+      overlay: "dark" | "base";
+      inset: InsetToken;
+      radius: RadiusToken;
+      verticalAlign: VerticalAlignToken;
+    }
+  | {
+      /**
+       * Copy on one side, a grid of photographs on the other.
+       *
+       * Distinct from `split`, which is ONE photograph bleeding to the viewport
+       * edge at `aspect: "fill"`. A gallery is contained, tiled and guttered: it
+       * reads as a set of glimpses of a congregation rather than a single
+       * establishing shot, which is what a people-first direction asks for.
+       */
+      archetype: "gallery";
+      /**
+       * The grid's principal frame — the first cell, and the photograph
+       * `templateCards()` shows on the picker. Every branch needs an `image`
+       * for that call, so this is not optional even though the grid draws from
+       * several sets.
+       */
+      image: "widescreen";
+      /** `wide-left` = copy first, gallery right. */
+      split: "wide-left" | "wide-right";
+      grid: GalleryLayout;
     };
 
 /**
@@ -96,11 +180,34 @@ export type DesignRecipe = {
    *
    * Every entry should be the page background or a wash of the church's brand
    * at 5-10% — a solid primary/secondary band is never assigned (see
-   * `components/website/blocks/tokens.ts`). `inverted` is the one exception: a
-   * dark editorial band is a real device, so a template may commit to it, but
-   * nothing reaches for it on the church's behalf.
+   * `components/website/blocks/tokens.ts`).
+   *
+   * NO rhythm commits to `inverted`, and none should. A dark editorial band is
+   * a real device, but `backgroundClass.inverted` paints the church's own
+   * `foreground`, and `lib/validation/brand.ts` checks that value's hex format
+   * rather than its luminance — so "dark" is a promise the brand step never
+   * made. Cinematic committed to it and shipped a pale band with white type on
+   * it. The token survives for the hero's overlay archetypes, where a real
+   * black scrim guarantees the darkness, and for a church that asks the editor
+   * for one explicitly.
    */
   bandRhythm: SurfaceToken[];
+  /**
+   * Let the rotation repeat a background on adjacent bands.
+   *
+   * The dedup in `applyDesignPass` exists because two adjacent bands sharing a
+   * ground is what makes a page read as one undifferentiated column. For a
+   * direction whose whole identity is a FLAT page that is the point —
+   * separation comes from the space between bands instead — and the dedup
+   * silently rewrites its rotation into the same alternation every other
+   * direction gets. That is how `modern-minimal`, the one direction whose mood
+   * promises "almost no background changes", ended up painting the identical
+   * sequence as `traditional-reverent`.
+   *
+   * Default false. A direction has to ask, and one that asks has to pay for the
+   * separation somewhere else — a larger `bandPadding.body` is the only lever.
+   */
+  allowRepeatBands?: boolean;
   bandPadding: { hero: SpacingToken; body: SpacingToken; closing: SpacingToken };
   /**
    * How CONTENT bands are ranged — the hero owns its own alignment and is not
@@ -203,10 +310,18 @@ function isSection(node: BlockNode): boolean {
  * `overlay: "none"` is deliberately not dark: with no wash over it a photo can
  * be any brightness, so the safe reading is to leave the inherited surface
  * alone rather than promise contrast the image cannot keep.
+ *
+ * `veil` is deliberately not dark either, and for the opposite reason to
+ * `none`: it is a WHITE wash that lifts a high-key frame so the page's own dark
+ * type can sit on it. Reading it as inverted here would strip every dark tone
+ * in the veil hero's stack and render the headline white on white — the exact
+ * failure this function was written to prevent, arrived at from the other side.
  */
+const DARKENING_OVERLAYS: ReadonlySet<string> = new Set(["scrim", "dark", "base"]);
+
 function effectiveSurface(node: BlockNode, inherited: SurfaceToken): SurfaceToken {
   const style = node.style;
-  if (style?.backgroundImage && (style.overlay === "scrim" || style.overlay === "dark")) {
+  if (style?.backgroundImage && style.overlay && DARKENING_OVERLAYS.has(style.overlay)) {
     return "inverted";
   }
   return style?.background ?? inherited;
@@ -295,8 +410,12 @@ function paddingForBand(index: number, total: number, recipe: DesignRecipe): Spa
  *
  * Two adjacent bands sharing a background is what makes a page read as one
  * undifferentiated column, so the caller also guarantees a change at every
- * step. The hero always opens on the rotation's first entry and the closing
- * band takes its last, which is the one place a page should push a little.
+ * step.
+ *
+ * `index` counts CONTENT bands — `isRhythmExempt` holds the hero out along
+ * with nav and footer, so position 0 is the first band after the hero, not the
+ * hero itself. The last content band takes the rotation's final entry, which
+ * is the one place a page should push a little.
  */
 function backgroundForBand(index: number, total: number, recipe: DesignRecipe): SurfaceToken {
   const rotation = recipe.bandRhythm.length > 0 ? recipe.bandRhythm : DEFAULT_DESIGN_RECIPE.bandRhythm;
@@ -656,9 +775,28 @@ function seedWelcomeImage(
     nodes.map((node) => {
       if (!filled && node.type === "image" && !node.src && !node.videoSrc) {
         filled = true;
+        const kind = recipe.welcomeImage as StockImageKind;
         return {
           ...node,
-          src: pickHeroImage(recipe.welcomeImage as StockImageKind, ctx.siteId ?? "site"),
+          /**
+           * `heroImageIn` as `avoid`, so the welcome band cannot draw the same
+           * photograph the hero did. No direction currently pairs one stock
+           * set for both, so this changes nothing today — it stops the next
+           * direction added from silently printing the same picture twice.
+           */
+          src: pickHeroImage(kind, ctx.siteId ?? "site", heroImageIn(blocks)),
+          /**
+           * The photograph's own shape wins over the band default.
+           *
+           * `applyRecipeToLeaves` assigned an aspect while this was still an
+           * EMPTY slot, so it took `recipe.image.aspect` — and the rule it
+           * follows for a slot that already holds a picture ("an image with a
+           * real src keeps its own aspect") is exactly the rule that should
+           * apply here, one step later. Without this, four of the six
+           * directions dropped a photograph of one orientation into a box of
+           * another and `object-cover` cropped straight through the subject.
+           */
+          aspect: STOCK_IMAGE_ASPECT[kind],
         };
       }
       if ("children" in node && Array.isArray(node.children)) {
@@ -824,6 +962,12 @@ export function applyDesignPass(
    * containing `inverted` hits it again every time the cycle comes round, so a
    * nine-band page gave the "one dark band carries the page" direction two of
    * them. The first one keeps its weight; later hits fall back to the wash.
+   *
+   * No recipe in `ART_DIRECTIONS` carries `inverted` any more, so this is dead
+   * for the template and AI paths. It is kept deliberately: a stored tree
+   * built before that change still reaches this function through
+   * `scripts/backfill-design-pass.ts`, and the rule applies again the moment
+   * anyone puts `inverted` back in a rotation.
    */
   let invertedUsed = false;
   const restyled = new Map<number, BlockNode>();
@@ -836,8 +980,9 @@ export function applyDesignPass(
       else invertedUsed = true;
     }
 
-    // Never two identical backgrounds back to back — the whole point.
-    if (background === previousBackground) {
+    // Never two identical backgrounds back to back — unless the direction's
+    // whole identity is a flat page and it opted out. See `allowRepeatBands`.
+    if (!recipe.allowRepeatBands && background === previousBackground) {
       background = background === "transparent" ? "surface" : "transparent";
     }
     previousBackground = background;

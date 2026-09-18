@@ -30,6 +30,8 @@ import {
   FormActions,
 } from "@/components/onboarding/form-primitives";
 import { BrandPreview } from "@/components/onboarding/brand-preview";
+import { useToast } from "@/components/ui/toast";
+import { NO_TEMPLATE_MESSAGE, resolveDesignExit } from "@/lib/onboarding/design-exit";
 
 async function uploadImage(siteId: string, type: "LOGO" | "FAVICON", file: File) {
   const formData = new FormData();
@@ -103,6 +105,9 @@ function ColorField({
   );
 }
 
+/** The scroll target the "no template picked" toast sends the church back to. */
+export const TEMPLATE_PICKER_ANCHOR = "brand-template-picker";
+
 export function BrandForm({
   siteId,
   defaultValues,
@@ -111,6 +116,7 @@ export function BrandForm({
   nextHref,
   onSaved,
   submitLabel = "Continue",
+  designFork,
 }: {
   siteId: string;
   defaultValues: BrandConfigInput;
@@ -119,8 +125,29 @@ export function BrandForm({
   nextHref?: string;
   onSaved?: () => void;
   submitLabel?: string;
+  /**
+   * Wizard-only: the design picker, plus the two exits it forks into.
+   *
+   * The picker renders INSIDE this form, immediately above the actions, and
+   * both exits are form submits. That is the whole point — the picker used to
+   * sit outside the form with its own "Generate with AI" link, so choosing AI
+   * navigated away without ever submitting, and the crew designed against
+   * whatever brand had last been persisted rather than the colours the church
+   * had just picked.
+   *
+   * Absent on the dashboard's brand screen, which has no design step to fork
+   * into and keeps the single `submitLabel` button.
+   */
+  designFork?: {
+    picker: React.ReactNode;
+    /** Whether a pre-built template has been applied. Gates the template exit. */
+    hasTemplate: boolean;
+    templateHref: string;
+    aiHref: string;
+  };
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const updateBrand = trpc.site.updateBrand.useMutation();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
@@ -147,11 +174,16 @@ export function BrandForm({
   const activeCombinationId = useMemo(() => {
     const primary = values?.colors?.primary?.toUpperCase();
     const secondary = values?.colors?.secondary?.toUpperCase();
+    const accent = values?.colors?.accent?.toUpperCase();
     return (
       brandCombinations.find(
         (combo) =>
           combo.colors.primary.toUpperCase() === primary &&
           combo.colors.secondary.toUpperCase() === secondary &&
+          // Accent is part of what a preset applies, so it is part of what
+          // makes one "in use" — otherwise a site carrying a stale accent
+          // would show the card as applied while its buttons disagreed.
+          combo.colors.secondary.toUpperCase() === accent &&
           combo.typography.primaryFont === values?.typography?.primaryFont &&
           combo.typography.secondaryFont === values?.typography?.secondaryFont
       )?.id ?? null
@@ -161,6 +193,17 @@ export function BrandForm({
   function applyCombination(combo: BrandCombination) {
     setValue("colors.primary", combo.colors.primary, { shouldDirty: true, shouldValidate: true });
     setValue("colors.secondary", combo.colors.secondary, { shouldDirty: true, shouldValidate: true });
+    /**
+     * Accent follows secondary, exactly as `defaultBrandConfig` pairs them.
+     * `--color-secondary` only ever paints a 10%-opacity placeholder, while
+     * `--color-accent` is what buttons, links and focus rings actually use —
+     * so a preset that set only the first two left every CTA on the previous
+     * accent, and the applied site did not match the two swatches on the card.
+     */
+    setValue("colors.accent", combo.colors.secondary, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
     setValue("typography.primaryFont", combo.typography.primaryFont, {
       shouldDirty: true,
       shouldValidate: true,
@@ -196,8 +239,46 @@ export function BrandForm({
     }
   }
 
-  const onSubmit = handleSubmit(async (data) => {
+  const onSubmit = handleSubmit(async (data, event) => {
+    /**
+     * Which exit was clicked, taken from the submit event's own `submitter`.
+     *
+     * Not a ref and not state. State would be a frame late — the click handler
+     * and the submit fire in the same event, so the handler would read the
+     * previous value — and a ref read inside a callback created during render
+     * is what it is: the browser already tracks which button submitted a form,
+     * and that is exactly the question being asked.
+     */
+    const submitter = (event?.nativeEvent as SubmitEvent | undefined)?.submitter;
+    const intent =
+      submitter instanceof HTMLButtonElement && submitter.value === "ai" ? "ai" : "template";
+
+    if (designFork) {
+      const exit = resolveDesignExit({ intent, ...designFork });
+
+      /**
+       * Refused BEFORE the save, so a church that has not picked a template
+       * loses nothing — the form keeps its values, the page does not navigate,
+       * and the toast sends them back to the picker rather than leaving them
+       * to work out what "Continue" meant.
+       */
+      if (!exit.ok) {
+        toast({ title: NO_TEMPLATE_MESSAGE, variant: "error" });
+        document
+          .getElementById(TEMPLATE_PICKER_ANCHOR)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
+      // Both exits save FIRST. The AI one is the reason this is a submit at
+      // all: the crew reads the stored brand, so it has to be stored by now.
+      await updateBrand.mutateAsync({ siteId, data });
+      router.push(exit.href);
+      return;
+    }
+
     await updateBrand.mutateAsync({ siteId, data });
+
     if (nextHref) router.push(nextHref);
     else {
       onSaved?.();
@@ -213,12 +294,6 @@ export function BrandForm({
         preview collapses under the form and is never seen while the colours
         are actually being chosen.
       */}
-      <BrandPreview
-        colors={values?.colors ?? {}}
-        primaryFont={values?.typography?.primaryFont}
-        secondaryFont={values?.typography?.secondaryFont}
-        churchName={churchName}
-      />
 
       <FieldGroup
         index={1}
@@ -386,6 +461,24 @@ export function BrandForm({
         </div>
       </FieldGroup>
 
+      {/*
+        Last thing before the actions, so the design is chosen with the brand
+        in view and the two Continue buttons sit directly under what they act
+        on. `scroll-mt` keeps the heading clear of the sticky step bar when the
+        toast scrolls back here.
+      */}
+      {designFork ? (
+        <FieldGroup
+          index={5}
+          title="Choose a design"
+          description="Pick one and every page fills in from your church details instantly, with no AI — or continue with AI and the crew will invent one."
+        >
+          <div id={TEMPLATE_PICKER_ANCHOR} className="scroll-mt-28">
+            {designFork.picker}
+          </div>
+        </FieldGroup>
+      ) : null}
+
       <FormActions>
         {backHref ? (
           <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
@@ -394,12 +487,28 @@ export function BrandForm({
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-3">
-          {saved ? <span className="text-sm text-success">Saved</span> : null}
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : submitLabel}
-          </Button>
-        </div>
+        {designFork ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            {/*
+              `name`/`value` rather than click handlers: the submit handler
+              reads `event.submitter`, so which exit was taken is carried by
+              the event itself instead of by state that would be a frame late.
+            */}
+            <Button type="submit" name="intent" value="ai" variant="outline" disabled={isSubmitting}>
+              Continue with AI Gen
+            </Button>
+            <Button type="submit" name="intent" value="template" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Continue with template"}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            {saved ? <span className="text-sm text-success">Saved</span> : null}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : submitLabel}
+            </Button>
+          </div>
+        )}
       </FormActions>
     </form>
   );

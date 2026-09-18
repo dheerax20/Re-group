@@ -1,3 +1,4 @@
+import { Music, Ticket, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,22 +12,65 @@ import { cn } from "@/lib/utils";
  * accent treatments, and a stat chip.
  */
 
-/** Placeholder for a data-bound block whose collection is empty. */
-export function EmptyState({ message }: { message: string }) {
+/**
+ * What a collection shows before the church has added anything to it.
+ *
+ * The line and the glyph, one entry per collection, rather than a `message`
+ * prop. Three call sites passing three ad-hoc strings is how "No upcoming
+ * events." and "Ministries are being added soon." ended up in two different
+ * voices on the same page.
+ *
+ * None of these invents a fact about a church — each is true of any
+ * congregation on day one or day one thousand, which is the same rule
+ * `lib/site/templates/copy.ts` documents for its fallbacks.
+ */
+const EMPTY_KIND = {
+  sermon: { Icon: Music, line: "Your next sermon will land here soon." },
+  event: { Icon: Ticket, line: "Check back soon — the next gathering is being planned." },
+  ministry: { Icon: Users, line: "Groups and teams are being added soon." },
+} as const;
+
+export type EmptyStateKind = keyof typeof EMPTY_KIND;
+
+/**
+ * A data-bound block whose collection is empty.
+ *
+ * Every site is generated BEFORE it has a single sermon or event, so this is
+ * the first thing a church sees on their own homepage. It has to read as a
+ * finished page waiting for content rather than as a failed load — the version
+ * this replaced put a 112px brand gradient slab where a card's photograph would
+ * go, which read as a broken image, with a dashed border under it, which read
+ * as unfinished.
+ *
+ * Deliberately NOT layout-aware: `grid`, `list`, `featured` and `calendar` all
+ * early-return this. An empty collection has no layout to vary.
+ *
+ * No `tone` prop either. No band rhythm emits `inverted` any more
+ * (`tests/design-pass.test.ts` asserts it), so a collection can only land on a
+ * 5-10% wash over the page background, all of which take ordinary dark text.
+ * A church that asks the editor for a dark band explicitly is the one case left
+ * — see WS-B.3.
+ */
+export function EmptyState({ kind }: { kind: EmptyStateKind }) {
+  const { Icon, line } = EMPTY_KIND[kind];
+
   return (
     /* `w-full` for the same reason `row` and `stack` carry it: the collection
        views early-return this, bypassing their own `grid w-full` wrapper, so
-       without it a church with no sermons yet gets a dashed card only as wide
-       as the sentence inside it. */
-    <div className="w-full overflow-hidden rounded-2xl border border-dashed border-site-muted/25">
-      <div
-        className="h-28"
-        style={{
-          background:
-            "linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 18%, white), color-mix(in oklab, var(--color-accent) 25%, white))",
-        }}
-      />
-      <div className="p-8 text-center text-base text-site-muted sm:text-lg">{message}</div>
+       without it a church with no sermons yet gets a card only as wide as the
+       sentence inside it.
+
+       The `ring` is not in the reference comps, which only show this on a white
+       page. It is imperceptible there, and it is what keeps the card reading as
+       a card on a band whose own background is a wash of the same accent —
+       which Community Forward's events band is. */
+    <div className="flex w-full items-center gap-6 rounded-3xl bg-site-accent/10 p-8 ring-1 ring-site-accent/20 sm:p-10">
+      <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-site-accent/10 sm:size-20">
+        <span className="flex size-12 items-center justify-center rounded-full bg-site-accent/20 sm:size-14">
+          <Icon className="size-6 text-site-accent" strokeWidth={1.75} aria-hidden />
+        </span>
+      </span>
+      <p className="text-base text-site-muted sm:text-lg">{line}</p>
     </div>
   );
 }

@@ -30,6 +30,10 @@ import {
   pinnedBandClass,
   imageTreatmentClass,
   imageAspectClass,
+  imageMaxHeightClass,
+  insetClass,
+  radiusClass,
+  verticalAlignClass,
   buttonEmphasisVariant,
   blockButtonSizeClass,
   focusRingClass,
@@ -216,15 +220,22 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
             node.style,
             cn(
               minHeightClass[minHeight],
-              // A ceiling on every content band: taller content scrolls
-              // within the section instead of pushing the page past one
-              // screen. `svh`, not `screen`, for the same mobile-Safari
-              // reason `minHeightClass` avoids `100vh`.
-              "max-h-svh overflow-y-auto",
-              // A band with a floor centres its copy on the optical centre
-              // line; without this the text pins to the top of a 78vh box.
-              minHeight === "none" ? "" : "flex flex-col justify-center",
-              photo ? "relative isolate overflow-hidden" : ""
+              /**
+               * A band with a floor centres its copy on the optical centre line
+               * by DEFAULT — without it the text pins to the top of a 78vh box,
+               * and `center` is what every tree stored before `verticalAlign`
+               * existed expects. A template may now say otherwise: the `card`
+               * hero sits its copy on the frame's bottom edge.
+               */
+              minHeight === "none"
+                ? ""
+                : cn("flex flex-col", verticalAlignClass[node.style?.verticalAlign ?? "center"]),
+              node.style?.inset ? insetClass[node.style.inset] : "",
+              node.style?.radius ? radiusClass[node.style.radius] : "",
+              // A radius needs a clip, or a background photograph squares the
+              // corners straight back off. Already required when there is a
+              // photo; now also for a rounded band without one.
+              photo || node.style?.radius ? "relative isolate overflow-hidden" : ""
             )
           )}
         >
@@ -287,6 +298,13 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
             node.style?.padding ? paddingClass[node.style.padding] : "",
             node.style?.width ? widthClass[node.style.width] : "",
             node.style?.gap ? stackGapClass[node.style.gap] : "gap-4",
+            /**
+             * A stack is already `flex flex-col`, so this needs no floor the
+             * way a section does — and a stack stretched by a taller sibling in
+             * a grid row is exactly what the token is for. The gallery hero's
+             * copy column centres against the grid beside it this way.
+             */
+            node.style?.verticalAlign ? verticalAlignClass[node.style.verticalAlign] : "",
             alignItemsClass[node.style?.align ?? "left"]
           )}
         >
@@ -390,10 +408,17 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
        * this that measure was silently dropped and the photo ran corner to
        * corner.
        */
+      /**
+       * The ratio box is capped in height as well as shaped — and by how much
+       * depends on whose photograph it is. `imageMaxHeightClass` carries the
+       * reasoning and the two ceilings; `maxHeight` is template-only, so an
+       * image that says nothing takes the content one.
+       */
       return (
         <div
           className={cn(
             "relative overflow-hidden",
+            imageMaxHeightClass[node.maxHeight ?? "content"],
             treatment,
             aspect,
             node.style?.width ? widthClass[node.style.width] : "w-full"
@@ -457,6 +482,11 @@ function RenderBlock({ node, site, content, annotate }: { node: BlockNode } & Ct
             // After `buttonVariants`, so the block scale wins over the shared
             // app-chrome one.
             blockButtonSizeClass,
+            // Same ordering, same reason: `buttonVariants` carries its own
+            // `rounded-*`, and two radius utilities have equal specificity, so
+            // only tailwind-merge's last-wins resolves this. Without it the
+            // `card` hero's pill is unreachable.
+            node.style?.radius ? radiusClass[node.style.radius] : "",
             node.font ? fontFamilyClass[node.font] : "",
             focusRingClass
           )}
@@ -525,7 +555,7 @@ function SermonCollectionView({
   limit?: number;
   sermons: SermonSummary[];
 }) {
-  if (sermons.length === 0) return <EmptyState message="No sermons have been added yet." />;
+  if (sermons.length === 0) return <EmptyState kind="sermon" />;
 
   if (layout === "list") {
     return (
@@ -550,7 +580,7 @@ function SermonCollectionView({
 
   if (layout === "featured") {
     const [featured, ...rest] = sermons;
-    if (!featured) return <EmptyState message="No sermons have been added yet." />;
+    if (!featured) return <EmptyState kind="sermon" />;
     return (
       <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-2">
         <Link
@@ -633,7 +663,7 @@ function EventCollectionView({
   limit?: number;
   events: EventSummary[];
 }) {
-  if (events.length === 0) return <EmptyState message="No upcoming events." />;
+  if (events.length === 0) return <EmptyState kind="event" />;
 
   if (layout === "list") {
     return (
@@ -734,7 +764,7 @@ function EventCollectionView({
  */
 function MinistryCollectionView({ items }: { items: Array<{ name: string; description: string }> }) {
   if (items.length === 0) {
-    return <EmptyState message="Ministries are being added soon." />;
+    return <EmptyState kind="ministry" />;
   }
 
   return (

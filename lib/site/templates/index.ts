@@ -1,4 +1,7 @@
+import { brightWelcomingTemplate } from "./bright-welcoming";
 import { cinematicTemplate } from "./cinematic";
+import { communityForwardTemplate } from "./community-forward";
+import { modernMinimalTemplate } from "./modern-minimal";
 import { traditionalTemplate } from "./traditional";
 import { warmEditorialTemplate } from "./warm-editorial";
 import { pickHeroImage } from "@/lib/site/blocks/hero";
@@ -20,6 +23,9 @@ export const SITE_TEMPLATES: SiteTemplate[] = [
   cinematicTemplate,
   traditionalTemplate,
   warmEditorialTemplate,
+  modernMinimalTemplate,
+  brightWelcomingTemplate,
+  communityForwardTemplate,
 ];
 
 export const SITE_TEMPLATE_IDS = SITE_TEMPLATES.map((t) => t.id) as [

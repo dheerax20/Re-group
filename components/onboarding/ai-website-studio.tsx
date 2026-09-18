@@ -12,15 +12,6 @@ import { cn } from "@/lib/utils";
 import { AuroraField, CrewCircuit, ProgressRing } from "./wizard-art";
 
 /**
- * Sites this page session has already auto-started a build for.
- *
- * Module scope on purpose — see the effect that reads it. Cleared on a real
- * page load, which is the correct lifetime: a fresh load re-reads the job from
- * the server and re-attaches rather than starting anything new.
- */
-const autoStartedSites = new Set<string>();
-
-/**
  * Watches a real build, live.
  *
  * Three versions of this have existed. The first advanced the step list on a
@@ -64,25 +55,22 @@ export function AiWebsiteStudio({
   });
 
   /**
-   * Start one automatically only when there is nothing to attach to.
+   * Whether there is a build to show at all.
    *
-   * The guard is module-scoped (`autoStartedSites`), NOT a ref, and that
-   * distinction is load-bearing. React StrictMode mounts this component twice
-   * in development, which creates two component instances — each with its own
-   * ref, each seeing an empty guard, each firing a mutation. tRPC's batch link
-   * then packs both into a single `ai.startBuild,ai.startBuild` request. The
-   * database rejects the second (one active job per site), so no church was
-   * ever double-charged, but a guard that reliably fires twice is not a guard.
+   * This component used to START one from a mount effect, so simply arriving on
+   * the step — or reloading it, or deep-linking `?mode=ai` — spent one of the
+   * church's monthly builds and ninety seconds before they had clicked anything
+   * that said "start". Worse, it fired before the Brand step's form had been
+   * submitted, so the crew designed against whatever brand was last persisted
+   * rather than the colours the church had just chosen.
    *
-   * Keyed by siteId so a genuine remount for a different site still starts.
+   * Now nothing starts without a click. A run already in flight still
+   * re-attaches on load, which is the behaviour that made the auto-start look
+   * reasonable in the first place.
    */
-  useEffect(() => {
-    if (runId || autoStartedSites.has(siteId)) return;
-    const settled = job && job.status !== "QUEUED" && job.status !== "RUNNING";
-    if (job && !settled) return;
-    autoStartedSites.add(siteId);
-    startBuild.mutate({ siteId });
-  }, [runId, job, siteId, startBuild]);
+  const settled = job !== null && job.status !== "QUEUED" && job.status !== "RUNNING";
+  const attached = Boolean(runId) || (job !== null && !settled);
+  const notStarted = !attached && !startBuild.isPending && !error;
 
   const { run } = useRealtimeRun(runId ?? "", {
     accessToken: token ?? undefined,
@@ -147,6 +135,26 @@ export function AiWebsiteStudio({
               Six specialists invent layout and copy. Photos stay empty on purpose —
               you&apos;ll add your own church images next.
             </p>
+
+            {/*
+              The gate. Nothing below this point costs anything until it is
+              clicked — the step used to start a build on arrival.
+            */}
+            {notStarted ? (
+              <div className="mt-5">
+                <Button
+                  type="button"
+                  onClick={() => startBuild.mutate({ siteId })}
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  <Sparkles className="size-4" />
+                  Start generating
+                </Button>
+                <p className="mt-2 text-xs text-editor-muted">
+                  Uses one of your monthly builds. Takes about a minute.
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -212,9 +220,6 @@ export function AiWebsiteStudio({
               setError(null);
               setJob(null);
               setRunId(null);
-              // An explicit retry is a deliberate act, so it clears the
-              // auto-start guard rather than being suppressed by it.
-              autoStartedSites.delete(siteId);
               startBuild.mutate({ siteId });
             }}
             disabled={startBuild.isPending}
@@ -228,7 +233,9 @@ export function AiWebsiteStudio({
             ? "This takes about a minute. You can safely close this tab and come back — the build keeps going."
             : succeeded
               ? "Done. Loading your homepage…"
-              : "Starting the crew…"}
+              : notStarted
+                ? "Nothing has been generated yet."
+                : "Starting the crew…"}
         </p>
       )}
     </div>

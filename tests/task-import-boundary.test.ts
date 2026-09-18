@@ -64,5 +64,10 @@ describe("task import boundary", () => {
     // An unknown key must still produce a defined variable rather than
     // `var(undefined)` on a church's public page.
     expect(registry.fontKeyToCssVar("nope")).toBe("var(--font-inter)");
+    // Georgia/Helvetica have no next/font entry — a literal stack, not a
+    // reference to an undefined CSS variable.
+    expect(registry.fontKeyToCssVar("georgia")).toBe("Georgia, 'Times New Roman', serif");
+    expect(registry.isStaticFontKey("georgia")).toBe(true);
+    expect(registry.isStaticFontKey("montserrat")).toBe(false);
   });
 });

@@ -51,7 +51,10 @@ const FIXTURE_FEATURES = {
   sermons: true,
   sermonSearch: false,
   events: true,
-  ministries: false,
+  // On, so the ministries band the newer templates carry is actually visible
+  // here — this page is the only place the six designs get compared, and a
+  // band that never renders cannot be assessed.
+  ministries: true,
   giving: true,
   contact: true,
   youtube: false,

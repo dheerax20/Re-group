@@ -1,6 +1,13 @@
-import type { BlockNode, SpacingToken, WidthToken } from "./types";
+import type {
+  BlockNode,
+  FontFamilyToken,
+  ImageAspectToken,
+  SpacingToken,
+  TextToneToken,
+  WidthToken,
+} from "./types";
 import { HERO_BLOCK_ID } from "./types";
-import type { HeroRecipe } from "./design-pass";
+import type { GalleryLayout, HeroRecipe } from "./design-pass";
 
 /**
  * The hero band, built by the design template rather than composed by the model.
@@ -48,9 +55,62 @@ export const STOCK_HERO_IMAGES = {
     "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdWEdyJ7w0e0LsFJ3Gpkji8ug41NmqTfY65MPC",
     "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdG56WJzpOiRa1UqfewFj4zK0JYX7IcDNVkAno",
   ],
+  /**
+   * Archetype D. High-key frames shot up into the sky, for DARK copy under a
+   * white veil — the exact inverse of `overlay`, which is graded dark so white
+   * type can sit on it. These are near-white across the top with the subject
+   * low in the frame, so a headline lands on empty sky and the architecture
+   * reads underneath it rather than behind it.
+   *
+   * Never pair this set with a `scrim` or `dark` overlay: black over a
+   * near-white photograph is a grey rectangle, and the frame's whole value is
+   * the empty space at the top.
+   */
+  light: [
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdRpvTt0cVFbga0pQmlCjsM7y4LdYexT5ENDqG",
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdGURcWFpOiRa1UqfewFj4zK0JYX7IcDNVkAno",
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdMGfKvGUTcexSsyb52UHIzW7AtofPhQVkFRiu",
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdRghoB5cVFbga0pQmlCjsM7y4LdYexT5ENDqG",
+  ],
+  /**
+   * Square-ish frames, for grid cells.
+   *
+   * The other four sets each answer "what does this church's ONE photograph
+   * look like". This one exists because a gallery needs several frames that
+   * tile — a set shot for a 21:9 hero crops to nothing in a 1:1 cell. It is
+   * also the only set a band can reach for more than one picture at a time.
+   */
+  square: [
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdVfrJvI1tjQqHoDnOp0aREegTBz758klciu3b",
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdx8q3XD7apT681RqmCDjkGsMrozVf9Lw20d3x",
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDd1JQw5mKiZer0AXnsPLYt96UGygTDmvh58dfu",
+    "https://8qsia8g9sr.ufs.sh/f/d84d87qBVFDdMhnQ83UTcexSsyb52UHIzW7AtofPhQVkFRiu",
+  ],
 } as const;
 
 export type StockImageKind = keyof typeof STOCK_HERO_IMAGES;
+
+/**
+ * The aspect box each stock set was actually shot for.
+ *
+ * A widescreen frame in a 4/5 portrait box is not a crop decision, it is a
+ * mistake: `object-cover` takes both edges off the room, and the box is 1.25×
+ * its own width tall where the photograph is 0.75×. Declared beside the sets
+ * rather than in each recipe, so a direction cannot pair a set with a box it
+ * was never shot for — four of the six used to.
+ *
+ * `overlay` never reaches a content band (it is the hero's own background
+ * image, painted by archetype A) but it is listed so the record is total, and
+ * so `Record<StockImageKind, …>` keeps demanding an entry for every new set.
+ */
+export const STOCK_IMAGE_ASPECT: Record<StockImageKind, ImageAspectToken> = {
+  overlay: "cinema",
+  vertical: "portrait",
+  widescreen: "wide",
+  /** Like `overlay`, only ever a band's `backgroundImage` — listed for the record. */
+  light: "cinema",
+  square: "square",
+};
 
 export function isStockImage(src: string | undefined): boolean {
   if (!src) return false;
@@ -72,6 +132,33 @@ export function pickHeroImage(
   siteId: string,
   avoid?: string
 ): string {
+  return pickStockImages(kind, siteId, 1, avoid)[0];
+}
+
+/**
+ * `count` distinct frames from one set, deterministic per site.
+ *
+ * Walks the set from the site's own hash rather than picking each frame
+ * independently, so a gallery never repeats a photograph inside itself and the
+ * same church keeps the same arrangement across rebuilds — the guarantee
+ * `pickHeroImage` gives for one picture, extended to a group. Three copies of
+ * the same steeple is worse than one photograph.
+ *
+ * A `count` larger than the pool cycles rather than throwing. Three of the five
+ * sets hold three frames, so a four-cell grid drawn from one of them WILL
+ * repeat; prefer `square` (four) for grids of four, or mix sets per cell.
+ *
+ * `pickHeroImage` is `pickStockImages(kind, siteId, 1, avoid)[0]`, which is the
+ * identical value it returned before this existed — `options[hash % len]` and
+ * `options[(hash + 0) % len]` are the same index, so no church's photograph
+ * moved when the hash was factored out.
+ */
+export function pickStockImages(
+  kind: StockImageKind,
+  siteId: string,
+  count: number,
+  avoid?: string
+): string[] {
   const set = STOCK_HERO_IMAGES[kind] as readonly string[];
   const pool = set.filter((url) => url !== avoid);
   const options = pool.length > 0 ? pool : set;
@@ -79,7 +166,7 @@ export function pickHeroImage(
   for (let i = 0; i < siteId.length; i += 1) {
     hash = (hash * 31 + siteId.charCodeAt(i)) >>> 0;
   }
-  return options[hash % options.length];
+  return Array.from({ length: count }, (_, i) => options[(hash + i) % options.length]);
 }
 
 /** The three strings the composer writes for the hero, and where its button goes. */
@@ -142,7 +229,136 @@ export function resolveHeroCopy(
 }
 
 /**
- * The copy stack, shared by all three archetypes.
+ * One gallery cell.
+ *
+ * Square corners and no radius — the grid's gutters do the separating, and a
+ * radius on every cell turns a set of glimpses into a row of stickers.
+ *
+ * No `maxHeight`, so every cell takes the `content` ceiling. This is the case
+ * that settled why that ceiling is its own token rather than keyed off
+ * `priority`: cell zero is both the page's largest contentful paint AND wants
+ * the shorter ceiling, because four cells at the hero's 70svh is a contact
+ * sheet rather than a hero.
+ */
+function cell(id: string, src: string, aspect: ImageAspectToken, priority = false): BlockNode {
+  return { id, type: "image", src, alt: "", aspect, treatment: "square", priority } as BlockNode;
+}
+
+/**
+ * The grid, as blocks.
+ *
+ * Every arrangement is a `stack` of full-width rows, so the gutters come from
+ * one `gap` token rather than per-cell margins — and so a narrow viewport
+ * collapses each `row` to a single column on its own (`rowColumnsClass` always
+ * has a `grid-cols-1` base). A gallery on a phone is a vertical run of
+ * photographs, which is the right answer and needs no separate mobile case.
+ *
+ * `priority` on the first cell only: it is the one frame inside the first
+ * viewport, and a block tree cannot tell the renderer which band it is in.
+ */
+function galleryBlock(layout: GalleryLayout, siteId: string, avoid?: string): BlockNode {
+  const row = (id: string, columns: 2 | 3, children: BlockNode[]): BlockNode =>
+    ({ id, type: "row", columns, style: { gap: "sm" }, children }) as BlockNode;
+
+  const children: BlockNode[] = (() => {
+    switch (layout) {
+      case "pair-feature": {
+        const pair = pickStockImages("vertical", siteId, 2);
+        const [feature] = pickStockImages("widescreen", siteId, 1, avoid);
+        return [
+          row("gallery-pair", 2, [
+            cell("gallery-a", pair[0], "portrait", true),
+            cell("gallery-b", pair[1], "portrait"),
+          ]),
+          cell("gallery-c", feature, "video"),
+        ];
+      }
+      case "triptych": {
+        const three = pickStockImages("square", siteId, 3);
+        return [
+          row(
+            "gallery-row",
+            3,
+            three.map((src, i) => cell(`gallery-${i}`, src, "square", i === 0))
+          ),
+        ];
+      }
+      case "duo": {
+        const two = pickStockImages("widescreen", siteId, 2, avoid);
+        return two.map((src, i) => cell(`gallery-${i}`, src, "video", i === 0));
+      }
+      case "quad": {
+        const four = pickStockImages("square", siteId, 4);
+        return [
+          row("gallery-top", 2, [
+            cell("gallery-a", four[0], "square", true),
+            cell("gallery-b", four[1], "square"),
+          ]),
+          row("gallery-bottom", 2, [
+            cell("gallery-c", four[2], "square"),
+            cell("gallery-d", four[3], "square"),
+          ]),
+        ];
+      }
+      case "feature-pair":
+      default: {
+        const [feature] = pickStockImages("widescreen", siteId, 1, avoid);
+        const pair = pickStockImages("vertical", siteId, 2);
+        return [
+          cell("gallery-a", feature, "video", true),
+          row("gallery-pair", 2, [
+            cell("gallery-b", pair[0], "portrait"),
+            cell("gallery-c", pair[1], "portrait"),
+          ]),
+        ];
+      }
+    }
+  })();
+
+  return { id: "hero-gallery", type: "stack", style: { gap: "sm" }, children } as BlockNode;
+}
+
+/**
+ * The headline and, when there is one, the subhead.
+ *
+ * Factored out of `copyStack` because the `card` archetype needs these two on
+ * their own: its call to action sits on the opposite side of the frame, so a
+ * primitive that stacks the button under the subhead is the wrong shape. The
+ * subhead's `weight`, `font` and tone logic is the detail most likely to drift
+ * if it existed in two places, which is why this is an extraction rather than a
+ * second copy.
+ */
+function copyLines(
+  copy: HeroCopy,
+  opts: { inverted?: boolean; subheadTone?: TextToneToken }
+): BlockNode[] {
+  const lines: BlockNode[] = [
+    { id: "hero-headline", type: "heading", scale: "display", text: copy.headline },
+  ];
+
+  if (copy.subhead) {
+    lines.push({
+      id: "hero-subhead",
+      type: "heading",
+      scale: "h3",
+      weight: "regular",
+      font: "secondary",
+      text: copy.subhead,
+      /**
+       * Accent on a light ground, plain inverted over a photograph. The
+       * references show a terracotta subhead on cream but a WHITE one over the
+       * scrim — an accent colour that reads beautifully on paper can fall
+       * under the contrast floor once it is sitting on a photograph.
+       */
+      style: { textTone: opts.subheadTone ?? (opts.inverted ? "inverted" : "accent") },
+    } as BlockNode);
+  }
+
+  return lines;
+}
+
+/**
+ * The copy stack, shared by every archetype that keeps its button in the column.
  *
  * Every reference pairs a sans headline with a SERIF subhead, and that
  * pairing is the single detail that most separates them from a default stack
@@ -163,29 +379,23 @@ function copyStack(
     width?: WidthToken;
     inverted?: boolean;
     padding?: SpacingToken;
+    /**
+     * The subhead's colour. `accent` on a light ground and `inverted` over a
+     * dark photograph are what the first three archetypes use; `veil` takes
+     * `muted`, because an accent line over a pale photograph falls under the
+     * contrast floor.
+     */
+    subheadTone?: TextToneToken;
+    /**
+     * The CTA label's face. Defaults to the SECOND face, which is what stops
+     * the button reading as a form control dropped onto a designed page —
+     * except under `veil`, whose reference matches the button to its serif
+     * headline instead and lets the sans subhead be the only thing between them.
+     */
+    ctaFont?: FontFamilyToken;
   }
 ): BlockNode {
-  const children: BlockNode[] = [
-    { id: "hero-headline", type: "heading", scale: "display", text: copy.headline },
-  ];
-
-  if (copy.subhead) {
-    children.push({
-      id: "hero-subhead",
-      type: "heading",
-      scale: "h3",
-      weight: "regular",
-      font: "secondary",
-      text: copy.subhead,
-      /**
-       * Accent on a light ground, plain inverted over a photograph. The
-       * references show a terracotta subhead on cream but a WHITE one over the
-       * scrim — an accent colour that reads beautifully on paper can fall
-       * under the contrast floor once it is sitting on a photograph.
-       */
-      style: { textTone: opts.inverted ? "inverted" : "accent" },
-    } as BlockNode);
-  }
+  const children: BlockNode[] = copyLines(copy, opts);
 
   /**
    * The reference puts ~48px between the subhead and the button where the rest
@@ -201,7 +411,7 @@ function copyStack(
     label: copy.ctaLabel,
     href: copy.ctaHref,
     emphasis: "primary",
-    font: "secondary",
+    font: opts.ctaFont ?? "secondary",
   } as BlockNode);
 
   return {
@@ -258,6 +468,160 @@ export function buildHeroBand(
         // the axis the nav logo is on, and a second gutter would push the
         // headline off it. The measure comes from the display scale itself.
         copyStack(copy, { align: recipe.align, inverted: true }),
+      ],
+    } as BlockNode;
+  }
+
+  if (recipe.archetype === "gallery") {
+    /**
+     * Archetype F — copy on one side, a grid of photographs on the other.
+     *
+     * `rowLayoutClass["wide-left"]` carries no `items-*` (unlike `columns`),
+     * which is correct for the `split` archetype whose `fill` photograph must
+     * stretch to the row's height. Here it means the copy column is stretched
+     * by the taller gallery beside it and pins its content to the top of that
+     * cell. `verticalAlign` on the stack is what centres it against the grid.
+     */
+    const copyColumn = {
+      id: "hero-copy-column",
+      type: "stack",
+      style: { gap: "md", align: "left", verticalAlign: "center" },
+      children: [copyStack(copy, { align: "left" })],
+    } as BlockNode;
+
+    return {
+      id: HERO_BLOCK_ID,
+      type: "section",
+      style: {
+        background: "transparent",
+        minHeight: "hero",
+        padding: "xl",
+        width: "full",
+        align: "left",
+      },
+      children: [
+        {
+          id: "hero-row",
+          type: "row",
+          layout: recipe.split,
+          style: { gap: "xl" },
+          /**
+           * DOM order is always copy-then-gallery. `wide-right` mirrors with
+           * CSS `order` inside `rowLayoutClass`, so a phone visitor meets the
+           * words before three photographs either way — the same rule the
+           * `split` archetype already follows.
+           */
+          children: [copyColumn, galleryBlock(recipe.grid, siteId, previousImage)],
+        } as BlockNode,
+      ],
+    } as BlockNode;
+  }
+
+  if (recipe.archetype === "card") {
+    /**
+     * Archetype E — the photograph as an inset card.
+     *
+     * Shares archetype A's dark frames and white type, and differs in how the
+     * frame is held: inset from all four viewport edges with rounded corners,
+     * so the page shows around it and the navigation has somewhere to sit above
+     * it rather than over it.
+     *
+     * `width: "full"`, not `bleed`: the frame carries the page gutter so the
+     * copy sits in from its rounded corner rather than on the curve.
+     */
+    return {
+      id: HERO_BLOCK_ID,
+      type: "section",
+      style: {
+        backgroundImage: photo,
+        overlay: recipe.overlay,
+        background: "inverted",
+        minHeight: "hero",
+        padding: "2xl",
+        width: "full",
+        align: "left",
+        inset: recipe.inset,
+        radius: recipe.radius,
+        verticalAlign: recipe.verticalAlign,
+      },
+      children: [
+        {
+          id: "hero-bar",
+          type: "row",
+          // Aligned on a shared bottom edge, so the button sits level with the
+          // subhead rather than floating level with the headline.
+          layout: "bar-end",
+          style: { gap: "lg" },
+          children: [
+            {
+              id: "hero-copy",
+              type: "stack",
+              style: { gap: "sm", align: "left", textTone: "inverted" },
+              children: copyLines(copy, { inverted: true }),
+            } as BlockNode,
+            {
+              id: "hero-cta",
+              type: "button",
+              label: copy.ctaLabel,
+              href: copy.ctaHref,
+              emphasis: "primary",
+              font: "secondary",
+              // The pill — the one place the radius token is doing design work
+              // rather than plumbing.
+              style: { radius: "full" },
+            } as BlockNode,
+          ],
+        } as BlockNode,
+      ],
+    } as BlockNode;
+  }
+
+  if (recipe.archetype === "veil") {
+    /**
+     * Archetype D — dark copy over a high-key photograph.
+     *
+     * `background: "transparent"`, NOT `"inverted"`. `effectiveSurface()` reads
+     * a background image as a dark surface only under a `scrim` or `dark`
+     * overlay, so this band stays light for `enforceBlockLegibility` — which is
+     * exactly right, because the copy here is the page's ordinary dark
+     * foreground. Setting `inverted` would make the legibility pass strip every
+     * dark tone in the stack and render the headline white on white.
+     *
+     * `minHeight: "screen"`, not `"hero"`: this frame is the whole first screen
+     * in the reference.
+     */
+    return {
+      id: HERO_BLOCK_ID,
+      type: "section",
+      style: {
+        backgroundImage: photo,
+        overlay: "veil",
+        background: "transparent",
+        minHeight: "screen",
+        padding: "2xl",
+        width: "full",
+        align: recipe.align,
+      },
+      children: [
+        copyStack(copy, {
+          align: recipe.align,
+          width: recipe.copyWidth,
+          // Grey, not accent: an accent line over a pale photograph is the one
+          // place that colour falls under the contrast floor.
+          subheadTone: "muted",
+          // The button matches the HEADLINE's face here, not the subhead's.
+          ctaFont: "primary",
+        }),
+        /**
+         * The band centres its children vertically (`minHeight` !== "none"),
+         * and every frame in the `light` set puts its subject in the LOWER
+         * half. A spacer under the copy lifts the stack above the optical
+         * centre so the headline sits on empty sky instead of across a
+         * roofline. A spacer rather than a `justify` token because the renderer
+         * owns that decision for every band with a floor, and one band is not a
+         * reason to widen `BlockStyle`.
+         */
+        { id: "hero-floor", type: "spacer", size: "2xl" } as BlockNode,
       ],
     } as BlockNode;
   }
@@ -321,6 +685,13 @@ export function buildHeroBand(
         aspect: recipe.aspect,
         treatment: recipe.treatment,
         priority: true,
+        /**
+         * The only image on the page that gets the taller ceiling. This IS the
+         * first screen, so a crop to 52svh would take the top off the frame the
+         * whole archetype is built around. Set beside `priority` but meaning
+         * something different — see `MaxHeightToken`.
+         */
+        maxHeight: "hero",
         style: { width: recipe.photoWidth },
       } as BlockNode,
     ],

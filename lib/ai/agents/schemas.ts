@@ -5,7 +5,24 @@ import type { BlockNode } from "@/lib/site/blocks/types";
 import type { HeroCopy } from "@/lib/site/blocks/hero";
 
 export const AI_GENERATED_TEMPLATE_ID = "ai-generated";
-export const AI_GENERATED_TEMPLATE_VERSION = 1;
+/**
+ * Written to `Site.templateVersion` for a crew-built site — the same contract
+ * `SiteTemplate.version` carries (`lib/site/templates/types.ts`): bump it when
+ * the output changes, so two sites stamped with the same number are actually
+ * the same page.
+ *
+ * 2, for everything in this release that changes a generated tree:
+ *
+ * - `cinematic`'s rhythm dropped its `inverted` band for a `primary` wash.
+ * - The seeded welcome photograph now takes its stock set's own aspect box
+ *   rather than the band default, which moves four of the six directions.
+ * - `modern-minimal`, `bright-welcoming` and `community-forward` each got a new
+ *   hero archetype (`veil`, `card`, `gallery`), so all three compose a
+ *   materially different first screen.
+ *
+ * `pickArtDirection` chooses among all six, so any build can differ.
+ */
+export const AI_GENERATED_TEMPLATE_VERSION = 2;
 
 /**
  * No `styleName`/`heroTreatment`/`navbarTreatment` here — those are decided

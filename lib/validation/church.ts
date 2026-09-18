@@ -23,7 +23,16 @@ export const churchInfoSchema = z.object({
   worshipStyle: z.string().max(80).optional().or(z.literal("")),
   serviceTimes: z.string().max(160).optional().or(z.literal("")),
   pastorName: z.string().max(120).optional().or(z.literal("")),
-  mission: z.string().max(400).optional().or(z.literal("")),
+  /**
+   * Sized to the ask. The Brand step's own hint invites "about 100 words",
+   * which is ~600 characters — a 400 cap rejected the exact answer the form
+   * requests, and (the field having no error slot) rejected it silently.
+   */
+  mission: z
+    .string()
+    .max(800, "Please keep your mission under about 130 words")
+    .optional()
+    .or(z.literal("")),
   values: z.string().max(240).optional().or(z.literal("")),
 });
 
